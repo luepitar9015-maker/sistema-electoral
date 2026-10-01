@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Sistema Electoral</string>
+    <string name="title_activity_main">Sistema Electoral</string>
+    <string name="package_name">com.sistemaelectoral.app</string>
+    <string name="custom_url_scheme">com.sistemaelectoral.app</string>
+</resources>

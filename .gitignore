@@ -1,0 +1,31 @@
+# Dependencias
+**/node_modules/
+node_modules/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Temporales y editores
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+client_temp/
+
+# Android build outputs y gradle cache
+client2/android/.gradle/
+client2/android/app/build/
+client2/android/build/
+**/.gradle/
+**/build/
+
+# Variables de entorno
+.env
+.env.local
+.env.*.local
+
+# SQLite journal
+*.sqlite-journal

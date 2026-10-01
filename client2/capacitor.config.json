@@ -1,0 +1,9 @@
+{
+  "appId": "com.sistemaelectoral.app",
+  "appName": "Sistema Electoral",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "http",
+    "cleartext": true
+  }
+}
