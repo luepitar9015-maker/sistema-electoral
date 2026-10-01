@@ -8,8 +8,7 @@ import {
     XCircle, AlertCircle, FileSpreadsheet, X, Zap, ExternalLink, Copy, Check,
     Flag, Globe, Building2, MapPin, Handshake, Quote, Award, Sparkles
 } from 'lucide-react';
-
-const API = 'http://localhost:3000/api';
+import { API } from '../config/api';
 
 export default function RegisterVoter() {
     const { user } = useAuth();

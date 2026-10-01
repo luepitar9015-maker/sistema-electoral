@@ -3,8 +3,8 @@ import axios from 'axios';
 import { useCampaign } from '../context/CampaignContext';
 import { colombiaData } from '../data/colombiaData';
 import { Search, Save, CheckCircle, Loader, Zap, ExternalLink, RefreshCw, Flag } from 'lucide-react';
+import { API } from '../config/api';
 
-const API = 'http://localhost:3000/api';
 const PAGE_SIZE = 100;
 
 export default function VotersList() {

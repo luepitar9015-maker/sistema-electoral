@@ -6,8 +6,7 @@ import {
     MapPin, Award, Upload, Image, ChevronRight, AlertCircle,
     CheckCircle2, Target, BarChart2
 } from 'lucide-react';
-
-const API = 'http://localhost:3000/api';
+import { API } from '../config/api';
 
 const TIPOS_APOYO = [
     { id: 'candidato_concejo',  label: 'Candidato(a) al Concejo Municipal' },

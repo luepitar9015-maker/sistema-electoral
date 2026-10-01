@@ -3,14 +3,14 @@ import axios from 'axios';
 import { useCampaign } from '../context/CampaignContext';
 import { colombiaData } from '../data/colombiaData';
 import ApoyosManagerModal from '../components/ApoyosManagerModal';
+import CampaignClock from '../components/common/CampaignClock';
 import {
     Flag, Plus, Globe, Building2, MapPin, CheckCircle,
     Users, Target, Award, Calendar, Edit3, Trash2, X,
     ChevronRight, ArrowRight, Sparkles, Filter, Upload, Image,
-    Quote, Handshake, Check
+    Quote, Handshake, Check, Clock
 } from 'lucide-react';
-
-const API = 'http://localhost:3000/api';
+import { API } from '../config/api';
 
 const CARGOS = [
     { id: 'senado',      nombre: 'Senado de la República',       nivel: 'nacional',      desc: 'Circunscripción Nacional (Toda Colombia)', icon: Globe },
@@ -47,7 +47,9 @@ export default function CampaignsPage() {
         descripcion: '',
         eslogan: '',
         foto_candidato: '',
-        logo_campana: ''
+        logo_campana: '',
+        fecha_inicio: '',
+        fecha_elecciones: ''
     });
 
     const [municipios, setMunicipios] = useState([]);
@@ -69,7 +71,9 @@ export default function CampaignsPage() {
             descripcion: '',
             eslogan: '',
             foto_candidato: '',
-            logo_campana: ''
+            logo_campana: '',
+            fecha_inicio: new Date().toISOString().split('T')[0],
+            fecha_elecciones: '2026-10-25'
         });
         setMunicipios([]);
         setFormError('');
@@ -91,7 +95,9 @@ export default function CampaignsPage() {
             descripcion: camp.descripcion || '',
             eslogan: camp.eslogan || '',
             foto_candidato: camp.foto_candidato || '',
-            logo_campana: camp.logo_campana || ''
+            logo_campana: camp.logo_campana || '',
+            fecha_inicio: camp.fecha_inicio ? camp.fecha_inicio.split(' ')[0] : '',
+            fecha_elecciones: camp.fecha_elecciones ? camp.fecha_elecciones.split(' ')[0] : ''
         });
         if (camp.departamento && colombiaData[camp.departamento]) {
             setMunicipios(colombiaData[camp.departamento]?.sort() || []);
@@ -341,6 +347,9 @@ export default function CampaignsPage() {
                                         <span className="font-semibold text-gray-700 text-right">{camp.partido_politico || 'Independiente'}</span>
                                     </div>
                                 </div>
+
+                                {/* Reloj Oficial de la Campaña */}
+                                <CampaignClock campaign={camp} mode="card" />
 
                                 {/* Barra de Progreso hacia la Meta */}
                                 <div className="space-y-1.5 pt-1">
@@ -795,6 +804,75 @@ export default function CampaignsPage() {
                                         className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs font-bold text-gray-800 focus:outline-none focus:border-[#00B894]"
                                     />
                                 </div>
+                            </div>
+
+                            {/* 5. Cronograma y Reloj Oficial de la Campaña (Inicio y Elecciones) */}
+                            <div className="bg-gradient-to-br from-slate-900 to-gray-900 border border-gray-800 rounded-2xl p-4 text-white space-y-3 shadow-inner">
+                                <div className="flex items-center gap-2">
+                                    <div className="p-2 bg-[#00B894]/20 border border-[#00B894]/40 rounded-xl text-[#00B894]">
+                                        <Clock size={16} />
+                                    </div>
+                                    <div>
+                                        <h4 className="font-black text-xs uppercase tracking-wider text-emerald-300">
+                                            Cronograma y Reloj Oficial de la Campaña
+                                        </h4>
+                                        <p className="text-[10px] text-gray-400">
+                                            Configura las fechas para activar el conteo regresivo al Día D y el cálculo del ritmo diario de votos requerido.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                                    <div>
+                                        <label className="block text-gray-300 font-bold mb-1 text-[11px] uppercase tracking-wider flex items-center gap-1.5">
+                                            <Calendar size={13} className="text-gray-400" />
+                                            Fecha de Inicio de Campaña
+                                        </label>
+                                        <input
+                                            type="date"
+                                            value={formData.fecha_inicio}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, fecha_inicio: e.target.value }))}
+                                            className="w-full bg-gray-800 border border-gray-700 rounded-xl p-2.5 text-xs font-bold text-white focus:outline-none focus:border-[#00B894]"
+                                            required
+                                        />
+                                        <span className="text-[10px] text-gray-400 mt-1 block">
+                                            Arranque oficial de la campaña
+                                        </span>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-emerald-400 font-bold mb-1 text-[11px] uppercase tracking-wider flex items-center gap-1.5">
+                                            <Calendar size={13} className="text-emerald-400" />
+                                            Día de las Elecciones (Día D)
+                                        </label>
+                                        <input
+                                            type="date"
+                                            value={formData.fecha_elecciones}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, fecha_elecciones: e.target.value }))}
+                                            className="w-full bg-gray-800 border border-emerald-500/60 rounded-xl p-2.5 text-xs font-bold text-emerald-300 focus:outline-none focus:border-emerald-400"
+                                            required
+                                        />
+                                        <span className="text-[10px] text-gray-400 mt-1 block">
+                                            Fecha de comicios (Apertura de urnas 8:00 AM)
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* Vista previa instantánea del lapso */}
+                                {formData.fecha_inicio && formData.fecha_elecciones && (
+                                    <div className="mt-2 p-2.5 bg-gray-800/80 border border-gray-700/80 rounded-xl flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
+                                        <span className="text-gray-300">
+                                            ⏳ Duración total:{' '}
+                                            <strong className="text-white">
+                                                {Math.max(1, Math.round((new Date(formData.fecha_elecciones).getTime() - new Date(formData.fecha_inicio).getTime()) / (1000 * 60 * 60 * 24)))} días
+                                            </strong>
+                                        </span>
+                                        <span className="text-emerald-400 font-bold">
+                                            Faltan:{' '}
+                                            {Math.ceil((new Date(formData.fecha_elecciones).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} días al Día D
+                                        </span>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Botones de Acción */}

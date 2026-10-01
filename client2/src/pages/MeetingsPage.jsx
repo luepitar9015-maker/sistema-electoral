@@ -11,8 +11,7 @@ import {
     AlertCircle, X, Check, Layers, Image as ImageIcon,
     Building2, Flag, Phone, FileText, ArrowRight
 } from 'lucide-react';
-
-const API = 'http://localhost:3000/api';
+import { API } from '../config/api';
 
 const ESTADOS_INFO = {
     programada: { label: 'Programada', color: 'bg-blue-100 text-blue-800 border-blue-200', dot: 'bg-blue-500' },

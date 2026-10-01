@@ -2,7 +2,9 @@ import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     BarChart, Bar, LineChart, Line
 } from 'recharts';
-import { Cloud, Sun, CloudRain } from 'lucide-react';
+import { Cloud, Sun, CloudRain, Clock, Users, Target, Flag } from 'lucide-react';
+import { useCampaign } from '../context/CampaignContext';
+import CampaignClock from '../components/common/CampaignClock';
 
 const dataBar = [
     { name: '2015', uv: 30, pv: 40 },
@@ -12,31 +14,74 @@ const dataBar = [
 ];
 
 const Dashboard = () => {
+    const { activeCampaign, campaigns } = useCampaign();
+    const currentCampaign = activeCampaign || (campaigns.length > 0 ? campaigns[0] : null);
+
+    const totalVoters = currentCampaign ? (currentCampaign.totalVoters || 0) : 1245;
+    const metaVotos = currentCampaign ? (currentCampaign.meta_votos || 0) : 50000;
+    const progressPercent = currentCampaign ? (currentCampaign.progressPercent || 0) : 45;
+    const leadersCount = currentCampaign ? (currentCampaign.totalLeaders || 0) : 38;
+
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
 
+            {/* Reloj Oficial y Cuenta Regresiva de Campaña (Hero Banner) */}
+            {currentCampaign && (
+                <CampaignClock campaign={currentCampaign} mode="banner" />
+            )}
+
             {/* Top Row Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 {[
-                    { title: 'VOTANTES REGISTRADOS', val: '1,245', sub: 'Total general' },
-                    { title: 'AVANCE META', val: '45%', sub: 'Progreso mensual', chart: true },
-                    { title: 'MESAS HABILITADAS', val: '58', sub: 'En funcionamiento' }
-                ].map((stat, i) => (
-                    <div key={i} className="bg-white p-6 rounded shadow flex flex-col justify-between h-32 relative hover:shadow-lg transition-shadow border-l-4 border-[#00B894]">
-                        <div>
-                            <h3 className="text-[#00B894] font-bold uppercase text-sm mb-1">{stat.title}</h3>
-                            <p className="text-gray-400 text-xs mb-2">{stat.sub}</p>
-                        </div>
-                        <div className="flex items-end justify-between">
-                            <span className="text-4xl text-gray-800 font-light">{stat.val}</span>
-                            {stat.chart && (
-                                <div className="absolute right-4 top-4">
-                                    <div className="w-12 h-12 rounded-full border-[6px] border-[#00B894] border-t-transparent border-l-transparent rotate-45 opacity-80"></div>
+                    {
+                        title: 'VOTANTES REGISTRADOS',
+                        val: totalVoters.toLocaleString(),
+                        sub: currentCampaign ? `Campaña: ${currentCampaign.nombre}` : 'Total general',
+                        icon: Users
+                    },
+                    {
+                        title: 'AVANCE META',
+                        val: `${progressPercent}%`,
+                        sub: metaVotos > 0 ? `Meta: ${metaVotos.toLocaleString()} votos` : 'Meta sin definir',
+                        chart: true,
+                        icon: Target
+                    },
+                    {
+                        title: 'LÍDERES ACTIVOS',
+                        val: leadersCount.toString(),
+                        sub: 'Estructura en territorio',
+                        icon: Flag
+                    },
+                    {
+                        title: 'DÍAS RESTANTES (DÍA D)',
+                        val: currentCampaign?.reloj?.dias_restantes !== undefined
+                            ? (currentCampaign.reloj.dias_restantes > 0 ? `${currentCampaign.reloj.dias_restantes} d` : '¡Hoy!')
+                            : '24 d',
+                        sub: currentCampaign?.fecha_elecciones ? `Elección: ${currentCampaign.fecha_elecciones.split(' ')[0]}` : 'Elección 25 oct 2026',
+                        icon: Clock
+                    }
+                ].map((stat, i) => {
+                    const StatIcon = stat.icon;
+                    return (
+                        <div key={i} className="bg-white p-5 rounded-2xl shadow flex flex-col justify-between h-32 relative hover:shadow-lg transition-shadow border-l-4 border-[#00B894]">
+                            <div>
+                                <div className="flex items-center justify-between mb-1">
+                                    <h3 className="text-[#00B894] font-bold uppercase text-[11px] tracking-wider">{stat.title}</h3>
+                                    {StatIcon && <StatIcon size={14} className="text-gray-400" />}
                                 </div>
-                            )}
+                                <p className="text-gray-400 text-[11px] truncate">{stat.sub}</p>
+                            </div>
+                            <div className="flex items-end justify-between">
+                                <span className="text-3xl text-gray-800 font-black">{stat.val}</span>
+                                {stat.chart && (
+                                    <div className="absolute right-4 top-4">
+                                        <div className="w-10 h-10 rounded-full border-[5px] border-[#00B894] border-t-transparent border-l-transparent rotate-45 opacity-80"></div>
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                    </div>
-                ))}
+                    );
+                })}
             </div>
 
             {/* Main Content Grid */}

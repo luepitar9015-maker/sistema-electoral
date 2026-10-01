@@ -10,8 +10,7 @@ import {
     Check, AlertCircle, ArrowUpRight, ShieldCheck, Video, HelpCircle,
     Copy, Link, Bot, Zap, Lightbulb, Rocket, Clock, Send
 } from 'lucide-react';
-
-const API = 'http://localhost:3000/api';
+import { API } from '../config/api';
 
 const PLATAFORMAS_INFO = {
     facebook:  { label: 'Facebook',  color: 'bg-blue-600 text-white', border: 'border-blue-500', light: 'bg-blue-50 text-blue-700' },

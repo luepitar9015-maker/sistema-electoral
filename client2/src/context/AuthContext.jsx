@@ -1,6 +1,7 @@
 import { createContext, useState, useEffect, useContext } from 'react';
 import axios from 'axios';
 import { jwtDecode } from 'jwt-decode';
+import { API } from '../config/api';
 
 const AuthContext = createContext();
 
@@ -36,7 +37,7 @@ export const AuthProvider = ({ children }) => {
 
     const login = async (email, password) => {
         try {
-            const res = await axios.post('http://localhost:3000/api/auth/login', { email, password });
+            const res = await axios.post(`${API}/auth/login`, { email, password });
             const { token, user } = res.data;
             localStorage.setItem('token', token);
             axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;

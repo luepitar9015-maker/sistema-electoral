@@ -99,6 +99,15 @@ const Campaign = sequelize.define('Campaign', {
     link_whatsapp: {
         type: DataTypes.STRING,
         allowNull: true
+    },
+    // Reloj y cronograma electoral de la campaña
+    fecha_inicio: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    fecha_elecciones: {
+        type: DataTypes.STRING,
+        allowNull: true
     }
 }, {
     tableName: 'Campaigns',

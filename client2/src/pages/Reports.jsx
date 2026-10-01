@@ -3,6 +3,7 @@ import { ComposableMap, Geographies, Geography, ZoomableGroup } from "react-simp
 import { scaleQuantile } from "d3-scale";
 import axios from 'axios';
 import { Loader } from 'lucide-react';
+import { API } from '../config/api';
 
 // GeoJSON público de Colombia (simplificado)
 const GEO_URL = "https://gist.githubusercontent.com/john-guerra/43c7656821069d00dcbc/raw/be6a6e239cd5b5b803c6e7c2ec905b2620e90848/colombia.geo.json";
@@ -28,8 +29,8 @@ const Reports = () => {
         try {
             console.log("Fetching data...");
             const [geoRes, leaderRes] = await Promise.all([
-                axios.get('http://localhost:3000/api/reports/geo'),
-                axios.get('http://localhost:3000/api/reports/leaders')
+                axios.get(`${API}/reports/geo`),
+                axios.get(`${API}/reports/leaders`)
             ]);
             console.log("Data received", geoRes.data, leaderRes.data);
             setGeoData(geoRes.data);

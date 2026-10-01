@@ -7,8 +7,7 @@ import {
     Edit3, Trash2, X, Check, Lock, Mail, Phone,
     Building2, Search, AlertCircle, Sparkles, KeyRound
 } from 'lucide-react';
-
-const API = 'http://localhost:3000/api';
+import { API } from '../config/api';
 
 const ROLES_INFO = [
     {

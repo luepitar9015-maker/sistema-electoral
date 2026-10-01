@@ -21,6 +21,54 @@ const determineNivelTerritorial = (tipo_cargo) => {
     }
 };
 
+// Cálculo de estadísticas del Reloj de Campaña
+const calculateClockStats = (camp, totalVoters) => {
+    const inicioStr = camp.fecha_inicio;
+    const finStr = camp.fecha_elecciones;
+    if (!finStr) return null;
+
+    const now = new Date();
+    const electionDate = new Date(finStr);
+    const startDate = inicioStr ? new Date(inicioStr) : new Date(camp.createdAt);
+
+    const totalDurationMs = electionDate.getTime() - startDate.getTime();
+    const elapsedMs = Math.max(0, now.getTime() - startDate.getTime());
+    const remainingMs = electionDate.getTime() - now.getTime();
+
+    const dias_totales = Math.max(1, Math.round(totalDurationMs / (1000 * 60 * 60 * 24)));
+    const dias_transcurridos = Math.max(0, Math.floor(elapsedMs / (1000 * 60 * 60 * 24)));
+    const dias_restantes = Math.ceil(remainingMs / (1000 * 60 * 60 * 24));
+
+    let estado = 'en_curso';
+    if (remainingMs < 0) {
+        estado = 'finalizada';
+    } else if (now < startDate) {
+        estado = 'no_iniciada';
+    }
+
+    const porcentaje_tiempo = totalDurationMs > 0 
+        ? Math.min(100, Math.max(0, Math.round((elapsedMs / totalDurationMs) * 100))) 
+        : 0;
+
+    const meta = camp.meta_votos || 0;
+    const votosFaltantes = Math.max(0, meta - (totalVoters || 0));
+    const ritmo_diario_requerido = (dias_restantes > 0 && votosFaltantes > 0)
+        ? Math.ceil(votosFaltantes / dias_restantes)
+        : 0;
+
+    return {
+        fecha_inicio: inicioStr,
+        fecha_elecciones: finStr,
+        dias_totales,
+        dias_transcurridos,
+        dias_restantes,
+        porcentaje_tiempo,
+        ritmo_diario_requerido,
+        votos_faltantes: votosFaltantes,
+        estado
+    };
+};
+
 // ─── LISTAR TODAS LAS CAMPAÑAS CON MÉTRICAS ────────────────────────────────
 exports.getCampaigns = async (req, res) => {
     try {
@@ -75,13 +123,16 @@ exports.getCampaigns = async (req, res) => {
             const counts = countMap[camp.id] || { totalVoters: 0, totalLeaders: 0, withPuesto: 0, totalApoyos: 0 };
             const meta = camp.meta_votos || 0;
             const progress = meta > 0 ? Math.min(100, Math.round((counts.totalVoters / meta) * 100)) : 0;
+            const reloj = calculateClockStats(camp, counts.totalVoters);
+
             return {
                 ...camp.toJSON(),
                 totalVoters: counts.totalVoters,
                 totalLeaders: counts.totalLeaders,
                 withPuesto: counts.withPuesto,
                 totalApoyos: counts.totalApoyos,
-                progressPercent: progress
+                progressPercent: progress,
+                reloj
             };
         });
 
@@ -111,13 +162,15 @@ exports.getCampaignById = async (req, res) => {
 
         const meta = campaign.meta_votos || 0;
         const progressPercent = meta > 0 ? Math.min(100, Math.round((totalVoters / meta) * 100)) : 0;
+        const reloj = calculateClockStats(campaign, totalVoters);
 
         res.json({
             ...campaign.toJSON(),
             totalVoters,
             totalLeaders,
             withPuesto,
-            progressPercent
+            progressPercent,
+            reloj
         });
     } catch (error) {
         console.error('Error al obtener detalle de campaña:', error);
@@ -138,7 +191,12 @@ exports.createCampaign = async (req, res) => {
             numero_tarjeton,
             meta_votos,
             color,
-            descripcion
+            descripcion,
+            eslogan,
+            foto_candidato,
+            logo_campana,
+            fecha_inicio,
+            fecha_elecciones
         } = req.body;
 
         if (!nombre || !tipo_cargo || !candidato) {
@@ -152,11 +210,9 @@ exports.createCampaign = async (req, res) => {
         let finalMuni = municipio || null;
 
         if (nivel_territorial === 'nacional') {
-            // En Senado / Presidencia el ámbito es todo el país
             finalDepto = 'COLOMBIA (NACIONAL)';
             finalMuni = 'TODOS LOS MUNICIPIOS';
         } else if (nivel_territorial === 'departamental') {
-            // En Cámara, Gobernación, Asamblea se exige departamento
             if (!departamento || departamento === 'COLOMBIA (NACIONAL)') {
                 return res.status(400).json({
                     message: `Para cargos departamentales (${tipo_cargo.toUpperCase()}) debes seleccionar el departamento correspondiente.`
@@ -165,7 +221,6 @@ exports.createCampaign = async (req, res) => {
             finalDepto = departamento;
             finalMuni = 'DEPARTAMENTO COMPLETO';
         } else if (nivel_territorial === 'municipal') {
-            // En Alcaldía y Concejo se exige departamento y municipio
             if (!departamento || !municipio || municipio.includes('TODOS') || municipio.includes('COMPLETO')) {
                 return res.status(400).json({
                     message: `Para cargos municipales (${tipo_cargo.toUpperCase()}) debes seleccionar el departamento y municipio específico.`
@@ -187,6 +242,11 @@ exports.createCampaign = async (req, res) => {
             meta_votos: parseInt(meta_votos || 0, 10),
             color: color || '#00B894',
             descripcion: descripcion || '',
+            eslogan: eslogan || '',
+            foto_candidato: foto_candidato || '',
+            logo_campana: logo_campana || '',
+            fecha_inicio: fecha_inicio || null,
+            fecha_elecciones: fecha_elecciones || null,
             link_instagram: req.body.link_instagram || '',
             link_tiktok: req.body.link_tiktok || '',
             link_facebook: req.body.link_facebook || '',
@@ -226,6 +286,11 @@ exports.updateCampaign = async (req, res) => {
             color,
             activa,
             descripcion,
+            eslogan,
+            foto_candidato,
+            logo_campana,
+            fecha_inicio,
+            fecha_elecciones,
             link_instagram,
             link_tiktok,
             link_facebook,
@@ -260,6 +325,11 @@ exports.updateCampaign = async (req, res) => {
             color: color ?? campaign.color,
             activa: activa !== undefined ? activa : campaign.activa,
             descripcion: descripcion ?? campaign.descripcion,
+            eslogan: eslogan !== undefined ? eslogan : campaign.eslogan,
+            foto_candidato: foto_candidato !== undefined ? foto_candidato : campaign.foto_candidato,
+            logo_campana: logo_campana !== undefined ? logo_campana : campaign.logo_campana,
+            fecha_inicio: fecha_inicio !== undefined ? fecha_inicio : campaign.fecha_inicio,
+            fecha_elecciones: fecha_elecciones !== undefined ? fecha_elecciones : campaign.fecha_elecciones,
             link_instagram: link_instagram !== undefined ? link_instagram : campaign.link_instagram,
             link_tiktok: link_tiktok !== undefined ? link_tiktok : campaign.link_tiktok,
             link_facebook: link_facebook !== undefined ? link_facebook : campaign.link_facebook,

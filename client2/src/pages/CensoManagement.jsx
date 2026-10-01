@@ -5,8 +5,7 @@ import {
     XCircle, AlertCircle, RefreshCw, ExternalLink, Copy, Check,
     FileSpreadsheet, Zap, Trash2, MapPin, Building, Hash
 } from 'lucide-react';
-
-const API = 'http://localhost:3000/api';
+import { API } from '../config/api';
 
 export default function CensoManagement() {
     const token = localStorage.getItem('token');

@@ -1,9 +1,9 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useAuth } from './AuthContext';
+import { API } from '../config/api';
 
 const CampaignContext = createContext(null);
-const API = 'http://localhost:3000/api';
 
 export const CampaignProvider = ({ children }) => {
     const { user } = useAuth();

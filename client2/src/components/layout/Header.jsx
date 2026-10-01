@@ -1,16 +1,19 @@
 import { Search, Mail, Bell } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useCampaign } from '../../context/CampaignContext';
 import CampaignSelector from './CampaignSelector';
+import CampaignClock from '../common/CampaignClock';
 
 const Header = ({ onMenuClick }) => {
     const { user } = useAuth();
+    const { activeCampaign } = useCampaign();
 
     return (
         <header className="h-16 bg-[#2D3436] border-b border-gray-700 flex items-center justify-between px-6 shadow-sm">
 
-            {/* Left: Search Bar & Campaign Selector */}
-            <div className="flex items-center gap-4 flex-1 max-w-2xl">
-                <div className="relative w-full max-w-xs hidden sm:flex items-center">
+            {/* Left: Search Bar, Campaign Selector & Live Clock */}
+            <div className="flex items-center gap-3.5 flex-1 max-w-3xl">
+                <div className="relative w-full max-w-xs hidden xl:flex items-center">
                     <input
                         type="text"
                         placeholder="Buscar en el sistema..."
@@ -23,6 +26,11 @@ const Header = ({ onMenuClick }) => {
 
                 {/* Selector de Campaña Activa */}
                 <CampaignSelector />
+
+                {/* Reloj Oficial de la Campaña */}
+                {activeCampaign && (
+                    <CampaignClock campaign={activeCampaign} mode="compact" />
+                )}
             </div>
 
             {/* Right: User/Notifications */}

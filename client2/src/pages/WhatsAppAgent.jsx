@@ -8,8 +8,7 @@ import {
     FileSpreadsheet, HelpCircle, Paperclip, Image, FileText,
     UploadCloud, X, FileCheck, Layers
 } from 'lucide-react';
-
-const API = 'http://localhost:3000/api';
+import { API } from '../config/api';
 
 const QUICK_EXAMPLES = [
     {
@@ -818,10 +817,10 @@ CEDULA,NOMBRES,APELLIDOS,TELEFONO,DIRECCION
                             <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 block">URL del Webhook (Callback URL)</span>
                             <div className="flex items-center gap-2">
                                 <code className="flex-1 bg-white p-2.5 rounded-xl border border-gray-200 text-xs font-mono font-bold text-slate-800 truncate">
-                                    http://localhost:3000/api/whatsapp/webhook
+                                    {`${API}/whatsapp/webhook`}
                                 </code>
                                 <button
-                                    onClick={() => navigator.clipboard.writeText('http://localhost:3000/api/whatsapp/webhook')}
+                                    onClick={() => navigator.clipboard.writeText(`${API}/whatsapp/webhook`)}
                                     className="p-2.5 bg-slate-800 text-white rounded-xl hover:bg-slate-700"
                                     title="Copiar URL"
                                 >
