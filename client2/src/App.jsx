@@ -16,6 +16,8 @@ import SocialMediaPage from './pages/SocialMediaPage';
 import DiaDDashboard from './features/diaD/DiaDDashboard';
 import TerritorialHeatMap from './features/territorio/TerritorialHeatMap';
 import DHondtSimulator from './features/simulador/DHondtSimulator';
+import LogisticaFlotaDashboard from './features/logistica/LogisticaFlotaDashboard';
+import CallCenterOperator from './features/callcenter/CallCenterOperator';
 
 const ProtectedRoute = ({ children, requireAdmin }) => {
     const { user, loading } = useAuth();
@@ -34,6 +36,8 @@ function AppRoutes() {
                 <Route path="dashboard" element={<Dashboard />} />
                 {/* Rutas operativas avanzadas */}
                 <Route path="dia-d" element={<DiaDDashboard />} />
+                <Route path="logistica" element={<LogisticaFlotaDashboard />} />
+                <Route path="callcenter" element={<CallCenterOperator />} />
                 <Route path="territorio" element={<TerritorialHeatMap />} />
                 <Route path="simulador" element={<DHondtSimulator />} />
                 <Route path="meetings" element={<MeetingsPage />} />
