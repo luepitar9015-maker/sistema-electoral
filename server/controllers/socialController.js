@@ -5,6 +5,9 @@ const SocialCompetitor = require('../models/SocialCompetitor');
 const SocialTeamInteraction = require('../models/SocialTeamInteraction');
 const User = require('../models/User');
 const Campaign = require('../models/Campaign');
+const { calculateProgrammaticMetrics } = require('../services/contentIntelligenceService');
+const socialSyncService = require('../services/socialSyncService');
+const SocialPostComment = require('../models/SocialPostComment');
 
 /**
  * Métricas generales y KPIs de redes sociales
@@ -151,7 +154,11 @@ exports.getPosts = async (req, res) => {
 
 exports.createPost = async (req, res) => {
     try {
-        const nuevo = await SocialMediaPost.create(req.body);
+        const campana_id = req.campana_id || req.body.campana_id || req.user.campana_id;
+        if (!campana_id) {
+            return res.status(400).json({ message: 'Se requiere una campaña para registrar la publicación' });
+        }
+        const nuevo = await SocialMediaPost.create({ ...req.body, campana_id });
         res.status(201).json({ message: 'Publicación registrada con éxito', post: nuevo });
     } catch (error) {
         console.error('Error al crear post:', error);
@@ -164,7 +171,17 @@ exports.updatePost = async (req, res) => {
         const { id } = req.params;
         const post = await SocialMediaPost.findByPk(id);
         if (!post) return res.status(404).json({ message: 'Publicación no encontrada' });
-        await post.update(req.body);
+
+        if (req.user.role !== 'superadmin' && req.campana_id && post.campana_id && post.campana_id !== req.campana_id) {
+            return res.status(403).json({ message: 'Acceso denegado: esta publicación pertenece a otra campaña' });
+        }
+
+        const dataToUpdate = { ...req.body };
+        if (req.user.role !== 'superadmin') {
+            delete dataToUpdate.campana_id; // No puede transferirse a otra campaña
+        }
+
+        await post.update(dataToUpdate);
         res.json({ message: 'Publicación actualizada', post });
     } catch (error) {
         console.error('Error al actualizar post:', error);
@@ -175,13 +192,21 @@ exports.updatePost = async (req, res) => {
 exports.deletePost = async (req, res) => {
     try {
         const { id } = req.params;
-        await SocialMediaPost.destroy({ where: { id } });
+        const post = await SocialMediaPost.findByPk(id);
+        if (!post) return res.status(404).json({ message: 'Publicación no encontrada' });
+
+        if (req.user.role !== 'superadmin' && req.campana_id && post.campana_id && post.campana_id !== req.campana_id) {
+            return res.status(403).json({ message: 'Acceso denegado: esta publicación pertenece a otra campaña' });
+        }
+
+        await post.destroy();
         res.json({ message: 'Publicación eliminada' });
     } catch (error) {
         console.error('Error al eliminar post:', error);
         res.status(500).json({ message: 'Error al eliminar publicación', error: error.message });
     }
 };
+
 
 /**
  * Trazabilidad: Registrar clic / apertura del link del candidato
@@ -598,14 +623,26 @@ exports.getViralAdvisorAnalysis = async (req, res) => {
         const topic = post ? (post.tema_estrategico || 'General') : (tema_estrategico || 'General');
         const trackingLink = post ? `http://localhost:3000/r/${post.id}` : 'https://campana.co/link';
 
-        // Cálculo dinámico de Viral Score
-        let score = 72;
-        if (contentText.length > 50 && contentText.length < 280) score += 6;
-        if (contentText.includes('#')) score += 5;
-        if (contentText.includes('?')) score += 4;
-        if (platform === 'tiktok' || platform === 'instagram') score += 5;
-        if (post && (post.engagement_rate > 7)) score += 6;
-        score = Math.min(score, 96);
+        // Cálculo dinámico de Viral Score mediante motor programático
+        let score = 65;
+        if (post && (post.alcance > 0 || post.reproducciones > 0)) {
+            const calculated = calculateProgrammaticMetrics({
+                views: post.reproducciones,
+                reach: post.alcance,
+                likes: post.likes,
+                comments: post.comentarios,
+                shares: post.compartidos,
+                saves: post.guardados
+            });
+            score = calculated.virality_score;
+        } else {
+            // Estimación para borradores antes de publicación
+            if (contentText.length > 50 && contentText.length < 280) score += 8;
+            if (contentText.includes('#')) score += 5;
+            if (contentText.includes('?')) score += 6;
+            if (platform === 'tiktok' || platform === 'instagram') score += 5;
+            score = Math.max(30, Math.min(score, 95));
+        }
 
         // Diagnóstico algorítmico según plataforma
         let diagnostico = '';
@@ -828,6 +865,79 @@ exports.dispatchLiveSupportAlert = async (req, res) => {
     } catch (error) {
         console.error('Error al despachar alerta de en vivo:', error);
         res.status(500).json({ message: 'Error al despachar alerta de en vivo', error: error.message });
+    }
+};
+
+/**
+ * SINCRONIZACIÓN DE PERFIL SOCIAL CON EXTRACCIÓN DE POSTS Y COMENTARIOS
+ */
+exports.syncProfile = async (req, res) => {
+    try {
+        const { url, campana_id } = req.body;
+        const activeCampanaId = campana_id || req.user?.campana_id || 1;
+        if (!url) {
+            return res.status(400).json({ success: false, message: 'La URL o link de la red social es requerida' });
+        }
+        const result = await socialSyncService.syncProfileFromUrl({ url, campanaId: activeCampanaId });
+        res.json(result);
+    } catch (error) {
+        console.error('Error al sincronizar perfil de red social:', error);
+        res.status(500).json({ success: false, message: 'Error al sincronizar perfil', error: error.message });
+    }
+};
+
+/**
+ * IMPORTACIÓN DE BASE DE DATOS DEL EQUIPO (EXCEL / CSV / JSON)
+ * Cruza automáticamente con los comentarios existentes para identificar quién es del equipo
+ */
+exports.importTeamDatabase = async (req, res) => {
+    try {
+        const { members, campana_id } = req.body;
+        const activeCampanaId = campana_id || req.user?.campana_id || 1;
+        if (!members || !Array.isArray(members) || members.length === 0) {
+            return res.status(400).json({ success: false, message: 'Debe proporcionar la lista de integrantes del equipo' });
+        }
+        const result = await socialSyncService.importTeamMembers({ members, campanaId: activeCampanaId });
+        res.json(result);
+    } catch (error) {
+        console.error('Error al importar base de datos del equipo:', error);
+        res.status(500).json({ success: false, message: 'Error al importar equipo', error: error.message });
+    }
+};
+
+/**
+ * CONSULTA DE COMENTARIOS DE UNA PUBLICACIÓN CON AUDITORÍA DEL EQUIPO
+ */
+exports.getPostComments = async (req, res) => {
+    try {
+        const { postId } = req.params;
+        const campana_id = req.query.campana_id || req.user?.campana_id || 1;
+        const result = await socialSyncService.getPostCommentsWithAudit(postId, campana_id);
+        res.json({ success: true, ...result });
+    } catch (error) {
+        console.error('Error al obtener comentarios y auditoría del equipo:', error);
+        res.status(500).json({ success: false, message: 'Error al obtener comentarios', error: error.message });
+    }
+};
+
+/**
+ * RESPUESTA A UN COMENTARIO DESDE LA PLATAFORMA
+ */
+exports.replyToComment = async (req, res) => {
+    try {
+        const { commentId } = req.params;
+        const { respuesta_texto } = req.body;
+        const comment = await SocialPostComment.findByPk(commentId);
+        if (!comment) {
+            return res.status(404).json({ success: false, message: 'Comentario no encontrado' });
+        }
+        comment.respondido = true;
+        comment.respuesta_texto = respuesta_texto;
+        await comment.save();
+        res.json({ success: true, comment });
+    } catch (error) {
+        console.error('Error al responder comentario:', error);
+        res.status(500).json({ success: false, message: 'Error al responder comentario', error: error.message });
     }
 };
 

@@ -40,6 +40,17 @@ exports.createUser = async (req, res) => {
             return res.status(400).json({ message: 'El correo y la contraseña son obligatorios' });
         }
 
+        // Solo superadmin puede asignar el rol de superadmin
+        if (role === 'superadmin' && req.user.role !== 'superadmin') {
+            return res.status(403).json({ message: 'Solo un superadmin puede crear otros usuarios superadmin' });
+        }
+
+        // Si no es superadmin, la campaña debe coincidir con la del usuario logueado
+        let targetCampanaId = campana_id ? parseInt(campana_id, 10) : null;
+        if (req.user.role !== 'superadmin' && req.user.campana_id) {
+            targetCampanaId = req.user.campana_id;
+        }
+
         const existing = await User.findOne({ where: { email } });
         if (existing) {
             return res.status(400).json({ message: 'Ya existe un usuario con este correo electrónico' });
@@ -53,7 +64,7 @@ exports.createUser = async (req, res) => {
             telefono: telefono || '',
             password: hashedPassword,
             role: role || 'apoyo_bd',
-            campana_id: campana_id ? parseInt(campana_id, 10) : null,
+            campana_id: targetCampanaId,
             activo: true
         });
 
@@ -88,6 +99,16 @@ exports.updateUser = async (req, res) => {
             return res.status(404).json({ message: 'Usuario no encontrado' });
         }
 
+        // Proteger privilegios de superadmin
+        if ((role === 'superadmin' || user.role === 'superadmin') && req.user.role !== 'superadmin') {
+            return res.status(403).json({ message: 'No tiene permisos para modificar un superadmin' });
+        }
+
+        // Si no es superadmin, no puede editar usuarios de otra campaña
+        if (req.user.role !== 'superadmin' && req.user.campana_id && user.campana_id && user.campana_id !== req.user.campana_id) {
+            return res.status(403).json({ message: 'No tiene permisos para modificar usuarios de otra campaña' });
+        }
+
         if (email && email !== user.email) {
             const emailExists = await User.findOne({ where: { email } });
             if (emailExists) {
@@ -99,7 +120,9 @@ exports.updateUser = async (req, res) => {
         if (nombre !== undefined) user.nombre = nombre;
         if (telefono !== undefined) user.telefono = telefono;
         if (role !== undefined) user.role = role;
-        if (campana_id !== undefined) user.campana_id = campana_id ? parseInt(campana_id, 10) : null;
+        if (campana_id !== undefined && req.user.role === 'superadmin') {
+            user.campana_id = campana_id ? parseInt(campana_id, 10) : null;
+        }
         if (activo !== undefined) user.activo = activo;
 
         if (password && password.trim().length >= 6) {
@@ -132,9 +155,19 @@ exports.updateUser = async (req, res) => {
 exports.deleteUser = async (req, res) => {
     try {
         const { id } = req.params;
-        const user = await User.findByPk(id);
+        const targetId = parseInt(id, 10);
+
+        if (targetId === req.user.id) {
+            return res.status(400).json({ message: 'No puede eliminar su propia cuenta activa' });
+        }
+
+        const user = await User.findByPk(targetId);
         if (!user) {
             return res.status(404).json({ message: 'Usuario no encontrado' });
+        }
+
+        if (user.role === 'superadmin' && req.user.role !== 'superadmin') {
+            return res.status(403).json({ message: 'Solo un superadmin puede eliminar a otro superadmin' });
         }
 
         if (user.role === 'superadmin' || user.role === 'admin') {

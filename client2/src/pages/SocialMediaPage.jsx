@@ -8,9 +8,12 @@ import {
     Repeat, Plus, Search, Filter, ExternalLink, CheckCircle,
     X, Trash2, Edit3, Sparkles, Swords, BarChart3,
     Check, AlertCircle, ArrowUpRight, ShieldCheck, Video, HelpCircle,
-    Copy, Link, Bot, Zap, Lightbulb, Rocket, Clock, Send
+    Copy, Link, Bot, Zap, Lightbulb, Rocket, Clock, Send, Upload, RefreshCw
 } from 'lucide-react';
 import { API } from '../config/api';
+import ContentIntelligenceDashboard from '../features/social/ContentIntelligenceDashboard';
+import TeamDatabaseUploadModal from '../features/social/TeamDatabaseUploadModal';
+import PostCommentsModal from '../features/social/PostCommentsModal';
 
 const PLATAFORMAS_INFO = {
     facebook:  { label: 'Facebook',  color: 'bg-blue-600 text-white', border: 'border-blue-500', light: 'bg-blue-50 text-blue-700' },
@@ -65,6 +68,11 @@ export default function SocialMediaPage() {
     const [modalCommentOpen, setModalCommentOpen] = useState(false);
     const [modalCompetitorOpen, setModalCompetitorOpen] = useState(false);
     const [modalEditLinksOpen, setModalEditLinksOpen] = useState(false);
+    const [modalTeamUploadOpen, setModalTeamUploadOpen] = useState(false);
+    const [selectedPostForComments, setSelectedPostForComments] = useState(null);
+    const [modalCommentsOpen, setModalCommentsOpen] = useState(false);
+    const [syncingProfileUrl, setSyncingProfileUrl] = useState(null);
+    const [syncSuccessToast, setSyncSuccessToast] = useState(null);
 
     // Asesor Virtual de Viralidad con Inteligencia Artificial
     const [modalAdvisorOpen, setModalAdvisorOpen] = useState(false);
@@ -304,7 +312,7 @@ export default function SocialMediaPage() {
     // Trazabilidad: Copiar link oficial del candidato
     const [copiedLinkId, setCopiedLinkId] = useState(null);
     const handleCopyCandidateLink = (postId) => {
-        const fullUrl = `http://localhost:3000/r/${postId}`;
+        const fullUrl = `${window.location.origin}/r/${postId}`;
         navigator.clipboard.writeText(fullUrl);
         setCopiedLinkId(postId);
         setTimeout(() => setCopiedLinkId(null), 3000);
@@ -321,7 +329,7 @@ export default function SocialMediaPage() {
         if (post.url_publicacion) {
             window.open(post.url_publicacion, '_blank', 'noopener,noreferrer');
         } else {
-            window.open(`http://localhost:3000/r/${post.id}`, '_blank', 'noopener,noreferrer');
+            window.open(`${window.location.origin}/r/${post.id}`, '_blank', 'noopener,noreferrer');
         }
     };
 
@@ -352,6 +360,34 @@ export default function SocialMediaPage() {
             }
         } catch (err) {
             alert(err.response?.data?.message || 'Error al guardar enlaces de redes');
+        }
+    };
+
+    // Sincronizar publicaciones y comentarios desde un enlace de red social
+    const handleSyncProfile = async (url) => {
+        if (!url) {
+            alert('Por favor configura primero la URL del perfil para sincronizar.');
+            return;
+        }
+        setSyncingProfileUrl(url);
+        try {
+            const res = await axios.post(`${API}/social/sync-profile`, {
+                url,
+                campana_id: activeCampaign?.id || 1
+            }, authHeaders);
+
+            await fetchAllData();
+            setSyncSuccessToast({
+                message: `Se importaron ${res.data.postsCreated} publicaciones y ${res.data.commentsCreated} comentarios. ${res.data.teamMatchedCount} interacciones corresponden a integrantes del equipo identificados.`,
+                platform: res.data.platform,
+                handle: res.data.handle
+            });
+            setTimeout(() => setSyncSuccessToast(null), 8000);
+        } catch (err) {
+            console.error('Error al sincronizar perfil:', err);
+            alert(err.response?.data?.message || 'Error al sincronizar publicaciones del perfil.');
+        } finally {
+            setSyncingProfileUrl(null);
         }
     };
 
@@ -518,7 +554,7 @@ export default function SocialMediaPage() {
         try {
             const payload = {
                 plataforma: livePost?.plataforma || 'Todas las Redes',
-                liveUrl: livePost?.url_publicacion || 'http://localhost:3000/social',
+                liveUrl: livePost?.url_publicacion || `${window.location.origin}/social`,
                 campana_id: activeCampaign?.id || 1
             };
             const res = await axios.post(`${API}/social/live-streams/alert`, payload, authHeaders);
@@ -607,6 +643,13 @@ export default function SocialMediaPage() {
 
                     {/* Acciones Rápidas */}
                     <div className="flex flex-wrap items-center gap-2">
+                        <button
+                            onClick={() => setActiveTab('inteligencia')}
+                            className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 text-white font-black text-xs uppercase rounded-2xl shadow-lg hover:shadow-cyan-500/30 hover:scale-[1.02] transition-all cursor-pointer border border-cyan-400/40"
+                        >
+                            <Sparkles size={16} className="text-cyan-200 animate-pulse" />
+                            <span>⚡ Impulsar Algoritmo</span>
+                        </button>
                         <button
                             onClick={() => handleOpenAdvisor()}
                             className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-purple-600 via-indigo-600 to-cyan-500 text-white font-black text-xs uppercase rounded-2xl shadow-lg hover:shadow-purple-500/30 hover:scale-[1.02] transition-all cursor-pointer border border-purple-400/40"
@@ -705,17 +748,53 @@ export default function SocialMediaPage() {
                         </div>
                     </div>
 
-                    <button
-                        type="button"
-                        onClick={() => setModalEditLinksOpen(true)}
-                        className="flex items-center gap-2 px-4 py-2 bg-indigo-600/60 hover:bg-indigo-600 text-white rounded-xl text-xs font-bold uppercase tracking-wider border border-indigo-500/50 transition-all cursor-pointer shadow-sm self-start sm:self-auto"
-                    >
-                        <Edit3 size={14} />
-                        <span>Configurar / Editar Links</span>
-                    </button>
+                    <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+                        <button
+                            type="button"
+                            onClick={() => setModalTeamUploadOpen(true)}
+                            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl text-xs font-black uppercase tracking-wider border border-emerald-500/40 transition-all cursor-pointer shadow-sm"
+                        >
+                            <Upload size={14} />
+                            <span>Subir Base de Datos del Equipo</span>
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => setModalEditLinksOpen(true)}
+                            className="flex items-center gap-2 px-4 py-2 bg-indigo-600/60 hover:bg-indigo-600 text-white rounded-xl text-xs font-bold uppercase tracking-wider border border-indigo-500/50 transition-all cursor-pointer shadow-sm"
+                        >
+                            <Edit3 size={14} />
+                            <span>Configurar / Editar Links</span>
+                        </button>
+                    </div>
                 </div>
 
-                {/* Grid de 6 Redes Sociales con sus Enlaces Directos y Botones de Copiar */}
+                {/* Notificación de Sincronización Exitosa */}
+                {syncSuccessToast && (
+                    <div className="bg-emerald-500/20 border border-emerald-500/40 rounded-2xl p-4 text-emerald-300 text-xs flex items-center justify-between gap-3 animate-in fade-in duration-300">
+                        <div className="flex items-center gap-2.5">
+                            <span className="p-2 rounded-xl bg-emerald-500/30 text-emerald-200">
+                                <CheckCircle size={18} />
+                            </span>
+                            <div>
+                                <p className="font-bold text-white text-xs">
+                                    ¡Sincronización Exitosa de {syncSuccessToast.handle} ({syncSuccessToast.platform.toUpperCase()})!
+                                </p>
+                                <p className="text-[11px] text-emerald-200/90 mt-0.5">
+                                    {syncSuccessToast.message}
+                                </p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => setSyncSuccessToast(null)}
+                            className="text-emerald-400 hover:text-white p-1 rounded-lg hover:bg-emerald-500/20 cursor-pointer"
+                        >
+                            <X size={16} />
+                        </button>
+                    </div>
+                )}
+
+                {/* Grid de 6 Redes Sociales con sus Enlaces Directos y Botones de Copiar y Sincronizar */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     {[
                         {
@@ -724,8 +803,8 @@ export default function SocialMediaPage() {
                             icon: '📸',
                             badge: 'bg-gradient-to-r from-purple-600 via-pink-600 to-amber-500',
                             border: 'border-pink-500/30',
-                            url: activeCampaign?.link_instagram || 'https://instagram.com/agaviriau',
-                            usuario: '@agaviriau'
+                            url: activeCampaign?.link_instagram || 'https://www.instagram.com/estrategia180?stkn=ZWVrbHNpN3JiZmlo',
+                            usuario: activeCampaign?.link_instagram ? '@campana' : '@estrategia180'
                         },
                         {
                             id: 'tiktok',
@@ -774,6 +853,7 @@ export default function SocialMediaPage() {
                         }
                     ].map(r => {
                         const isCopied = copiedLinkId === r.id;
+                        const isSyncing = syncingProfileUrl === r.url;
                         return (
                             <div
                                 key={r.id}
@@ -801,29 +881,43 @@ export default function SocialMediaPage() {
                                     </a>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-2 pt-1 border-t border-gray-800/60">
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            navigator.clipboard.writeText(r.url);
-                                            setCopiedLinkId(r.id);
-                                            setTimeout(() => setCopiedLinkId(null), 3000);
-                                        }}
-                                        className="flex items-center justify-center gap-1 py-1 px-2 bg-slate-900 hover:bg-slate-800 text-gray-200 rounded-xl text-[10px] font-bold border border-gray-800 transition-colors cursor-pointer"
-                                    >
-                                        {isCopied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
-                                        <span>{isCopied ? '¡Copiado!' : 'Copiar Link'}</span>
-                                    </button>
+                                <div className="space-y-2 pt-1 border-t border-gray-800/60">
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                navigator.clipboard.writeText(r.url);
+                                                setCopiedLinkId(r.id);
+                                                setTimeout(() => setCopiedLinkId(null), 3000);
+                                            }}
+                                            className="flex items-center justify-center gap-1 py-1 px-2 bg-slate-900 hover:bg-slate-800 text-gray-200 rounded-xl text-[10px] font-bold border border-gray-800 transition-colors cursor-pointer"
+                                        >
+                                            {isCopied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+                                            <span>{isCopied ? '¡Copiado!' : 'Copiar Link'}</span>
+                                        </button>
 
-                                    <a
-                                        href={r.url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="flex items-center justify-center gap-1 py-1 px-2 bg-indigo-600/80 hover:bg-indigo-600 text-white rounded-xl text-[10px] font-bold transition-colors cursor-pointer shadow-xs"
-                                    >
-                                        <ExternalLink size={12} />
-                                        <span>Abrir Perfil</span>
-                                    </a>
+                                        <a
+                                            href={r.url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center justify-center gap-1 py-1 px-2 bg-indigo-600/80 hover:bg-indigo-600 text-white rounded-xl text-[10px] font-bold transition-colors cursor-pointer shadow-xs"
+                                        >
+                                            <ExternalLink size={12} />
+                                            <span>Abrir Perfil</span>
+                                        </a>
+                                    </div>
+
+                                    {r.id !== 'whatsapp' && (
+                                        <button
+                                            type="button"
+                                            disabled={isSyncing}
+                                            onClick={() => handleSyncProfile(r.url)}
+                                            className="w-full flex items-center justify-center gap-1.5 py-1.5 px-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-xs disabled:opacity-50"
+                                        >
+                                            <RefreshCw size={12} className={isSyncing ? 'animate-spin' : ''} />
+                                            <span>{isSyncing ? 'Sincronizando...' : '🔄 Sincronizar Publicaciones y Comentarios'}</span>
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         );
@@ -896,7 +990,26 @@ export default function SocialMediaPage() {
                     <Swords size={16} className="text-amber-500" />
                     <span>Radar de Oposición ({competitors.length})</span>
                 </button>
+
+                <button
+                    onClick={() => setActiveTab('inteligencia')}
+                    className={`flex items-center gap-2 px-5 py-3 rounded-2xl font-black text-xs uppercase tracking-wider transition-all cursor-pointer ${
+                        activeTab === 'inteligencia'
+                            ? 'bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-600 text-white shadow-lg shadow-cyan-500/25'
+                            : 'text-cyan-700 bg-cyan-50/80 hover:bg-cyan-100 border border-cyan-200'
+                    }`}
+                >
+                    <Sparkles size={16} className={activeTab === 'inteligencia' ? 'text-cyan-200 animate-pulse' : 'text-cyan-600'} />
+                    <span>⚡ Impulsar Algoritmo Social</span>
+                </button>
             </div>
+
+            {/* ========================================================= */}
+            {/* PESTAÑA: IMPULSAR ALGORITMO SOCIAL / CONTENT INTELLIGENCE */}
+            {/* ========================================================= */}
+            {activeTab === 'inteligencia' && (
+                <ContentIntelligenceDashboard activeCampaign={activeCampaign} token={token} />
+            )}
 
             {/* ========================================================= */}
             {/* PESTAÑA 0: SEGUIMIENTO A LOS EN VIVO EN TODAS LAS REDES */}
@@ -1475,14 +1588,27 @@ export default function SocialMediaPage() {
                                                     </div>
                                                 )}
 
+                                                {/* Botón para ver Comentarios y Reacciones con Identificación del Integrante al lado */}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setSelectedPostForComments(p);
+                                                        setModalCommentsOpen(true);
+                                                    }}
+                                                    className="w-full flex items-center justify-center gap-1.5 py-2 bg-gradient-to-r from-purple-600 via-indigo-600 to-indigo-700 hover:from-purple-700 hover:to-indigo-800 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-md shadow-indigo-500/20 cursor-pointer"
+                                                >
+                                                    <MessageSquare size={13} />
+                                                    <span>💬 Ver Comentarios & Identificar Equipo ({p.comentarios_conteo || 0})</span>
+                                                </button>
+
                                                 {/* Botón para abrir la Auditoría de Participación del Equipo */}
                                                 <button
                                                     type="button"
                                                     onClick={() => handleOpenAuditModal(p)}
-                                                    className="w-full flex items-center justify-center gap-1.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-colors shadow-sm cursor-pointer"
+                                                    className="w-full flex items-center justify-center gap-1.5 py-1.5 bg-slate-100 hover:bg-indigo-50 text-indigo-900 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-colors border border-indigo-200 cursor-pointer"
                                                 >
-                                                    <Users size={12} />
-                                                    <span>Auditar Apoyo del Equipo</span>
+                                                    <Users size={12} className="text-indigo-600" />
+                                                    <span>Registrar Apoyo Manual</span>
                                                 </button>
                                             </div>
 
@@ -3346,6 +3472,28 @@ export default function SocialMediaPage() {
                     </div>
                 </div>
             )}
+
+            {/* Modal de Carga de Base de Datos del Equipo (Excel / CSV) */}
+            <TeamDatabaseUploadModal
+                isOpen={modalTeamUploadOpen}
+                onClose={() => setModalTeamUploadOpen(false)}
+                campanaId={activeCampaign?.id || 1}
+                onImportSuccess={async () => {
+                    await fetchAllData();
+                }}
+            />
+
+            {/* Modal de Comentarios y Reacciones con Identificación de Integrantes al lado */}
+            <PostCommentsModal
+                isOpen={modalCommentsOpen}
+                onClose={() => {
+                    setModalCommentsOpen(false);
+                    setSelectedPostForComments(null);
+                }}
+                post={selectedPostForComments}
+                campanaId={activeCampaign?.id || 1}
+                onOpenTeamUpload={() => setModalTeamUploadOpen(true)}
+            />
         </div>
     );
 }

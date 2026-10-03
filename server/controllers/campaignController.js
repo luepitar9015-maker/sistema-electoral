@@ -72,9 +72,16 @@ const calculateClockStats = (camp, totalVoters) => {
 // ─── LISTAR TODAS LAS CAMPAÑAS CON MÉTRICAS ────────────────────────────────
 exports.getCampaigns = async (req, res) => {
     try {
+        const whereClause = {};
+        if (req.user && !['superadmin', 'admin'].includes(req.user.role) && req.user.campana_id) {
+            whereClause.id = req.user.campana_id;
+        }
+
         const campaigns = await Campaign.findAll({
+            where: whereClause,
             order: [['activa', 'DESC'], ['createdAt', 'DESC']]
         });
+
 
         // Obtener conteo de votantes y líderes por campaña
         const voterCounts = await Voter.findAll({
@@ -146,10 +153,18 @@ exports.getCampaigns = async (req, res) => {
 // ─── OBTENER DETALLE DE UNA CAMPAÑA ────────────────────────────────────────
 exports.getCampaignById = async (req, res) => {
     try {
-        const campaign = await Campaign.findByPk(req.params.id);
+        const campaignId = parseInt(req.params.id, 10);
+        if (req.user && !['superadmin', 'admin'].includes(req.user.role) && req.user.campana_id) {
+            if (campaignId !== parseInt(req.user.campana_id, 10)) {
+                return res.status(403).json({ message: 'Acceso denegado: no tiene permisos para ver esta campaña' });
+            }
+        }
+
+        const campaign = await Campaign.findByPk(campaignId);
         if (!campaign) {
             return res.status(404).json({ message: 'Campaña no encontrada' });
         }
+
 
         const totalVoters = await Voter.count({ where: { campana_id: campaign.id } });
         const totalLeaders = await Voter.count({ where: { campana_id: campaign.id, isLeader: true } });

@@ -1,7 +1,11 @@
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 const express = require('express');
 const cors = require('cors');
-const path = require('path');
+
+const jwt = require('jsonwebtoken');
 const sequelize = require('./database/db');
+const { getSecretKey, verifyJwtToken } = require('./middleware/authMiddleware');
 const User = require('./models/User');
 const Voter = require('./models/Voter');
 const CensoElectoral = require('./models/CensoElectoral');
@@ -15,6 +19,12 @@ const SocialTeamAccount = require('./models/SocialTeamAccount');
 const SocialNegativeComment = require('./models/SocialNegativeComment');
 const SocialCompetitor = require('./models/SocialCompetitor');
 const SocialTeamInteraction = require('./models/SocialTeamInteraction');
+const SocialMetricSnapshot = require('./models/SocialMetricSnapshot');
+const SocialContentAnalysis = require('./models/SocialContentAnalysis');
+const SocialExperiment = require('./models/SocialExperiment');
+const AuditLog = require('./models/AuditLog');
+const AIUsageLog = require('./models/AIUsageLog');
+const SocialPostComment = require('./models/SocialPostComment');
 
 // Asociaciones de Reuniones
 Reunion.hasMany(ReunionAsistente, { foreignKey: 'reunion_id', as: 'asistentes', onDelete: 'CASCADE' });
@@ -25,7 +35,27 @@ Reunion.belongsTo(Campaign, { foreignKey: 'campana_id', as: 'campana' });
 SocialMediaPost.hasMany(SocialTeamInteraction, { foreignKey: 'post_id', as: 'interacciones_equipo', onDelete: 'CASCADE' });
 SocialTeamInteraction.belongsTo(SocialMediaPost, { foreignKey: 'post_id' });
 
+// Asociaciones de Media Lab / Inteligencia de Contenido
+SocialMediaPost.hasMany(SocialMetricSnapshot, { foreignKey: 'post_id', as: 'snapshots', onDelete: 'CASCADE' });
+SocialMetricSnapshot.belongsTo(SocialMediaPost, { foreignKey: 'post_id' });
+Campaign.hasMany(SocialMetricSnapshot, { foreignKey: 'campana_id', as: 'snapshots_metricas' });
+SocialMetricSnapshot.belongsTo(Campaign, { foreignKey: 'campana_id' });
+
+SocialMediaPost.hasMany(SocialContentAnalysis, { foreignKey: 'post_id', as: 'analisis_contenido', onDelete: 'CASCADE' });
+SocialContentAnalysis.belongsTo(SocialMediaPost, { foreignKey: 'post_id' });
+Campaign.hasMany(SocialContentAnalysis, { foreignKey: 'campana_id', as: 'analisis_contenido' });
+SocialContentAnalysis.belongsTo(Campaign, { foreignKey: 'campana_id' });
+
+Campaign.hasMany(SocialExperiment, { foreignKey: 'campana_id', as: 'experimentos_sociales' });
+SocialExperiment.belongsTo(Campaign, { foreignKey: 'campana_id' });
+
+SocialMediaPost.hasMany(SocialPostComment, { foreignKey: 'post_id', as: 'comentarios_sociales', onDelete: 'CASCADE' });
+SocialPostComment.belongsTo(SocialMediaPost, { foreignKey: 'post_id' });
+Campaign.hasMany(SocialPostComment, { foreignKey: 'campana_id', as: 'comentarios_campana' });
+SocialPostComment.belongsTo(Campaign, { foreignKey: 'campana_id' });
+
 const app = express();
+
 const PORT = process.env.PORT || 3000;
 
 const authRoutes = require('./routes/authRoutes');
@@ -38,13 +68,33 @@ const userRoutes = require('./routes/userRoutes');
 const whatsappRoutes = require('./routes/whatsappRoutes');
 const reunionRoutes = require('./routes/reunionRoutes');
 const socialRoutes = require('./routes/socialRoutes');
+const contentIntelligenceRoutes = require('./routes/contentIntelligenceRoutes');
 
 app.use(cors());
 app.use(express.json({ limit: '25mb' }));
 app.use(express.urlencoded({ limit: '25mb', extended: true }));
 
-// Servir archivos estáticos subidos (evidencias fotográficas, adjuntos)
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// Servir archivos protegidos (evidencias fotográficas, adjuntos) con verificación de token
+app.use('/uploads', (req, res, next) => {
+    // Permitir token vía header Authorization o query parameter ?token=...
+    const authHeader = req.headers['authorization'];
+    const token = (authHeader && authHeader.startsWith('Bearer ')) 
+        ? authHeader.split(' ')[1] 
+        : req.query.token;
+
+    if (!token) {
+        return res.status(401).json({ message: 'Acceso no autorizado: token requerido para ver archivos.' });
+    }
+
+    try {
+        const decoded = verifyJwtToken(token);
+        req.user = decoded;
+        next();
+    } catch (e) {
+        return res.status(403).json({ message: 'Token inválido o expirado' });
+    }
+}, express.static(path.join(__dirname, 'uploads')));
+
 
 // API routes
 app.use('/api/auth', authRoutes);
@@ -57,6 +107,7 @@ app.use('/api/apoyos', apoyoRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/reuniones', reunionRoutes);
 app.use('/api/social', socialRoutes);
+app.use('/api/social/intelligence', contentIntelligenceRoutes);
 
 // Ruta pública de Revisor y Trazabilidad por el Link del Candidato
 app.get('/r/:postId', async (req, res) => {
@@ -82,10 +133,21 @@ app.get('/r/:postId', async (req, res) => {
 
 // Servir el frontend React (build de producción)
 const frontendBuild = path.join(__dirname, '../client2/dist');
-app.use(express.static(frontendBuild));
+app.use(express.static(frontendBuild, {
+    setHeaders: (res, filePath) => {
+        if (filePath.endsWith('index.html')) {
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+            res.setHeader('Pragma', 'no-cache');
+            res.setHeader('Expires', '0');
+        }
+    }
+}));
 
 // Para cualquier ruta que no sea API, devolver el index.html del frontend
 app.use((req, res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     res.sendFile(path.join(frontendBuild, 'index.html'));
 });
 

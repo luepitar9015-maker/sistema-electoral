@@ -4,7 +4,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const reunionController = require('../controllers/reunionController');
-const { verifyToken } = require('../middleware/authMiddleware');
+const { verifyToken, authorizeCampaignAccess } = require('../middleware/authMiddleware');
 
 // Configuración de almacenamiento para evidencias y archivos
 const uploadDir = path.join(__dirname, '../uploads/evidencias');
@@ -28,8 +28,10 @@ const upload = multer({
     limits: { fileSize: 25 * 1024 * 1024 } // 25 MB
 });
 
-// Todas las rutas requieren autenticación
+// Todas las rutas requieren autenticación y aislamiento de campaña
 router.use(verifyToken);
+router.use(authorizeCampaignAccess);
+
 
 // CRUD de reuniones
 router.get('/', reunionController.getReuniones);

@@ -29,3 +29,9 @@ client2/android/build/
 
 # SQLite journal
 *.sqlite-journal
+*.bak
+*.sqlite.pre_*
+
+# Archivos comprimidos y binarios
+*.zip
+*.apk

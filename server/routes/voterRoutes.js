@@ -2,12 +2,13 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const voterController = require('../controllers/voterController');
-const { verifyToken } = require('../middleware/authMiddleware');
+const { verifyToken, authorizeCampaignAccess } = require('../middleware/authMiddleware');
 
 // multer en memoria (no guarda en disco)
 const upload = multer({ storage: multer.memoryStorage() });
 
-router.use(verifyToken); // Todas las rutas requieren autenticación
+router.use(verifyToken);
+router.use(authorizeCampaignAccess);
 
 router.post('/',               voterController.createVoter);
 router.get('/',                voterController.getVoters);
@@ -22,3 +23,4 @@ router.get('/:id',             voterController.getVoterById);
 router.put('/:id',             voterController.updateVoter);
 
 module.exports = router;
+

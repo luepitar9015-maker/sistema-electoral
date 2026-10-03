@@ -1521,7 +1521,7 @@ export default function MeetingsPage() {
                                             className="group relative bg-slate-900 rounded-2xl overflow-hidden aspect-video border border-gray-200 shadow-sm"
                                         >
                                             <img
-                                                src={foto.url.startsWith('http') ? foto.url : `http://localhost:3000${foto.url}`}
+                                                src={foto.url}
                                                 alt={foto.nombre || 'Evidencia'}
                                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 cursor-pointer"
                                                 onClick={() => setSelectedPhotoPreview(foto)}
@@ -1556,7 +1556,7 @@ export default function MeetingsPage() {
                                         <X size={24} />
                                     </button>
                                     <img
-                                        src={selectedPhotoPreview.url.startsWith('http') ? selectedPhotoPreview.url : `http://localhost:3000${selectedPhotoPreview.url}`}
+                                        src={selectedPhotoPreview.url}
                                         alt="Preview"
                                         className="max-h-[80vh] max-w-[90vw] rounded-2xl object-contain shadow-2xl"
                                     />

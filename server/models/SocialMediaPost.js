@@ -129,10 +129,36 @@ const SocialMediaPost = sequelize.define('SocialMediaPost', {
     link_candidato: {
         type: DataTypes.STRING,
         allowNull: true
+    },
+    // Metadatos audiovisuales (Media Lab / Content Intelligence)
+    video_url: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    video_duration_seconds: {
+        type: DataTypes.FLOAT,
+        allowNull: true
+    },
+    video_resolution: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    video_fps: {
+        type: DataTypes.FLOAT,
+        allowNull: true
+    },
+    video_aspect_ratio: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    is_simulation: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false
     }
 }, {
     tableName: 'SocialMediaPosts',
     timestamps: true
 });
+
 
 module.exports = SocialMediaPost;

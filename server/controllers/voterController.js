@@ -13,9 +13,12 @@ exports.createVoter = async (req, res) => {
             return res.status(400).json({ message: 'Ya existe un votante con esta cédula' });
         }
 
+        const assignedCampanaId = req.campana_id || voterData.campana_id || req.user.campana_id || null;
+
         const newVoter = await Voter.create({
             ...voterData,
-            usuario_registro_id: req.user.userId,
+            campana_id: assignedCampanaId,
+            usuario_registro_id: req.user.id || req.user.userId,
             isLeader: isLeader || false
         });
 
@@ -29,8 +32,9 @@ exports.createVoter = async (req, res) => {
 exports.getVoters = async (req, res) => {
     try {
         const whereClause = {};
-        if (req.query.campana_id) {
-            whereClause.campana_id = req.query.campana_id;
+        const campanaId = req.campana_id || (req.query.campana_id ? parseInt(req.query.campana_id, 10) : null);
+        if (campanaId) {
+            whereClause.campana_id = campanaId;
         }
 
         const voters = await Voter.findAll({
@@ -51,8 +55,9 @@ exports.getVoters = async (req, res) => {
 exports.getLeaders = async (req, res) => {
     try {
         const whereClause = { isLeader: true };
-        if (req.query.campana_id) {
-            whereClause.campana_id = req.query.campana_id;
+        const campanaId = req.campana_id || (req.query.campana_id ? parseInt(req.query.campana_id, 10) : null);
+        if (campanaId) {
+            whereClause.campana_id = campanaId;
         }
         const leaders = await Voter.findAll({
             where: whereClause,
@@ -71,6 +76,11 @@ exports.getVoterById = async (req, res) => {
             include: [{ model: User, attributes: ['email'] }]
         });
         if (!voter) return res.status(404).json({ message: 'Votante no encontrado' });
+
+        if (req.user.role !== 'superadmin' && req.campana_id && voter.campana_id && voter.campana_id !== req.campana_id) {
+            return res.status(403).json({ message: 'Acceso denegado: este votante pertenece a otra campaña' });
+        }
+
         res.json(voter);
     } catch (error) {
         res.status(500).json({ message: 'Error al obtener el votante', error: error.message });
@@ -81,6 +91,10 @@ exports.updateVoter = async (req, res) => {
     try {
         const voter = await Voter.findByPk(req.params.id);
         if (!voter) return res.status(404).json({ message: 'Votante no encontrado' });
+
+        if (req.user.role !== 'superadmin' && req.campana_id && voter.campana_id && voter.campana_id !== req.campana_id) {
+            return res.status(403).json({ message: 'Acceso denegado: no puede modificar votantes de otra campaña' });
+        }
 
         const { nombres, apellidos, cedula, direccion, lugar_votacion, departamento, municipio, mesa, lider_nombre, lider_cedula, isLeader, campana_id } = req.body;
 
@@ -104,7 +118,7 @@ exports.updateVoter = async (req, res) => {
             lider_nombre:  lider_nombre  ?? voter.lider_nombre,
             lider_cedula:  lider_cedula  ?? voter.lider_cedula,
             isLeader:      isLeader      ?? voter.isLeader,
-            campana_id:    campana_id    !== undefined ? campana_id : voter.campana_id,
+            campana_id:    req.user.role === 'superadmin' && campana_id !== undefined ? campana_id : voter.campana_id,
         });
 
         res.json({ message: 'Votante actualizado exitosamente', voter });
@@ -113,6 +127,7 @@ exports.updateVoter = async (req, res) => {
         res.status(500).json({ message: 'Error al actualizar el votante', error: error.message });
     }
 };
+
 
 // ─── DESCARGA DE PLANTILLA EXCEL ───────────────────────────────────────────
 exports.downloadTemplate = async (req, res) => {
@@ -300,8 +315,7 @@ exports.importVoters = async (req, res) => {
             const isLeaderVal = norm(row.isLeader || '');
             const isLeader = ['true', 'si', 'sí', '1', 'lider', 'líder', 's', 'yes'].includes(isLeaderVal);
 
-            const campanaId = req.body.campana_id || req.query.campana_id || null;
-            const apoyoId = req.body.apoyo_id || req.query.apoyo_id || null;
+            const targetCampana = req.campana_id || (campanaId ? parseInt(campanaId, 10) : null);
 
             await Voter.create({
                 nombres:             row.nombres,
@@ -314,11 +328,12 @@ exports.importVoters = async (req, res) => {
                 municipio:           row.municipio,
                 lider_nombre:        row.lider_nombre || '',
                 lider_cedula:        row.lider_cedula || '',
-                campana_id:          campanaId ? parseInt(campanaId, 10) : null,
+                campana_id:          targetCampana,
                 apoyo_id:            apoyoId ? parseInt(apoyoId, 10) : null,
                 isLeader,
-                usuario_registro_id: req.user.userId
+                usuario_registro_id: req.user.id || req.user.userId
             });
+
             results.success++;
         }
 
