@@ -2,7 +2,7 @@ import { useState } from 'react';
 import {
     LayoutDashboard, Users, FileText, UserPlus, LogOut,
     Search, User as UserIcon, Circle, ChevronRight, List, Database, Flag,
-    MessageSquare, Sparkles, CalendarDays, Share2
+    MessageSquare, Sparkles, CalendarDays, Share2, Vote, Compass, Calculator
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -15,6 +15,9 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
     // Menú dinámico basado en los roles y módulos existentes
     const menuItems = [
         { icon: LayoutDashboard, label: 'INICIO',               path: '/dashboard' },
+        { icon: Vote,           label: 'OPERACIÓN DÍA D',      path: '/dia-d',    badge: 'GOTV' },
+        { icon: Compass,        label: 'MAPA TERRITORIAL',     path: '/territorio', badge: 'GIS' },
+        { icon: Calculator,     label: 'SIMULADOR CURULES',    path: '/simulador' },
         { icon: CalendarDays,   label: 'REUNIONES Y AGENDA',   path: '/meetings', badge: 'EVENTOS' },
         { icon: Share2,         label: 'REDES SOCIALES',       path: '/social',   badge: 'EN VIVO' },
         { icon: Flag,            label: 'CAMPAÑAS',             path: '/campaigns' },

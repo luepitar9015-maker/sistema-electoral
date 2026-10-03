@@ -25,6 +25,9 @@ const SocialExperiment = require('./models/SocialExperiment');
 const AuditLog = require('./models/AuditLog');
 const AIUsageLog = require('./models/AIUsageLog');
 const SocialPostComment = require('./models/SocialPostComment');
+const VoterInteraction = require('./models/VoterInteraction');
+const TestigoElectoral = require('./models/TestigoElectoral');
+const DiaDMesaReporte = require('./models/DiaDMesaReporte');
 
 // Asociaciones de Reuniones
 Reunion.hasMany(ReunionAsistente, { foreignKey: 'reunion_id', as: 'asistentes', onDelete: 'CASCADE' });
@@ -69,6 +72,7 @@ const whatsappRoutes = require('./routes/whatsappRoutes');
 const reunionRoutes = require('./routes/reunionRoutes');
 const socialRoutes = require('./routes/socialRoutes');
 const contentIntelligenceRoutes = require('./routes/contentIntelligenceRoutes');
+const diaDRoutes = require('./routes/diaDRoutes');
 
 app.use(cors());
 app.use(express.json({ limit: '25mb' }));
@@ -108,6 +112,7 @@ app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/reuniones', reunionRoutes);
 app.use('/api/social', socialRoutes);
 app.use('/api/social/intelligence', contentIntelligenceRoutes);
+app.use('/api/dia-d', diaDRoutes);
 
 // Ruta pública de Revisor y Trazabilidad por el Link del Candidato
 app.get('/r/:postId', async (req, res) => {

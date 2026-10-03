@@ -175,6 +175,67 @@ class WhatsAppAiService {
         // 2. Extraer entidades mediante procesamiento inteligente
         const parsed = this.parseMessageEntities(rawText, nombreRemitente, telefonoRemitente);
 
+        // 2.1 Detectar intención de Consulta Ciudadana de Puesto de Votación
+        const isQueryIntent = /(?:donde|d[oó]nde\s+(?:me\s+toca\s+)?voto|puesto|mesa|consultar?\s*(?:puesto|cedula|c[eé]dula)?|^c[eé]dula\s*\d+|^\d{6,11}$)/i.test(rawText);
+        const singleCedMatch = rawText.match(/\b\d{6,11}\b/);
+
+        if (isQueryIntent && singleCedMatch && parsed.voters.length <= 1 && !parsed.leader) {
+            const queryCedula = singleCedMatch[0];
+            const censoInfo = await CensoElectoral.findOne({ where: { cedula: queryCedula } });
+            const voterRecord = await Voter.findOne({ where: { cedula: queryCedula } });
+
+            let queryResponse = '';
+            if (censoInfo) {
+                const nombreCiudadano = (censoInfo.nombres ? `${censoInfo.nombres} ${censoInfo.apellidos || ''}` : voterRecord ? `${voterRecord.nombres} ${voterRecord.apellidos}` : 'Ciudadano').trim();
+                const liderAsignado = voterRecord?.lider_nombre ? `${voterRecord.lider_nombre}` : (campaign?.candidato ? `Equipo de ${campaign.candidato}` : 'Coordinación Electoral');
+
+                queryResponse = `🗳️ *CONSULTA OFICIAL DE PUESTO DE VOTACIÓN* 🇨🇴\n\n` +
+                    `¡Hola, *${nombreCiudadano}*!\n\n` +
+                    `Tu información electoral registrada es:\n` +
+                    `📍 *Puesto de Votación:* ${censoInfo.puesto_votacion || 'Principal'}\n` +
+                    `🏢 *Dirección:* ${censoInfo.direccion || 'Casco Urbano'}\n` +
+                    `🗳️ *Mesa Asignada:* *Mesa ${censoInfo.mesa || '1'}*\n` +
+                    `🗺️ *Municipio:* ${censoInfo.municipio || ''} (${censoInfo.departamento || ''})\n\n` +
+                    `👥 *Tu Enlace / Líder de Campaña:* ${liderAsignado}\n\n` +
+                    `⏰ *Horario de votación:* 8:00 AM a 4:00 PM.\n` +
+                    `⚠️ *Recuerda:* Presenta tu cédula de ciudadanía física o digital original.\n\n` +
+                    `_${campaign?.nombre ? 'Campaña ' + campaign.nombre + ' te desea una excelente jornada.' : '¡Tu voto construye el futuro!'}_`;
+            } else if (voterRecord) {
+                queryResponse = `🗳️ *CONSULTA DE PUESTO DE VOTACIÓN* 🇨🇴\n\n` +
+                    `¡Hola, *${voterRecord.nombres} ${voterRecord.apellidos}*!\n\n` +
+                    `Estás registrado(a) en nuestra campaña electoral:\n` +
+                    `📍 *Puesto:* ${voterRecord.lugar_votacion || 'Por confirmar'}\n` +
+                    `🗳️ *Mesa:* ${voterRecord.mesa || 'Por confirmar'}\n` +
+                    `🗺️ *Municipio:* ${voterRecord.municipio || ''}\n` +
+                    `👥 *Líder Asignado:* ${voterRecord.lider_nombre || 'Equipo Central'}\n\n` +
+                    `⚠️ Tu puesto exacto se confirmará en cuanto se actualice el censo oficial. ¡Tu líder te contactará!`;
+            } else {
+                queryResponse = `🔍 *CONSULTA ELECTORAL*\n\n` +
+                    `No encontramos un registro asignado con la cédula *${queryCedula}* en nuestro censo territorial local.\n\n` +
+                    `👉 Por favor verifica que el número esté bien escrito o consulta directamente en la Registraduría Nacional.\n\n` +
+                    `Si deseas unirte a la campaña o registrarte con un líder, responde con tu nombre completo y barrio.`;
+            }
+
+            await WhatsAppMessage.create({
+                campana_id: campaign?.id || null,
+                remitente_telefono: telefonoRemitente || '+573000000000',
+                remitente_nombre: nombreRemitente || 'Ciudadano Consulta',
+                mensaje: rawText,
+                respuesta: queryResponse,
+                tipo_mensaje: 'consulta_puesto',
+                votantes_procesados: 0,
+                lider_registrado: false,
+                detalles_json: JSON.stringify({ queryCedula, found: !!censoInfo })
+            });
+
+            return {
+                reply: queryResponse,
+                tipo: 'consulta_puesto',
+                success: true,
+                resultado: { queryCedula, puesto: censoInfo?.puesto_votacion, mesa: censoInfo?.mesa }
+            };
+        }
+
         // 3. Autoconsulta del Líder en el Censo si se detectó cédula
         let leaderData = null;
         if (parsed.leader) {

@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useCampaign } from '../context/CampaignContext';
 import { colombiaData } from '../data/colombiaData';
-import { Search, Save, CheckCircle, Loader, Zap, ExternalLink, RefreshCw, Flag } from 'lucide-react';
+import { Search, Save, CheckCircle, Loader, Zap, ExternalLink, RefreshCw, Flag, Star } from 'lucide-react';
+import VoterScoringModal from '../components/VoterScoringModal';
 import { API } from '../config/api';
 
 const PAGE_SIZE = 100;
@@ -25,6 +26,7 @@ export default function VotersList() {
     const [filterCamp, setFilterCamp] = useState(activeCampaign?.id || '');
     const [filterApoyo, setFilterApoyo] = useState('');
     const [page, setPage] = useState(1);
+    const [scoringVoter, setScoringVoter] = useState(null);
 
     useEffect(() => {
         if (activeCampaign) {
@@ -209,6 +211,7 @@ export default function VotersList() {
                                     <th className="px-2 py-2.5 text-left border-r border-gray-600 bg-[#00B894]" style={{width:'180px'}}>📍 Lugar de Votación</th>
                                     <th className="px-2 py-2.5 text-left border-r border-gray-600" style={{width:'70px'}}>Mesa</th>
                                     <th className="px-2 py-2.5 text-left border-r border-gray-600" style={{width:'130px'}}>Líder</th>
+                                    <th className="px-2 py-2.5 text-center border-r border-gray-600" style={{width:'90px'}}>⭐ Fidelidad</th>
                                     <th className="px-2 py-2.5 text-center w-20">Guardar</th>
                                 </tr>
                             </thead>
@@ -315,6 +318,21 @@ export default function VotersList() {
                                             <td className="border-r border-gray-100 px-1">
                                                 <input value={row.lider_nombre || ''} onChange={e => handleCell(row.id, 'lider_nombre', e.target.value)} className={inputCls} />
                                             </td>
+                                            {/* Fidelidad / Scoring */}
+                                            <td className="border-r border-gray-100 px-1 text-center">
+                                                <button
+                                                    onClick={() => setScoringVoter(row)}
+                                                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border transition ${
+                                                        (row.fidelidad_score || 3) >= 4 ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100' :
+                                                        (row.fidelidad_score || 3) === 3 ? 'bg-amber-50 text-amber-700 border-amber-300 hover:bg-amber-100' :
+                                                        'bg-red-50 text-red-700 border-red-300 hover:bg-red-100'
+                                                    }`}
+                                                    title="Abrir ficha de fidelidad y seguimiento"
+                                                >
+                                                    <Star className="w-3 h-3 fill-current" />
+                                                    <span>{row.fidelidad_score || 3}/5</span>
+                                                </button>
+                                            </td>
                                             {/* Botón Guardar */}
                                             <td className="px-1 text-center">
                                                 <button
@@ -359,6 +377,16 @@ export default function VotersList() {
                     </div>
                 )}
             </div>
+
+            {scoringVoter && (
+                <VoterScoringModal
+                    voter={scoringVoter}
+                    onClose={() => setScoringVoter(null)}
+                    onUpdated={(updated) => {
+                        setRows(prev => prev.map(r => r.id === updated.id ? { ...r, ...updated } : r));
+                    }}
+                />
+            )}
         </div>
     );
 }

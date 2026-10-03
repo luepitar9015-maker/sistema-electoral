@@ -10,6 +10,7 @@ router.get('/excel', reportController.exportExcel);
 router.get('/pdf', reportController.exportPDF);
 router.get('/geo', reportController.getGeoStats);
 router.get('/leaders', reportController.getLeaderStats);
+router.post('/simulate-dhondt', reportController.simulateDHondt);
 
 module.exports = router;
 

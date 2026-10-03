@@ -13,6 +13,9 @@ import CampaignsPage from './pages/CampaignsPage';
 import WhatsAppAgent from './pages/WhatsAppAgent';
 import MeetingsPage from './pages/MeetingsPage';
 import SocialMediaPage from './pages/SocialMediaPage';
+import DiaDDashboard from './features/diaD/DiaDDashboard';
+import TerritorialHeatMap from './features/territorio/TerritorialHeatMap';
+import DHondtSimulator from './features/simulador/DHondtSimulator';
 
 const ProtectedRoute = ({ children, requireAdmin }) => {
     const { user, loading } = useAuth();
@@ -29,7 +32,10 @@ function AppRoutes() {
             <Route path="/" element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
                 <Route index element={<Navigate to="/dashboard" />} />
                 <Route path="dashboard" element={<Dashboard />} />
-                {/* Rutas del sistema */}
+                {/* Rutas operativas avanzadas */}
+                <Route path="dia-d" element={<DiaDDashboard />} />
+                <Route path="territorio" element={<TerritorialHeatMap />} />
+                <Route path="simulador" element={<DHondtSimulator />} />
                 <Route path="meetings" element={<MeetingsPage />} />
                 <Route path="social" element={<SocialMediaPage />} />
                 <Route path="campaigns" element={<CampaignsPage />} />

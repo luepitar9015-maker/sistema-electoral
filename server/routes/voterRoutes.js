@@ -18,6 +18,14 @@ router.get('/leaders',         voterController.getLeaders);
 router.get('/template',        voterController.downloadTemplate);
 router.post('/import',         upload.single('file'), voterController.importVoters);
 
+// Inteligencia territorial / GIS
+router.get('/geo-data',        voterController.getTerritorialGeoData);
+
+// Scoring y seguimiento
+router.put('/:id/scoring',     voterController.updateVoterScoring);
+router.post('/:id/interactions', voterController.addVoterInteraction);
+router.get('/:id/interactions', voterController.getVoterInteractions);
+
 // CRUD individual
 router.get('/:id',             voterController.getVoterById);
 router.put('/:id',             voterController.updateVoter);

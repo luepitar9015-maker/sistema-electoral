@@ -1,6 +1,8 @@
 const Voter = require('../models/Voter');
 const User = require('../models/User');
 const Campaign = require('../models/Campaign');
+const VoterInteraction = require('../models/VoterInteraction');
+const { Op } = require('sequelize');
 const ExcelJS = require('exceljs');
 
 exports.createVoter = async (req, res) => {
@@ -35,6 +37,14 @@ exports.getVoters = async (req, res) => {
         const campanaId = req.campana_id || (req.query.campana_id ? parseInt(req.query.campana_id, 10) : null);
         if (campanaId) {
             whereClause.campana_id = campanaId;
+        }
+
+        // Restricción de seguridad: Los líderes solo ven sus propios votantes
+        if (req.user && req.user.role === 'lider') {
+            whereClause[Op.or] = [
+                { lider_cedula: req.user.cedula },
+                { usuario_registro_id: req.user.id }
+            ];
         }
 
         const voters = await Voter.findAll({
@@ -344,5 +354,129 @@ exports.importVoters = async (req, res) => {
     } catch (error) {
         console.error('Error importando Excel:', error);
         res.status(500).json({ message: 'Error al procesar el archivo Excel', error: error.message });
+    }
+};
+
+// Actualizar Scoring de Fidelidad e Intención de Voto
+exports.updateVoterScoring = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { fidelidad_score, intencion_voto, observaciones_seguimiento, latitud, longitud } = req.body;
+
+        const voter = await Voter.findByPk(id);
+        if (!voter) {
+            return res.status(404).json({ message: 'Votante no encontrado' });
+        }
+
+        if (fidelidad_score !== undefined) voter.fidelidad_score = parseInt(fidelidad_score, 10);
+        if (intencion_voto !== undefined) voter.intencion_voto = intencion_voto;
+        if (observaciones_seguimiento !== undefined) voter.observaciones_seguimiento = observaciones_seguimiento;
+        if (latitud !== undefined) voter.latitud = parseFloat(latitud);
+        if (longitud !== undefined) voter.longitud = parseFloat(longitud);
+
+        await voter.save();
+        return res.json({ message: 'Scoring y datos territoriales actualizados', voter });
+    } catch (error) {
+        console.error('Error al actualizar scoring del votante:', error);
+        return res.status(500).json({ message: 'Error al actualizar scoring' });
+    }
+};
+
+// Registrar interacción con el votante (Llamada, Visita, Reunión, etc.)
+exports.addVoterInteraction = async (req, res) => {
+    try {
+        const { id } = req.params; // voter_id
+        const { tipo, resultado, notas } = req.body;
+
+        const voter = await Voter.findByPk(id);
+        if (!voter) {
+            return res.status(404).json({ message: 'Votante no encontrado' });
+        }
+
+        const interaction = await VoterInteraction.create({
+            voter_id: id,
+            usuario_id: req.user.id || req.user.userId,
+            tipo: tipo || 'llamada',
+            resultado: resultado || 'positivo',
+            notas: notas || ''
+        });
+
+        // Si la interacción es muy positiva o de riesgo, ajustar fidelidad automáticamente
+        if (resultado === 'positivo' && voter.fidelidad_score < 5) {
+            voter.fidelidad_score = Math.min(5, voter.fidelidad_score + 1);
+            await voter.save();
+        } else if (resultado === 'negativo') {
+            voter.fidelidad_score = Math.max(1, voter.fidelidad_score - 1);
+            voter.intencion_voto = 'dudoso';
+            await voter.save();
+        }
+
+        return res.status(201).json({ message: 'Interacción registrada', interaction });
+    } catch (error) {
+        console.error('Error al registrar interacción:', error);
+        return res.status(500).json({ message: 'Error al registrar interacción' });
+    }
+};
+
+// Obtener historial de interacciones de un votante
+exports.getVoterInteractions = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const interacciones = await VoterInteraction.findAll({
+            where: { voter_id: id },
+            include: [{ model: User, as: 'responsable', attributes: ['id', 'email', 'cedula'] }],
+            order: [['createdAt', 'DESC']]
+        });
+        return res.json(interacciones);
+    } catch (error) {
+        return res.status(500).json({ message: 'Error al obtener historial de interacciones' });
+    }
+};
+
+// Obtener datos geoespaciales para mapa de calor territorial (Leaflet / GIS)
+exports.getTerritorialGeoData = async (req, res) => {
+    try {
+        const campanaId = req.campaignId || (req.query.campana_id ? parseInt(req.query.campana_id, 10) : null);
+        const whereClause = {};
+        if (campanaId) whereClause.campana_id = campanaId;
+
+        const voters = await Voter.findAll({
+            where: whereClause,
+            attributes: ['id', 'nombres', 'apellidos', 'cedula', 'municipio', 'departamento', 'lugar_votacion', 'mesa', 'latitud', 'longitud', 'fidelidad_score', 'intencion_voto', 'ha_votado', 'lider_nombre']
+        });
+
+        // Agrupación por puestos de votación
+        const puestosMap = {};
+        voters.forEach(v => {
+            const puestoKey = `${v.municipio || ''} - ${v.lugar_votacion || 'Sin Puesto'}`;
+            if (!puestosMap[puestoKey]) {
+                puestosMap[puestoKey] = {
+                    puesto: v.lugar_votacion || 'Sin Puesto',
+                    municipio: v.municipio || '',
+                    departamento: v.departamento || '',
+                    total_votantes: 0,
+                    votos_efectivos: 0,
+                    latitud: v.latitud || null,
+                    longitud: v.longitud || null,
+                    scores: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
+                };
+            }
+            puestosMap[puestoKey].total_votantes++;
+            if (v.ha_votado) puestosMap[puestoKey].votos_efectivos++;
+            const sc = v.fidelidad_score || 3;
+            if (puestosMap[puestoKey].scores[sc] !== undefined) puestosMap[puestoKey].scores[sc]++;
+            if (!puestosMap[puestoKey].latitud && v.latitud) puestosMap[puestoKey].latitud = v.latitud;
+            if (!puestosMap[puestoKey].longitud && v.longitud) puestosMap[puestoKey].longitud = v.longitud;
+        });
+
+        return res.json({
+            total_geolocalizados: voters.filter(v => !!v.latitud && !!v.longitud).length,
+            total_votantes: voters.length,
+            puestos: Object.values(puestosMap),
+            votantes_geolocalizados: voters.filter(v => !!v.latitud && !!v.longitud)
+        });
+    } catch (error) {
+        console.error('Error al generar datos territoriales:', error);
+        return res.status(500).json({ message: 'Error al generar mapa territorial' });
     }
 };

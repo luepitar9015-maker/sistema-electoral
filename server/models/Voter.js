@@ -77,6 +77,42 @@ const Voter = sequelize.define('Voter', {
     isLeader: {
         type: DataTypes.BOOLEAN,
         defaultValue: false
+    },
+    // Inteligencia del Voto y Scoring (1: En riesgo, 2: Indeciso, 3: Simpatizante, 4: Comprometido, 5: Militante Seguro)
+    fidelidad_score: {
+        type: DataTypes.INTEGER,
+        defaultValue: 3,
+        validate: { min: 1, max: 5 }
+    },
+    intencion_voto: {
+        type: DataTypes.STRING,
+        defaultValue: 'probable' // 'seguro', 'probable', 'dudoso', 'en_contra'
+    },
+    // Operación Día D (GOTV - Get Out The Vote)
+    ha_votado: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false
+    },
+    hora_voto: {
+        type: DataTypes.DATE,
+        allowNull: true
+    },
+    registrado_por_voto_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true
+    },
+    // Geolocalización territorial (GIS / Mapas de calor)
+    latitud: {
+        type: DataTypes.FLOAT,
+        allowNull: true
+    },
+    longitud: {
+        type: DataTypes.FLOAT,
+        allowNull: true
+    },
+    observaciones_seguimiento: {
+        type: DataTypes.TEXT,
+        allowNull: true
     }
 }, {
     timestamps: true,
