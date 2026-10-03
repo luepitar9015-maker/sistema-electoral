@@ -71,9 +71,11 @@ exports.authorizeCampaignAccess = (req, res, next) => {
 
     const requested = req.query?.campana_id || req.body?.campana_id || req.params?.campana_id;
 
-    // superadmin tiene acceso global multi-campaña
-    if (req.user.role === 'superadmin') {
-        req.campana_id = requested ? parseInt(requested, 10) : null;
+    // superadmin y admin tienen acceso global multi-campaña
+    if (req.user.role === 'superadmin' || req.user.role === 'admin') {
+        const resolvedId = requested ? parseInt(requested, 10) : (req.user.campana_id ? parseInt(req.user.campana_id, 10) : null);
+        req.campana_id = resolvedId;
+        req.campaignId = resolvedId;
         return next();
     }
 
@@ -90,6 +92,7 @@ exports.authorizeCampaignAccess = (req, res, next) => {
 
     // Forzar el aislamiento
     req.campana_id = userCampanaId;
+    req.campaignId = userCampanaId;
     if (req.query) req.query.campana_id = userCampanaId;
     if (req.body && typeof req.body === 'object') req.body.campana_id = userCampanaId;
 

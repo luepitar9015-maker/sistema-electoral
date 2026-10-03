@@ -4,9 +4,10 @@ const Voter = require('../models/Voter');
 
 exports.getVehiculos = async (req, res) => {
     try {
-        const campana_id = req.campaignId || req.query.campana_id;
+        const campana_id = req.campaignId || req.campana_id || req.query.campana_id;
+        const where = campana_id ? { campana_id } : {};
         const vehiculos = await LogisticaVehiculo.findAll({
-            where: { campana_id },
+            where,
             order: [['estado', 'ASC'], ['conductor_nombre', 'ASC']]
         });
         return res.json(vehiculos);
@@ -17,7 +18,7 @@ exports.getVehiculos = async (req, res) => {
 
 exports.createVehiculo = async (req, res) => {
     try {
-        const campana_id = req.campaignId || req.body.campana_id;
+        const campana_id = req.campaignId || req.campana_id || req.body.campana_id;
         const { conductor_nombre, conductor_telefono, placa, tipo_vehiculo, capacidad_pasajeros, zona_asignada, observaciones } = req.body;
 
         if (!conductor_nombre || !conductor_telefono || !placa) {
@@ -68,9 +69,9 @@ exports.deleteVehiculo = async (req, res) => {
 
 exports.getDespachos = async (req, res) => {
     try {
-        const campana_id = req.campaignId || req.query.campana_id;
+        const campana_id = req.campaignId || req.campana_id || req.query.campana_id;
         const { estado } = req.query;
-        const where = { campana_id };
+        const where = campana_id ? { campana_id } : {};
         if (estado && estado !== 'todos') where.estado = estado;
 
         const despachos = await LogisticaDespacho.findAll({
@@ -178,9 +179,10 @@ exports.completarDespacho = async (req, res) => {
 
 exports.getLogisticaSummary = async (req, res) => {
     try {
-        const campana_id = req.campaignId || req.query.campana_id;
-        const vehiculos = await LogisticaVehiculo.findAll({ where: { campana_id } });
-        const despachos = await LogisticaDespacho.findAll({ where: { campana_id } });
+        const campana_id = req.campaignId || req.campana_id || req.query.campana_id;
+        const where = campana_id ? { where: { campana_id } } : {};
+        const vehiculos = await LogisticaVehiculo.findAll(where);
+        const despachos = await LogisticaDespacho.findAll(where);
 
         const totalVehiculos = vehiculos.length;
         const disponibles = vehiculos.filter(v => v.estado === 'disponible').length;

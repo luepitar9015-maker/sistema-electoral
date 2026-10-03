@@ -6,21 +6,20 @@ const User = require('../models/User');
 
 exports.getNextVoter = async (req, res) => {
     try {
-        const campana_id = req.campaignId || req.query.campana_id;
+        const campana_id = req.campaignId || req.campana_id || req.query.campana_id;
         const { puesto, soloPendientesDiaD, minFidelidad = 1 } = req.query;
 
-        const where = { campana_id };
+        const where = campana_id ? { campana_id } : {};
         if (puesto) where.lugar_votacion = puesto;
         if (soloPendientesDiaD === 'true') where.ha_votado = false;
         if (minFidelidad) where.fidelidad_score = { [Op.gte]: parseInt(minFidelidad, 10) };
 
         // Excluir votantes llamados en las últimas 3 horas
         const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000);
+        const callWhere = { fecha_llamada: { [Op.gte]: threeHoursAgo } };
+        if (campana_id) callWhere.campana_id = campana_id;
         const recentCalled = await CallCenterLog.findAll({
-            where: {
-                campana_id,
-                fecha_llamada: { [Op.gte]: threeHoursAgo }
-            },
+            where: callWhere,
             attributes: ['voter_id']
         });
         const calledIds = recentCalled.map(c => c.voter_id);
@@ -110,14 +109,16 @@ exports.recordCall = async (req, res) => {
 
 exports.getCallCenterStats = async (req, res) => {
     try {
-        const campana_id = req.campaignId || req.query.campana_id;
-        const totalLlamadas = await CallCenterLog.count({ where: { campana_id } });
-        const misLlamadas = await CallCenterLog.count({ where: { campana_id, usuario_id: req.user.id } });
+        const campana_id = req.campaignId || req.campana_id || req.query.campana_id;
+        const baseWhere = campana_id ? { campana_id } : {};
 
-        const confirmados = await CallCenterLog.count({ where: { campana_id, resultado: 'confirmo_voto' } });
-        const transporte = await CallCenterLog.count({ where: { campana_id, resultado: 'requiere_transporte' } });
-        const noContesta = await CallCenterLog.count({ where: { campana_id, resultado: 'no_contesta' } });
-        const indecisos = await CallCenterLog.count({ where: { campana_id, resultado: 'indeciso' } });
+        const totalLlamadas = await CallCenterLog.count({ where: baseWhere });
+        const misLlamadas = await CallCenterLog.count({ where: { ...baseWhere, usuario_id: req.user.id } });
+
+        const confirmados = await CallCenterLog.count({ where: { ...baseWhere, resultado: 'confirmo_voto' } });
+        const transporte = await CallCenterLog.count({ where: { ...baseWhere, resultado: 'requiere_transporte' } });
+        const noContesta = await CallCenterLog.count({ where: { ...baseWhere, resultado: 'no_contesta' } });
+        const indecisos = await CallCenterLog.count({ where: { ...baseWhere, resultado: 'indeciso' } });
 
         const efectividad = totalLlamadas > 0 ? Math.round(((confirmados + transporte) / totalLlamadas) * 100) : 0;
 
