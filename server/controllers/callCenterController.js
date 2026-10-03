@@ -50,11 +50,12 @@ exports.getNextVoter = async (req, res) => {
 
 exports.recordCall = async (req, res) => {
     try {
-        const campana_id = req.campaignId || req.body.campana_id;
         const { voter_id, resultado, notas, duracion_segundos = 0, origen_direccion, destino_puesto } = req.body;
 
         const voter = await Voter.findByPk(voter_id);
         if (!voter) return res.status(404).json({ message: 'Votante no encontrado' });
+
+        let campana_id = req.campaignId || req.campana_id || req.body.campana_id || voter.campana_id || 1;
 
         const log = await CallCenterLog.create({
             campana_id,

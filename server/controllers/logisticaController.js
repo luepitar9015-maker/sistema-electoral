@@ -1,6 +1,7 @@
 const LogisticaVehiculo = require('../models/LogisticaVehiculo');
 const LogisticaDespacho = require('../models/LogisticaDespacho');
 const Voter = require('../models/Voter');
+const Campaign = require('../models/Campaign');
 
 exports.getVehiculos = async (req, res) => {
     try {
@@ -18,7 +19,11 @@ exports.getVehiculos = async (req, res) => {
 
 exports.createVehiculo = async (req, res) => {
     try {
-        const campana_id = req.campaignId || req.campana_id || req.body.campana_id;
+        let campana_id = req.campaignId || req.campana_id || req.body.campana_id;
+        if (!campana_id) {
+            const firstCamp = await Campaign.findOne({ attributes: ['id'] });
+            campana_id = firstCamp ? firstCamp.id : 1;
+        }
         const { conductor_nombre, conductor_telefono, placa, tipo_vehiculo, capacidad_pasajeros, zona_asignada, observaciones } = req.body;
 
         if (!conductor_nombre || !conductor_telefono || !placa) {
@@ -90,7 +95,11 @@ exports.getDespachos = async (req, res) => {
 
 exports.createDespacho = async (req, res) => {
     try {
-        const campana_id = req.campaignId || req.body.campana_id;
+        let campana_id = req.campaignId || req.campana_id || req.body.campana_id;
+        if (!campana_id) {
+            const firstCamp = await Campaign.findOne({ attributes: ['id'] });
+            campana_id = firstCamp ? firstCamp.id : 1;
+        }
         const { solicitante_nombre, solicitante_telefono, origen_direccion, destino_puesto, cantidad_pasajeros, voter_id, vehiculo_id, notas } = req.body;
 
         if (!solicitante_nombre || !origen_direccion || !destino_puesto) {
