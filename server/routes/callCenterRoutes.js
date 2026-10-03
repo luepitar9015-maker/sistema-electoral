@@ -8,6 +8,7 @@ router.use(authorizeCampaignAccess);
 
 router.get('/next', callCenterController.getNextVoter);
 router.post('/record', callCenterController.recordCall);
+router.post('/log', callCenterController.recordCall);
 router.get('/stats', callCenterController.getCallCenterStats);
 
 module.exports = router;
