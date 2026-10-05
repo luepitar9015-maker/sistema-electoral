@@ -13,8 +13,8 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
     const navigate = useNavigate();
     const { user, logout } = useAuth();
 
-    // Menú dinámico basado en los roles y módulos existentes
-    const menuItems = [
+    // Módulos generales del sistema
+    const allMenuItems = [
         { icon: LayoutDashboard, label: 'INICIO',               path: '/dashboard' },
         { icon: Vote,           label: 'OPERACIÓN DÍA D',      path: '/dia-d',       badge: 'GOTV' },
         { icon: Truck,          label: 'FLOTA Y TRANSPORTE',   path: '/logistica',   badge: 'LOGÍSTICA' },
@@ -22,17 +22,53 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
         { icon: Compass,        label: 'MAPA TERRITORIAL',     path: '/territorio',  badge: 'GIS' },
         { icon: Building2,      label: 'BANCO NECESIDADES',    path: '/necesidades', badge: 'IA / 4 AÑOS' },
         { icon: Calculator,     label: 'SIMULADOR CURULES',    path: '/simulador' },
-        { icon: CalendarDays,   label: 'REUNIONES Y AGENDA',   path: '/meetings', badge: 'EVENTOS' },
-        { icon: Share2,         label: 'REDES SOCIALES',       path: '/social',   badge: 'EN VIVO' },
-        { icon: Flag,            label: 'CAMPAÑAS',             path: '/campaigns' },
-        { icon: MessageSquare,   label: 'AGENTE WHATSAPP',      path: '/whatsapp', badge: 'IA' },
-        { icon: UserPlus,        label: 'REGISTRO',             path: '/register'  },
-        { icon: List,            label: 'VOTANTES',             path: '/voters'    },
-        { icon: Database,        label: 'CENSO / PUESTOS',      path: '/censo'     },
-        { icon: FileText,        label: 'INFORMES',             path: '/reports'   },
+        { icon: CalendarDays,   label: 'REUNIONES Y AGENDA',   path: '/meetings',    badge: 'EVENTOS' },
+        { icon: Share2,         label: 'REDES SOCIALES',       path: '/social',      badge: 'EN VIVO' },
+        { icon: Flag,           label: 'CAMPAÑAS',             path: '/campaigns' },
+        { icon: MessageSquare,  label: 'AGENTE WHATSAPP',      path: '/whatsapp',    badge: 'IA' },
+        { icon: UserPlus,       label: 'REGISTRO',             path: '/register'  },
+        { icon: List,           label: 'VOTANTES',             path: '/voters'    },
+        { icon: Database,       label: 'CENSO / PUESTOS',      path: '/censo'     },
+        { icon: FileText,       label: 'INFORMES',             path: '/reports'   },
     ];
 
-    // Módulo de usuarios para superadmin y admin
+    // Permisos de navegación por rol
+    const ROLE_ALLOWED_PATHS = {
+        superadmin: ['*'],
+        admin: ['*'],
+        candidato: ['*'],
+        gerente: ['*'],
+        coordinador_zonal: [
+            '/dashboard', '/territorio', '/voters', '/register', 
+            '/necesidades', '/meetings', '/dia-d', '/reports'
+        ],
+        comunicaciones_prensa: [
+            '/dashboard', '/social', '/whatsapp', '/necesidades', '/meetings'
+        ],
+        testigo_electoral: [
+            '/dia-d', '/censo'
+        ],
+        lider: [
+            '/dashboard', '/register', '/voters', '/necesidades', '/meetings', '/reports'
+        ],
+        apoyo_bd: [
+            '/dashboard', '/register', '/voters', '/censo', '/necesidades'
+        ],
+        orador: [
+            '/dashboard', '/meetings', '/necesidades'
+        ],
+        lider_avanzada: [
+            '/dashboard', '/meetings', '/logistica', '/necesidades'
+        ]
+    };
+
+    const allowed = ROLE_ALLOWED_PATHS[user?.role] || ['/dashboard', '/voters', '/register'];
+    const menuItems = allMenuItems.filter(item => {
+        if (allowed.includes('*')) return true;
+        return allowed.includes(item.path);
+    });
+
+    // Módulo de usuarios exclusivo para superadmin y admin
     if (user?.role === 'superadmin' || user?.role === 'admin') {
         menuItems.push({ icon: Users, label: 'USUARIOS / ROLES', path: '/users' });
     }
@@ -53,6 +89,12 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
                 return 'CANDIDATO DE CAMPAÑA';
             case 'gerente':
                 return 'GERENTE DE CAMPAÑA';
+            case 'coordinador_zonal':
+                return 'COORDINADOR ZONAL';
+            case 'comunicaciones_prensa':
+                return 'COMUNICACIONES & PRENSA';
+            case 'testigo_electoral':
+                return 'TESTIGO ELECTORAL (DÍA D)';
             case 'orador':
                 return 'ORADOR DELEGADO';
             case 'lider_avanzada':

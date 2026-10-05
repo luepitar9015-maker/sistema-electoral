@@ -29,6 +29,24 @@ const ROLES_INFO = [
         color: 'bg-blue-100 text-blue-800 border-blue-300'
     },
     {
+        id: 'coordinador_zonal',
+        label: 'Coordinador Zonal / Comunal',
+        desc: 'Coordina y supervisa a los líderes territoriales de una comuna o subregión. Gestiona la movilización y el seguimiento electoral zonal.',
+        color: 'bg-indigo-100 text-indigo-800 border-indigo-300'
+    },
+    {
+        id: 'comunicaciones_prensa',
+        label: 'Comunicaciones, Prensa & Redes',
+        desc: 'Manejo de contenidos en redes sociales, WhatsApp masivo, agenda de medios y generación de discursos estratégicos sin acceso a datos privados de votantes.',
+        color: 'bg-pink-100 text-pink-800 border-pink-300'
+    },
+    {
+        id: 'testigo_electoral',
+        label: 'Testigo Electoral / Jurado Día D',
+        desc: 'Auditoría en mesas de votación el Día D, verificación del formulario E-14 y reporte de transmisión de votos y alertas de fraude.',
+        color: 'bg-amber-100 text-amber-800 border-amber-300'
+    },
+    {
         id: 'orador',
         label: 'Orador Delegado',
         desc: 'Preside reuniones delegadas, visualiza lugares y agenda, da inicio oficial a las reuniones y carga evidencias fotográficas.',
@@ -44,12 +62,12 @@ const ROLES_INFO = [
         id: 'apoyo_bd',
         label: 'Apoyo de Bases de Datos',
         desc: 'Carga masiva de Excel, digitación y depuración de votantes y líderes.',
-        color: 'bg-amber-100 text-amber-800 border-amber-300'
+        color: 'bg-teal-100 text-teal-800 border-teal-300'
     },
     {
         id: 'lider',
         label: 'Líder Territorial',
-        desc: 'Registro y seguimiento de sus votantes asignados.',
+        desc: 'Registro y seguimiento exclusivo de sus votantes asignados.',
         color: 'bg-gray-100 text-gray-800 border-gray-300'
     }
 ];

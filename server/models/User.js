@@ -27,7 +27,9 @@ const User = sequelize.define('User', {
         type: DataTypes.STRING,
         allowNull: false
     },
-    // Roles: superadmin (soporte/técnico), candidato, gerente, apoyo_bd, lider, admin
+    // Roles: 
+    // superadmin, candidato, gerente, coordinador_zonal, lider, apoyo_bd, 
+    // testigo_electoral, comunicaciones_prensa, orador, lider_avanzada, admin
     role: {
         type: DataTypes.STRING,
         defaultValue: 'apoyo_bd'
