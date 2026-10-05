@@ -108,10 +108,33 @@ const Campaign = sequelize.define('Campaign', {
     fecha_elecciones: {
         type: DataTypes.STRING,
         allowNull: true
+    },
+    // Modo de Operación: Campaña Electoral Activa vs Mandatario en Cargo (4 Años de Gestión)
+    modo_operacion: {
+        type: DataTypes.STRING,
+        defaultValue: 'electoral' // 'electoral', 'gestion_cargo'
+    },
+    periodo_gobierno: {
+        type: DataTypes.STRING,
+        defaultValue: '2024-2027',
+        allowNull: true
+    },
+    // Red de Coequiperos / Campañas Hijas (Padrinazgo Electoral a 4 Años)
+    parent_campaign_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true
+    },
+    meta_comunas_json: {
+        type: DataTypes.TEXT,
+        allowNull: true
     }
 }, {
     tableName: 'Campaigns',
     timestamps: true
 });
+
+// Auto-relación para Red de Coequiperos (Campañas Hijas)
+Campaign.hasMany(Campaign, { foreignKey: 'parent_campaign_id', as: 'coequiperos' });
+Campaign.belongsTo(Campaign, { foreignKey: 'parent_campaign_id', as: 'campana_matriz' });
 
 module.exports = Campaign;

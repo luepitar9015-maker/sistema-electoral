@@ -4,11 +4,14 @@ import { useCampaign } from '../context/CampaignContext';
 import { colombiaData } from '../data/colombiaData';
 import ApoyosManagerModal from '../components/ApoyosManagerModal';
 import CampaignClock from '../components/common/CampaignClock';
+import TermometroVictoriaModal from '../components/TermometroVictoriaModal';
+import CoequiperosModal from '../components/CoequiperosModal';
+import CompromisosGestionModal from '../components/CompromisosGestionModal';
 import {
     Flag, Plus, Globe, Building2, MapPin, CheckCircle,
     Users, Target, Award, Calendar, Edit3, Trash2, X,
     ChevronRight, ArrowRight, Sparkles, Filter, Upload, Image,
-    Quote, Handshake, Check, Clock
+    Quote, Handshake, Check, Clock, Flame, Network, Landmark, Shield
 } from 'lucide-react';
 import { API } from '../config/api';
 
@@ -30,8 +33,11 @@ export default function CampaignsPage() {
     const [modalOpen, setModalOpen] = useState(false);
     const [editingCampaign, setEditingCampaign] = useState(null);
 
-    // Apoyos modal state
+    // Modals de Inteligencia & Gobernanza 4 Años
     const [selectedCampaignForApoyos, setSelectedCampaignForApoyos] = useState(null);
+    const [selectedCampaignForTermometro, setSelectedCampaignForTermometro] = useState(null);
+    const [selectedCampaignForCoequiperos, setSelectedCampaignForCoequiperos] = useState(null);
+    const [selectedCampaignForCompromisos, setSelectedCampaignForCompromisos] = useState(null);
 
     // Formulario de Campaña
     const [formData, setFormData] = useState({
@@ -49,7 +55,9 @@ export default function CampaignsPage() {
         foto_candidato: '',
         logo_campana: '',
         fecha_inicio: '',
-        fecha_elecciones: ''
+        fecha_elecciones: '',
+        modo_operacion: 'electoral',
+        periodo_gobierno: '2024-2027'
     });
 
     const [municipios, setMunicipios] = useState([]);
@@ -73,7 +81,9 @@ export default function CampaignsPage() {
             foto_candidato: '',
             logo_campana: '',
             fecha_inicio: new Date().toISOString().split('T')[0],
-            fecha_elecciones: '2026-10-25'
+            fecha_elecciones: '2026-10-25',
+            modo_operacion: 'electoral',
+            periodo_gobierno: '2024-2027'
         });
         setMunicipios([]);
         setFormError('');
@@ -97,7 +107,9 @@ export default function CampaignsPage() {
             foto_candidato: camp.foto_candidato || '',
             logo_campana: camp.logo_campana || '',
             fecha_inicio: camp.fecha_inicio ? camp.fecha_inicio.split(' ')[0] : '',
-            fecha_elecciones: camp.fecha_elecciones ? camp.fecha_elecciones.split(' ')[0] : ''
+            fecha_elecciones: camp.fecha_elecciones ? camp.fecha_elecciones.split(' ')[0] : '',
+            modo_operacion: camp.modo_operacion || 'electoral',
+            periodo_gobierno: camp.periodo_gobierno || '2024-2027'
         });
         if (camp.departamento && colombiaData[camp.departamento]) {
             setMunicipios(colombiaData[camp.departamento]?.sort() || []);
@@ -295,6 +307,11 @@ export default function CampaignsPage() {
                                                 <IconComponent size={11} />
                                                 {camp.nivel_territorial} · {camp.tipo_cargo}
                                             </span>
+                                            {camp.modo_operacion === 'gestion_cargo' && (
+                                                <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border bg-amber-100 text-amber-900 border-amber-300 flex items-center gap-1 w-max mt-1">
+                                                    <Landmark size={10} /> Mandatario en Cargo ({camp.periodo_gobierno || '2024-2027'})
+                                                </span>
+                                            )}
                                             <h3 className="font-black text-slate-800 text-base leading-snug uppercase mt-1">
                                                 {camp.nombre}
                                             </h3>
@@ -382,24 +399,57 @@ export default function CampaignsPage() {
                                 </div>
 
                                 {/* Botón / Insignia de Apoyos Políticos */}
-                                <div className="pt-2">
+                                <div className="pt-1">
                                     <button
                                         type="button"
                                         onClick={() => setSelectedCampaignForApoyos(camp)}
-                                        className="w-full flex items-center justify-between p-2.5 bg-gradient-to-r from-emerald-50 to-teal-50 hover:from-emerald-100 hover:to-teal-100 border border-emerald-200/80 rounded-2xl text-emerald-900 transition-all group"
+                                        className="w-full flex items-center justify-between p-2 bg-gradient-to-r from-emerald-50 to-teal-50 hover:from-emerald-100 hover:to-teal-100 border border-emerald-200/80 rounded-2xl text-emerald-900 transition-all group"
                                     >
                                         <div className="flex items-center gap-2">
                                             <div className="p-1.5 bg-emerald-500 text-white rounded-xl group-hover:scale-105 transition-transform">
-                                                <Handshake size={14} />
+                                                <Handshake size={13} />
                                             </div>
                                             <div className="text-left">
                                                 <span className="text-xs font-black uppercase tracking-wider block">Apoyos Políticos</span>
-                                                <span className="text-[10px] text-emerald-700">Aliados y compromisos pactados</span>
+                                                <span className="text-[10px] text-emerald-700">Aliados y compromisos</span>
                                             </div>
                                         </div>
-                                        <span className="bg-emerald-600 text-white text-xs font-black px-2.5 py-1 rounded-xl shadow-sm">
+                                        <span className="bg-emerald-600 text-white text-xs font-black px-2 py-0.5 rounded-lg shadow-sm">
                                             {camp.totalApoyos || 0}
                                         </span>
+                                    </button>
+                                </div>
+
+                                {/* Barra de Inteligencia Electoral & Gobernanza (3 Herramientas Estratégicas) */}
+                                <div className="grid grid-cols-3 gap-1.5 pt-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => setSelectedCampaignForTermometro(camp)}
+                                        className="flex flex-col items-center justify-center p-2 rounded-2xl bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 text-[10px] font-black uppercase tracking-wider transition-all"
+                                        title="Ver Termómetro de Victoria & Déficit Territorial"
+                                    >
+                                        <Flame size={15} className="text-rose-600 mb-0.5" />
+                                        <span>Termómetro</span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setSelectedCampaignForCoequiperos(camp)}
+                                        className="flex flex-col items-center justify-center p-2 rounded-2xl bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 text-[10px] font-black uppercase tracking-wider transition-all"
+                                        title="Ver y Gestionar Red de Coequiperos (Campañas Hijas)"
+                                    >
+                                        <Network size={15} className="text-teal-600 mb-0.5" />
+                                        <span>Coequiperos</span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setSelectedCampaignForCompromisos(camp)}
+                                        className="flex flex-col items-center justify-center p-2 rounded-2xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-[10px] font-black uppercase tracking-wider transition-all"
+                                        title="Gestión de Mandato 4 Años & Rendición de Cuentas"
+                                    >
+                                        <Landmark size={15} className="text-amber-600 mb-0.5" />
+                                        <span>Mandato 4A</span>
                                     </button>
                                 </div>
                             </div>
@@ -875,6 +925,49 @@ export default function CampaignsPage() {
                                 )}
                             </div>
 
+                            {/* 6. Modo de Operación: Campaña vs. Mandatario en Cargo (4 Años) */}
+                            <div className="p-4 bg-amber-50/60 border border-amber-200 rounded-2xl space-y-3">
+                                <span className="text-xs font-bold text-amber-900 uppercase tracking-wide flex items-center gap-1.5">
+                                    <Landmark size={15} className="text-amber-600" />
+                                    6. Régimen de Operación & Gobernanza (4 Años)
+                                </span>
+                                
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-gray-700 font-bold mb-1 text-[11px] uppercase">
+                                            Modo de Operación
+                                        </label>
+                                        <select
+                                            value={formData.modo_operacion}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, modo_operacion: e.target.value }))}
+                                            className="w-full bg-white border border-amber-300 rounded-xl p-2.5 text-xs font-bold text-gray-800 focus:outline-none focus:border-amber-500"
+                                        >
+                                            <option value="electoral">🎯 Campaña Electoral Activa</option>
+                                            <option value="gestion_cargo">🏛️ Mandatario en Cargo (4 Años de Gestión & Rendición)</option>
+                                        </select>
+                                        <span className="text-[10px] text-gray-500 mt-1 block">
+                                            Activa el panel de obras, debates y proyectos durante el mandato.
+                                        </span>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-gray-700 font-bold mb-1 text-[11px] uppercase">
+                                            Periodo Constitucional
+                                        </label>
+                                        <input
+                                            type="text"
+                                            placeholder="Ej. 2024-2027 o 2026-2030"
+                                            value={formData.periodo_gobierno}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, periodo_gobierno: e.target.value }))}
+                                            className="w-full bg-white border border-amber-300 rounded-xl p-2.5 text-xs font-bold text-gray-800 focus:outline-none focus:border-amber-500"
+                                        />
+                                        <span className="text-[10px] text-gray-500 mt-1 block">
+                                            Cuatrienio oficial de gestión pública.
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
                             {/* Botones de Acción */}
                             <div className="pt-4 border-t border-gray-100 flex items-center justify-end gap-3">
                                 <button
@@ -904,6 +997,34 @@ export default function CampaignsPage() {
                     isOpen={!!selectedCampaignForApoyos}
                     onClose={() => setSelectedCampaignForApoyos(null)}
                     onApoyosUpdated={refreshCampaigns}
+                />
+            )}
+
+            {/* Modal de Termómetro de Victoria & Déficit Territorial */}
+            {selectedCampaignForTermometro && (
+                <TermometroVictoriaModal
+                    campaign={selectedCampaignForTermometro}
+                    isOpen={!!selectedCampaignForTermometro}
+                    onClose={() => setSelectedCampaignForTermometro(null)}
+                />
+            )}
+
+            {/* Modal de Red de Coequiperos (Campañas Hijas) */}
+            {selectedCampaignForCoequiperos && (
+                <CoequiperosModal
+                    campaign={selectedCampaignForCoequiperos}
+                    isOpen={!!selectedCampaignForCoequiperos}
+                    onClose={() => setSelectedCampaignForCoequiperos(null)}
+                    onUpdated={refreshCampaigns}
+                />
+            )}
+
+            {/* Modal de Gobernanza 4 Años & Compromisos de Mandato */}
+            {selectedCampaignForCompromisos && (
+                <CompromisosGestionModal
+                    campaign={selectedCampaignForCompromisos}
+                    isOpen={!!selectedCampaignForCompromisos}
+                    onClose={() => setSelectedCampaignForCompromisos(null)}
                 />
             )}
 
