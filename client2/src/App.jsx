@@ -18,6 +18,7 @@ import TerritorialHeatMap from './features/territorio/TerritorialHeatMap';
 import DHondtSimulator from './features/simulador/DHondtSimulator';
 import LogisticaFlotaDashboard from './features/logistica/LogisticaFlotaDashboard';
 import CallCenterOperator from './features/callcenter/CallCenterOperator';
+import NecesidadesPage from './pages/NecesidadesPage';
 
 const ProtectedRoute = ({ children, requireAdmin }) => {
     const { user, loading } = useAuth();
@@ -39,6 +40,7 @@ function AppRoutes() {
                 <Route path="logistica" element={<LogisticaFlotaDashboard />} />
                 <Route path="callcenter" element={<CallCenterOperator />} />
                 <Route path="territorio" element={<TerritorialHeatMap />} />
+                <Route path="necesidades" element={<NecesidadesPage />} />
                 <Route path="simulador" element={<DHondtSimulator />} />
                 <Route path="meetings" element={<MeetingsPage />} />
                 <Route path="social" element={<SocialMediaPage />} />

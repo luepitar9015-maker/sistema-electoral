@@ -18,8 +18,9 @@ router.get('/leaders',         voterController.getLeaders);
 router.get('/template',        voterController.downloadTemplate);
 router.post('/import',         upload.single('file'), voterController.importVoters);
 
-// Inteligencia territorial / GIS
+// Inteligencia territorial, GIS y Anti-Trashumancia
 router.get('/geo-data',        voterController.getTerritorialGeoData);
+router.post('/auditar-trashumancia', voterController.auditarTrashumanciaMasiva);
 
 // Scoring y seguimiento
 router.put('/:id/scoring',     voterController.updateVoterScoring);

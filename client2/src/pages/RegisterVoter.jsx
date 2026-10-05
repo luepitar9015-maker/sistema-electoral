@@ -39,6 +39,7 @@ export default function RegisterVoter() {
     const [censoLoading, setCensoLoading] = useState(false);
     const [censoInfo, setCensoInfo] = useState(null);
     const [censoNotFound, setCensoNotFound] = useState(false);
+    const [trashumanciaInfo, setTrashumanciaInfo] = useState(null);
     const [copiedReg, setCopiedReg] = useState(false);
 
     // Import state
@@ -144,7 +145,14 @@ export default function RegisterVoter() {
         setCensoInfo(null);
 
         try {
-            const res = await axios.get(`${API}/censo/lookup/${cleanCed}`, authHeaders);
+            const campQuery = activeCampaign?.id ? `?campana_id=${activeCampaign.id}` : '';
+            const res = await axios.get(`${API}/censo/lookup/${cleanCed}${campQuery}`, authHeaders);
+            if (res.data.trashumancia) {
+                setTrashumanciaInfo(res.data.trashumancia);
+            } else {
+                setTrashumanciaInfo(null);
+            }
+
             if (res.data.found) {
                 const data = res.data.data;
                 setCensoInfo(data);
@@ -172,6 +180,7 @@ export default function RegisterVoter() {
         } catch (error) {
             console.error('Error buscando en censo:', error);
             setCensoNotFound(true);
+            setTrashumanciaInfo(null);
         } finally {
             setCensoLoading(false);
         }
@@ -702,8 +711,37 @@ export default function RegisterVoter() {
                                 required
                             />
 
+                            {/* Semáforo de Trashumancia y Consistencia Territorial */}
+                            {trashumanciaInfo && (
+                                <div className={`mt-2 p-3 rounded-2xl border text-xs flex flex-col gap-1 transition-all ${
+                                    trashumanciaInfo.estado_trashumancia === 'valido'
+                                        ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-900'
+                                        : trashumanciaInfo.estado_trashumancia === 'alerta_municipio'
+                                            ? 'bg-amber-500/15 border-amber-500/50 text-amber-950 font-medium'
+                                            : trashumanciaInfo.estado_trashumancia === 'alerta_departamento'
+                                                ? 'bg-rose-500/15 border-rose-500/50 text-rose-950 font-medium'
+                                                : 'bg-slate-100 border-slate-300 text-slate-800'
+                                }`}>
+                                    <div className="flex items-center gap-1.5 font-black uppercase text-[11px] tracking-wide">
+                                        {trashumanciaInfo.estado_trashumancia === 'valido' && <span>🟢 Voto Territorial Válido</span>}
+                                        {trashumanciaInfo.estado_trashumancia === 'alerta_municipio' && <span>🟡 Alerta: Vota en otro Municipio</span>}
+                                        {trashumanciaInfo.estado_trashumancia === 'alerta_departamento' && <span>🔴 Alerta de Trashumancia: Vota en otro Dpto</span>}
+                                        {trashumanciaInfo.estado_trashumancia === 'no_en_censo' && <span>⚪ Cédula no registrada en Censo Local</span>}
+                                        {trashumanciaInfo.estado_trashumancia === 'sospecha_concentracion' && <span>🟠 Alerta de Concentración de Direcciones</span>}
+                                    </div>
+                                    <p className="text-[11px] leading-snug">
+                                        {trashumanciaInfo.detalle_trashumancia}
+                                    </p>
+                                    {trashumanciaInfo.municipio_censo_real && (
+                                        <div className="text-[10px] text-gray-600 font-mono mt-0.5 pt-1 border-t border-gray-200/60">
+                                            Censo: {trashumanciaInfo.municipio_censo_real} ({trashumanciaInfo.departamento_censo_real}) - Puesto: {trashumanciaInfo.puesto_censo_real || 'S/P'}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
                             {/* Mensaje de éxito al encontrar en censo */}
-                            {censoInfo && (
+                            {censoInfo && !trashumanciaInfo && (
                                 <div className="mt-2 p-2 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-[11px] flex items-center gap-2">
                                     <CheckCircle size={14} className="text-emerald-600 flex-shrink-0" />
                                     <span><strong>✓ Asignado:</strong> {censoInfo.puesto_votacion} {censoInfo.mesa ? `(Mesa ${censoInfo.mesa})` : ''}</span>

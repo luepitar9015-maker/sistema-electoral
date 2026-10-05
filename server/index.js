@@ -31,6 +31,7 @@ const DiaDMesaReporte = require('./models/DiaDMesaReporte');
 const LogisticaVehiculo = require('./models/LogisticaVehiculo');
 const LogisticaDespacho = require('./models/LogisticaDespacho');
 const CallCenterLog = require('./models/CallCenterLog');
+const NecesidadCiudadana = require('./models/NecesidadCiudadana');
 
 // Asociaciones de Reuniones
 Reunion.hasMany(ReunionAsistente, { foreignKey: 'reunion_id', as: 'asistentes', onDelete: 'CASCADE' });
@@ -78,6 +79,7 @@ const contentIntelligenceRoutes = require('./routes/contentIntelligenceRoutes');
 const diaDRoutes = require('./routes/diaDRoutes');
 const logisticaRoutes = require('./routes/logisticaRoutes');
 const callCenterRoutes = require('./routes/callCenterRoutes');
+const necesidadesRoutes = require('./routes/necesidadesRoutes');
 
 app.use(cors());
 app.use(express.json({ limit: '25mb' }));
@@ -120,6 +122,7 @@ app.use('/api/social/intelligence', contentIntelligenceRoutes);
 app.use('/api/dia-d', diaDRoutes);
 app.use('/api/logistica', logisticaRoutes);
 app.use('/api/callcenter', callCenterRoutes);
+app.use('/api/necesidades', necesidadesRoutes);
 
 // Ruta pública de Revisor y Trazabilidad por el Link del Candidato
 app.get('/r/:postId', async (req, res) => {

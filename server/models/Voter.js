@@ -113,6 +113,31 @@ const Voter = sequelize.define('Voter', {
     observaciones_seguimiento: {
         type: DataTypes.TEXT,
         allowNull: true
+    },
+    // Control Inteligente de Censo y Trashumancia Electoral
+    estado_trashumancia: {
+        type: DataTypes.STRING,
+        defaultValue: 'pendiente' // 'valido', 'alerta_municipio', 'alerta_departamento', 'no_en_censo', 'sospecha_concentracion'
+    },
+    detalle_trashumancia: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    },
+    municipio_censo_real: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    departamento_censo_real: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    puesto_censo_real: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    mesa_censo_real: {
+        type: DataTypes.STRING,
+        allowNull: true
     }
 }, {
     timestamps: true,

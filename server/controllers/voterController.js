@@ -4,6 +4,7 @@ const Campaign = require('../models/Campaign');
 const VoterInteraction = require('../models/VoterInteraction');
 const { Op } = require('sequelize');
 const ExcelJS = require('exceljs');
+const { evaluarTrashumancia } = require('../services/trashumanciaService');
 
 exports.createVoter = async (req, res) => {
     try {
@@ -15,13 +16,29 @@ exports.createVoter = async (req, res) => {
             return res.status(400).json({ message: 'Ya existe un votante con esta cédula' });
         }
 
-        const assignedCampanaId = req.campana_id || voterData.campana_id || req.user.campana_id || null;
+        const assignedCampanaId = req.campana_id || voterData.campana_id || req.user?.campana_id || null;
+
+        // Evaluación automática de Censo y Trashumancia Electoral
+        const evaluacion = await evaluarTrashumancia({
+            cedula: voterData.cedula,
+            direccion: voterData.direccion || '',
+            departamentoReportado: voterData.departamento || '',
+            municipioReportado: voterData.municipio || '',
+            campanaId: assignedCampanaId,
+            voterModel: Voter
+        });
 
         const newVoter = await Voter.create({
             ...voterData,
             campana_id: assignedCampanaId,
-            usuario_registro_id: req.user.id || req.user.userId,
-            isLeader: isLeader || false
+            usuario_registro_id: req.user?.id || req.user?.userId || null,
+            isLeader: isLeader || false,
+            estado_trashumancia: evaluacion.estado_trashumancia,
+            detalle_trashumancia: evaluacion.detalle_trashumancia,
+            municipio_censo_real: evaluacion.municipio_censo_real || voterData.municipio || null,
+            departamento_censo_real: evaluacion.departamento_censo_real || voterData.departamento || null,
+            puesto_censo_real: evaluacion.puesto_censo_real || voterData.lugar_votacion || null,
+            mesa_censo_real: evaluacion.mesa_censo_real || voterData.mesa || null
         });
 
         res.status(201).json(newVoter);
@@ -480,3 +497,55 @@ exports.getTerritorialGeoData = async (req, res) => {
         return res.status(500).json({ message: 'Error al generar mapa territorial' });
     }
 };
+
+// ─── AUDITORÍA MASIVA DE TRASHUMANCIA ELECTORAL ─────────────────────────────
+exports.auditarTrashumanciaMasiva = async (req, res) => {
+    try {
+        const campanaId = req.campana_id || (req.query.campana_id ? parseInt(req.query.campana_id, 10) : null);
+        const whereClause = {};
+        if (campanaId) whereClause.campana_id = campanaId;
+
+        const voters = await Voter.findAll({ where: whereClause });
+
+        const stats = {
+            total_auditados: voters.length,
+            validos: 0,
+            alerta_municipio: 0,
+            alerta_departamento: 0,
+            no_en_censo: 0,
+            sospecha_concentracion: 0
+        };
+
+        for (const v of voters) {
+            const ev = await evaluarTrashumancia({
+                cedula: v.cedula,
+                direccion: v.direccion || '',
+                departamentoReportado: v.departamento || '',
+                municipioReportado: v.municipio || '',
+                campanaId: v.campana_id || campanaId,
+                voterModel: Voter
+            });
+
+            v.estado_trashumancia = ev.estado_trashumancia;
+            v.detalle_trashumancia = ev.detalle_trashumancia;
+            if (ev.municipio_censo_real) v.municipio_censo_real = ev.municipio_censo_real;
+            if (ev.departamento_censo_real) v.departamento_censo_real = ev.departamento_censo_real;
+            if (ev.puesto_censo_real) v.puesto_censo_real = ev.puesto_censo_real;
+            if (ev.mesa_censo_real) v.mesa_censo_real = ev.mesa_censo_real;
+            await v.save();
+
+            if (stats[ev.estado_trashumancia] !== undefined) {
+                stats[ev.estado_trashumancia]++;
+            }
+        }
+
+        return res.json({
+            message: 'Auditoría de trashumancia completada exitosamente',
+            stats
+        });
+    } catch (error) {
+        console.error('Error en auditarTrashumanciaMasiva:', error);
+        return res.status(500).json({ message: 'Error al ejecutar auditoría', error: error.message });
+    }
+};
+

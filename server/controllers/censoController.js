@@ -2,6 +2,7 @@ const CensoElectoral = require('../models/CensoElectoral');
 const Voter = require('../models/Voter');
 const ExcelJS = require('exceljs');
 const { Op } = require('sequelize');
+const { evaluarTrashumancia } = require('../services/trashumanciaService');
 
 // Normalizar texto: minúsculas, sin tildes, sin espacios extra
 const norm = (str) =>
@@ -43,6 +44,8 @@ const CENSO_COLUMN_MAP = {
 exports.lookupCedula = async (req, res) => {
     try {
         const rawCedula = String(req.params.cedula || '').replace(/\D/g, '').trim();
+        const campanaId = req.query.campana_id ? parseInt(req.query.campana_id, 10) : (req.campana_id || null);
+
         if (!rawCedula) {
             return res.status(400).json({ found: false, message: 'Número de cédula inválido' });
         }
@@ -51,16 +54,25 @@ exports.lookupCedula = async (req, res) => {
             where: { cedula: rawCedula }
         });
 
+        // Evaluación de trashumancia
+        const evaluacion = await evaluarTrashumancia({
+            cedula: rawCedula,
+            campanaId,
+            voterModel: Voter
+        });
+
         if (!record) {
             return res.json({
                 found: false,
                 cedula: rawCedula,
+                trashumancia: evaluacion,
                 message: 'La cédula no figura en el censo electoral local.'
             });
         }
 
         return res.json({
             found: true,
+            trashumancia: evaluacion,
             data: {
                 cedula: record.cedula,
                 departamento: record.departamento || '',

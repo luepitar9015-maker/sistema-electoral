@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useCampaign } from '../context/CampaignContext';
 import { colombiaData } from '../data/colombiaData';
-import { Search, Save, CheckCircle, Loader, Zap, ExternalLink, RefreshCw, Flag, Star } from 'lucide-react';
+import { Search, Save, CheckCircle, Loader, Zap, ExternalLink, RefreshCw, Flag, Star, ShieldAlert } from 'lucide-react';
 import VoterScoringModal from '../components/VoterScoringModal';
 import { API } from '../config/api';
 
@@ -21,10 +21,12 @@ export default function VotersList() {
     const [saved, setSaved] = useState({});       // id => true
     const [loading, setLoading] = useState(true);
     const [autoAssigning, setAutoAssigning] = useState(false);
+    const [auditingTrashumancia, setAuditingTrashumancia] = useState(false);
     const [search, setSearch] = useState('');
     const [filterDept, setFilterDept] = useState('');
     const [filterCamp, setFilterCamp] = useState(activeCampaign?.id || '');
     const [filterApoyo, setFilterApoyo] = useState('');
+    const [filterTrashumancia, setFilterTrashumancia] = useState('');
     const [page, setPage] = useState(1);
     const [scoringVoter, setScoringVoter] = useState(null);
 
@@ -58,7 +60,8 @@ export default function VotersList() {
         const dept = !filterDept || v.departamento === filterDept;
         const campOk = !filterCamp || v.campana_id === parseInt(filterCamp, 10);
         const apoyoOk = !filterApoyo || v.apoyo_id === parseInt(filterApoyo, 10);
-        return ok && dept && campOk && apoyoOk;
+        const trashumanciaOk = !filterTrashumancia || v.estado_trashumancia === filterTrashumancia;
+        return ok && dept && campOk && apoyoOk && trashumanciaOk;
     });
 
     const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -100,6 +103,27 @@ export default function VotersList() {
         }
     };
 
+    const handleAuditarTrashumancia = async () => {
+        setAuditingTrashumancia(true);
+        try {
+            const campQuery = filterCamp ? `?campana_id=${filterCamp}` : '';
+            const res = await axios.post(`${API}/voters/auditar-trashumancia${campQuery}`, {}, { headers });
+            const s = res.data.stats;
+            alert(`🛡️ Auditoría de Trashumancia Completada:\n\n` +
+                `• Total Votantes Auditados: ${s.total_auditados}\n` +
+                `• 🟢 Votos Válidos: ${s.validos}\n` +
+                `• 🟡 Votan en otro Municipio: ${s.alerta_municipio}\n` +
+                `• 🔴 Votan en otro Departamento: ${s.alerta_departamento}\n` +
+                `• ⚪ No encontrados en Censo: ${s.no_en_censo}\n` +
+                `• 🟠 Sospecha Concentración de Direcciones: ${s.sospecha_concentracion}`);
+            fetch();
+        } catch (e) {
+            alert(e.response?.data?.message || 'Error al ejecutar auditoría de trashumancia');
+        } finally {
+            setAuditingTrashumancia(false);
+        }
+    };
+
     const handleOpenRegistraduria = (cedula) => {
         const cleanCed = String(cedula || '').replace(/\D/g, '').trim();
         if (cleanCed) {
@@ -127,7 +151,17 @@ export default function VotersList() {
                         title="Autodiligencia los puestos y mesas de los votantes buscando en el censo electoral local"
                     >
                         <Zap size={14} className={autoAssigning ? 'animate-bounce text-yellow-300' : 'text-yellow-300'} />
-                        <span>{autoAssigning ? 'Autodiligenciando...' : '⚡ Autodiligenciar desde Censo'}</span>
+                        <span>{autoAssigning ? 'Autodiligenciando...' : '⚡ Autodiligenciar Censo'}</span>
+                    </button>
+
+                    <button
+                        onClick={handleAuditarTrashumancia}
+                        disabled={auditingTrashumancia}
+                        className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 disabled:bg-gray-400 text-white font-black px-3.5 py-2 rounded-lg uppercase tracking-wider text-xs shadow-sm transition-all border border-slate-600"
+                        title="Audita automáticamente si los votantes están habilitados en el municipio/departamento de la campaña activa"
+                    >
+                        <ShieldAlert size={14} className={auditingTrashumancia ? 'animate-spin text-rose-400' : 'text-rose-400'} />
+                        <span>{auditingTrashumancia ? 'Auditando...' : '🛡️ Auditar Trashumancia'}</span>
                     </button>
 
                     <div className="bg-white border rounded-lg px-3 py-1.5 text-center shadow-sm">
@@ -182,6 +216,20 @@ export default function VotersList() {
                         ))}
                 </select>
 
+                {/* Filtro de Trashumancia / Censo */}
+                <select
+                    value={filterTrashumancia}
+                    onChange={e => { setFilterTrashumancia(e.target.value); setPage(1); }}
+                    className="px-2.5 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none font-bold text-rose-700 bg-white min-w-48"
+                >
+                    <option value="">🛡️ Todos los Estados de Trashumancia</option>
+                    <option value="valido">🟢 Voto Válido en Territorio</option>
+                    <option value="alerta_municipio">🟡 Alerta: Vota en otro Municipio</option>
+                    <option value="alerta_departamento">🔴 Alerta: Vota en otro Departamento</option>
+                    <option value="no_en_censo">⚪ Sin Censo Local</option>
+                    <option value="sospecha_concentracion">🟠 Concentración de Direcciones</option>
+                </select>
+
                 <select value={filterDept} onChange={e => { setFilterDept(e.target.value); setPage(1); }}
                     className="px-2.5 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none min-w-40 bg-white">
                     <option value="">Todos los departamentos</option>
@@ -210,6 +258,7 @@ export default function VotersList() {
                                     <th className="px-2 py-2.5 text-left border-r border-gray-600" style={{width:'130px'}}>Municipio</th>
                                     <th className="px-2 py-2.5 text-left border-r border-gray-600 bg-[#00B894]" style={{width:'180px'}}>📍 Lugar de Votación</th>
                                     <th className="px-2 py-2.5 text-left border-r border-gray-600" style={{width:'70px'}}>Mesa</th>
+                                    <th className="px-2 py-2.5 text-center border-r border-gray-600" style={{width:'130px'}}>🛡️ Trashumancia</th>
                                     <th className="px-2 py-2.5 text-left border-r border-gray-600" style={{width:'130px'}}>Líder</th>
                                     <th className="px-2 py-2.5 text-center border-r border-gray-600" style={{width:'90px'}}>⭐ Fidelidad</th>
                                     <th className="px-2 py-2.5 text-center w-20">Guardar</th>
@@ -313,6 +362,26 @@ export default function VotersList() {
                                                     placeholder="Mesa"
                                                     className={`${inputCls} text-center`}
                                                 />
+                                            </td>
+                                            {/* Trashumancia / Censo Real */}
+                                            <td className="border-r border-gray-100 px-1 text-center" title={row.detalle_trashumancia || 'Sin análisis de censo'}>
+                                                <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider cursor-help ${
+                                                    row.estado_trashumancia === 'valido'
+                                                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                                        : row.estado_trashumancia === 'alerta_municipio'
+                                                            ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                                                            : row.estado_trashumancia === 'alerta_departamento'
+                                                                ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                                                                : row.estado_trashumancia === 'sospecha_concentracion'
+                                                                    ? 'bg-orange-100 text-orange-800 border border-orange-300'
+                                                                    : 'bg-gray-100 text-gray-500'
+                                                }`}>
+                                                    {row.estado_trashumancia === 'valido' ? '🟢 Válido' :
+                                                     row.estado_trashumancia === 'alerta_municipio' ? '🟡 Otro Mpio' :
+                                                     row.estado_trashumancia === 'alerta_departamento' ? '🔴 Dif. Dpto' :
+                                                     row.estado_trashumancia === 'sospecha_concentracion' ? '🟠 Concentrado' :
+                                                     '⚪ Sin Censo'}
+                                                </span>
                                             </td>
                                             {/* Líder */}
                                             <td className="border-r border-gray-100 px-1">
