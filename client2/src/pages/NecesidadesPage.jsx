@@ -6,7 +6,8 @@ import { colombiaData } from '../data/colombiaData';
 import {
     Sparkles, Plus, Search, Filter, MapPin, Users, DollarSign,
     AlertTriangle, CheckCircle2, Clock, FileText, Copy, Check,
-    X, ChevronRight, BarChart3, Building2, Flame, RefreshCw, Send
+    X, ChevronRight, BarChart3, Building2, Flame, RefreshCw, Send,
+    Share2, ExternalLink
 } from 'lucide-react';
 import { API } from '../config/api';
 
@@ -84,6 +85,28 @@ export default function NecesidadesPage() {
     const [cargandoIA, setCargandoIA] = useState(false);
     const [resumenIA, setResumenIA] = useState(null);
     const [copiadoIA, setCopiadoIA] = useState(false);
+
+    // Modal Compartir Enlace Ciudadano
+    const [modalCompartirAbierto, setModalCompartirAbierto] = useState(false);
+    const [copiadoLink, setCopiadoLink] = useState(false);
+
+    const publicUrl = typeof window !== 'undefined'
+        ? `${window.location.origin}/participa${activeCampaign?.id ? `?campana=${activeCampaign.id}` : ''}`
+        : '';
+
+    const handleCopiarLink = () => {
+        navigator.clipboard.writeText(publicUrl);
+        setCopiadoLink(true);
+        setTimeout(() => setCopiadoLink(false), 2500);
+    };
+
+    const handleCompartirWhatsApp = () => {
+        const candidatoNombre = activeCampaign?.candidato || 'nuestro candidato';
+        const texto = encodeURIComponent(
+            `¡Hola! Participa y cuéntanos las necesidades de tu barrio o vereda para construir el plan de gobierno con ${candidatoNombre}. Registra tu solicitud aquí: ${publicUrl}`
+        );
+        window.open(`https://api.whatsapp.com/send?text=${texto}`, '_blank');
+    };
 
     useEffect(() => {
         if (filtroDepto && filtroDepto !== 'TODOS' && colombiaData[filtroDepto]) {
@@ -226,6 +249,14 @@ export default function NecesidadesPage() {
                     </div>
 
                     <div className="flex flex-wrap items-center gap-3">
+                        <button
+                            onClick={() => setModalCompartirAbierto(true)}
+                            className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition-all shadow-lg shadow-indigo-600/30 transform hover:-translate-y-0.5"
+                            title="Compartir link público para que los ciudadanos radiquen sus necesidades"
+                        >
+                            <Share2 size={18} />
+                            <span>Enlace Ciudadano</span>
+                        </button>
                         <button
                             onClick={handleGenerarResumenIA}
                             className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black shadow-lg shadow-emerald-500/25 transition-all transform hover:-translate-y-0.5 active:translate-y-0"
@@ -811,6 +842,88 @@ export default function NecesidadesPage() {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal Compartir Enlace Ciudadano */}
+            {modalCompartirAbierto && (
+                <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-slate-900 border border-indigo-500/40 rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-5 animate-in zoom-in-95 duration-200">
+                        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                            <div className="flex items-center gap-2.5">
+                                <div className="p-2.5 bg-indigo-500/20 text-indigo-400 rounded-xl">
+                                    <Share2 size={20} />
+                                </div>
+                                <div>
+                                    <h3 className="font-black text-base uppercase text-white">
+                                        Enlace Público de Participación Ciudadana
+                                    </h3>
+                                    <p className="text-xs text-slate-400">
+                                        Compártelo con votantes, juntas de acción comunal y redes sociales.
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setModalCompartirAbierto(false)}
+                                className="text-slate-400 hover:text-white p-1 rounded-lg"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 space-y-2">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                                Enlace Directo (No requiere inicio de sesión)
+                            </span>
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="text"
+                                    readOnly
+                                    value={publicUrl}
+                                    className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-emerald-400 select-all focus:outline-none"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={handleCopiarLink}
+                                    className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5"
+                                >
+                                    {copiadoLink ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+                                    <span>{copiadoLink ? 'Copiado' : 'Copiar'}</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="space-y-2 text-xs text-slate-300">
+                            <span className="font-bold text-slate-400 uppercase text-[10px] tracking-wider block">
+                                ¿Cómo utilizar este enlace?
+                            </span>
+                            <ul className="space-y-1.5 list-disc list-inside text-slate-400">
+                                <li>Envíalo a grupos de WhatsApp comunitarios y de líderes barriales.</li>
+                                <li>Genera un código QR con este link para volantes, pendones y pancartas.</li>
+                                <li>Toda necesidad radicada por los ciudadanos ingresará con folio automático al mapa y al motor de IA.</li>
+                            </ul>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row items-center gap-2 pt-2 border-t border-slate-800">
+                            <button
+                                type="button"
+                                onClick={handleCompartirWhatsApp}
+                                className="w-full flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20ba5a] text-slate-950 font-black text-xs uppercase tracking-wider py-3 rounded-xl transition-all shadow-md"
+                            >
+                                <Share2 size={16} />
+                                <span>Enviar por WhatsApp</span>
+                            </button>
+                            <a
+                                href={publicUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="w-full sm:w-auto px-4 py-3 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-colors flex items-center justify-center gap-1.5"
+                            >
+                                <span>Probar</span>
+                                <ExternalLink size={14} />
+                            </a>
+                        </div>
                     </div>
                 </div>
             )}

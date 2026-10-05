@@ -19,6 +19,7 @@ import DHondtSimulator from './features/simulador/DHondtSimulator';
 import LogisticaFlotaDashboard from './features/logistica/LogisticaFlotaDashboard';
 import CallCenterOperator from './features/callcenter/CallCenterOperator';
 import NecesidadesPage from './pages/NecesidadesPage';
+import ParticipaCiudadano from './pages/ParticipaCiudadano';
 
 const ProtectedRoute = ({ children, requireAdmin }) => {
     const { user, loading } = useAuth();
@@ -32,6 +33,11 @@ function AppRoutes() {
     return (
         <Routes>
             <Route path="/login" element={<Login />} />
+            {/* Rutas Públicas (Sin login) para Participación Ciudadana */}
+            <Route path="/participa" element={<ParticipaCiudadano />} />
+            <Route path="/necesidad-ciudadana" element={<Navigate to="/participa" replace />} />
+            <Route path="/voz-ciudadana" element={<Navigate to="/participa" replace />} />
+
             <Route path="/" element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
                 <Route index element={<Navigate to="/dashboard" />} />
                 <Route path="dashboard" element={<Dashboard />} />

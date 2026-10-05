@@ -441,3 +441,92 @@ Genera una respuesta en formato JSON estrictamente válido con la siguiente estr
         return res.status(500).json({ message: 'Error al generar resumen ejecutivo', error: error.message });
     }
 };
+
+// Obtener campañas activas para el selector público del portal ciudadano
+exports.getCampanasPublicas = async (req, res) => {
+    try {
+        const campanas = await Campaign.findAll({
+            where: { activo: true },
+            attributes: ['id', 'nombre', 'candidato', 'tipo_cargo', 'departamento', 'municipio', 'partido_politico', 'color', 'foto_candidato', 'logo_campana', 'eslogan'],
+            order: [['nombre', 'ASC']]
+        });
+        return res.json(campanas);
+    } catch (error) {
+        console.error('Error al listar campañas públicas:', error);
+        return res.status(500).json({ message: 'Error al obtener campañas', error: error.message });
+    }
+};
+
+// Crear necesidad ciudadana desde portal público (sin autenticación requerida)
+exports.createNecesidadPublica = async (req, res) => {
+    try {
+        const {
+            titulo,
+            descripcion,
+            categoria,
+            departamento,
+            municipio,
+            comuna_corregimiento,
+            barrio_vereda,
+            direccion_referencia,
+            prioridad,
+            impacto_familias_estimado,
+            solucion_propuesta,
+            reportado_por_nombre,
+            reportado_por_telefono,
+            reportado_por_cedula,
+            evidencia_foto_url,
+            campana_id
+        } = req.body;
+
+        if (!titulo || !descripcion || !departamento || !municipio) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Título, descripción de la necesidad, departamento y municipio son obligatorios' 
+            });
+        }
+
+        // Generar código de radicado único
+        const randomNum = Math.floor(1000 + Math.random() * 9000);
+        const año = new Date().getFullYear();
+        const folioRadicado = `PQR-${año}-${randomNum}`;
+
+        const nueva = await NecesidadCiudadana.create({
+            titulo,
+            descripcion,
+            categoria: categoria || 'vias_infraestructura',
+            nivel_territorial: 'municipal',
+            departamento,
+            municipio,
+            comuna_corregimiento: comuna_corregimiento || null,
+            barrio_vereda: barrio_vereda || null,
+            direccion_referencia: direccion_referencia || null,
+            prioridad: prioridad || 'media',
+            estado: 'reportada',
+            impacto_familias_estimado: impacto_familias_estimado ? parseInt(impacto_familias_estimado, 10) : 1,
+            solucion_propuesta: solucion_propuesta || null,
+            reportado_por_nombre: reportado_por_nombre || 'Ciudadano Anónimo',
+            reportado_por_telefono: reportado_por_telefono || null,
+            reportado_por_cedula: reportado_por_cedula || null,
+            origen_reporte: 'ciudadano',
+            evidencia_foto_url: evidencia_foto_url || null,
+            campana_id: campana_id ? parseInt(campana_id, 10) : null,
+            usuario_registro_id: null
+        });
+
+        return res.status(201).json({
+            success: true,
+            message: 'Tu necesidad ciudadana ha sido radicada exitosamente en el Banco Territorial de Soluciones.',
+            folio: folioRadicado,
+            id: nueva.id,
+            data: nueva
+        });
+    } catch (error) {
+        console.error('Error al registrar necesidad ciudadana pública:', error);
+        return res.status(500).json({ 
+            success: false, 
+            message: 'Error al radicar necesidad ciudadana', 
+            error: error.message 
+        });
+    }
+};

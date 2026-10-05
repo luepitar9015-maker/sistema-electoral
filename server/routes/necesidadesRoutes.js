@@ -3,7 +3,15 @@ const router = express.Router();
 const necesidadesController = require('../controllers/necesidadesController');
 const { verifyToken, authorizeCampaignAccess } = require('../middleware/authMiddleware');
 
-// Middleware de autenticación y asignación de campaña
+// ==========================================
+// Rutas PÚBLICAS (Para ciudadanos sin login)
+// ==========================================
+router.get('/publica/campanas', necesidadesController.getCampanasPublicas);
+router.post('/publica', necesidadesController.createNecesidadPublica);
+
+// ==========================================
+// Rutas PROTEGIDAS (Requieren login y campaña)
+// ==========================================
 router.use(verifyToken);
 router.use(authorizeCampaignAccess);
 
