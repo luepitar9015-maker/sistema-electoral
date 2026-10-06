@@ -394,22 +394,107 @@ exports.updateCampaign = async (req, res) => {
     }
 };
 
-// ─── ELIMINAR CAMPAÑA ──────────────────────────────────────────────────────
+// ─── ELIMINAR CAMPAÑA (LIMPIEZA EN CASCADA COMPLETA) ────────────────────────
 exports.deleteCampaign = async (req, res) => {
+    const t = await sequelize.transaction();
     try {
-        const campaign = await Campaign.findByPk(req.params.id);
+        const campaign = await Campaign.findByPk(req.params.id, { transaction: t });
         if (!campaign) {
+            await t.rollback();
             return res.status(404).json({ message: 'Campaña no encontrada' });
         }
 
-        // Desvincular votantes antes de eliminar
-        await Voter.update({ campana_id: null }, { where: { campana_id: campaign.id } });
-        await campaign.destroy();
+        const campId = campaign.id;
 
-        res.json({ message: 'Campaña eliminada exitosamente' });
+        const safeRequire = (modPath) => {
+            try { return require(modPath); } catch (e) { return null; }
+        };
+
+        const Reunion = safeRequire('../models/Reunion');
+        const ReunionAsistente = safeRequire('../models/ReunionAsistente');
+        const SocialMediaPost = safeRequire('../models/SocialMediaPost');
+        const SocialTeamInteraction = safeRequire('../models/SocialTeamInteraction');
+        const SocialMetricSnapshot = safeRequire('../models/SocialMetricSnapshot');
+        const SocialContentAnalysis = safeRequire('../models/SocialContentAnalysis');
+        const SocialExperiment = safeRequire('../models/SocialExperiment');
+        const SocialPostComment = safeRequire('../models/SocialPostComment');
+        const SocialNegativeComment = safeRequire('../models/SocialNegativeComment');
+        const SocialTeamAccount = safeRequire('../models/SocialTeamAccount');
+        const SocialCompetitorAttack = safeRequire('../models/SocialCompetitorAttack');
+        const SocialCompetitor = safeRequire('../models/SocialCompetitor');
+        const DiaDMesaReporte = safeRequire('../models/DiaDMesaReporte');
+        const TestigoElectoral = safeRequire('../models/TestigoElectoral');
+        const LogisticaDespacho = safeRequire('../models/LogisticaDespacho');
+        const LogisticaVehiculo = safeRequire('../models/LogisticaVehiculo');
+        const CallCenterLog = safeRequire('../models/CallCenterLog');
+        const NecesidadCiudadana = safeRequire('../models/NecesidadCiudadana');
+        const CompromisoGestion = safeRequire('../models/CompromisoGestion');
+        const Apoyo = safeRequire('../models/Apoyo');
+        const WhatsAppMessage = safeRequire('../models/WhatsAppMessage');
+        const User = safeRequire('../models/User');
+
+        // 1. Limpiar Reuniones y sus asistentes
+        if (Reunion) {
+            const reuniones = await Reunion.findAll({ where: { campana_id: campId }, attributes: ['id'], transaction: t });
+            const reunionIds = reuniones.map(r => r.id);
+            if (reunionIds.length > 0 && ReunionAsistente) {
+                await ReunionAsistente.destroy({ where: { reunion_id: reunionIds }, transaction: t });
+            }
+            await Reunion.destroy({ where: { campana_id: campId }, transaction: t });
+        }
+
+        // 2. Limpiar Publicaciones de Redes Sociales y tablas dependientes
+        if (SocialMediaPost) {
+            const posts = await SocialMediaPost.findAll({ where: { campana_id: campId }, attributes: ['id'], transaction: t });
+            const postIds = posts.map(p => p.id);
+            if (postIds.length > 0) {
+                if (SocialTeamInteraction) await SocialTeamInteraction.destroy({ where: { post_id: postIds }, transaction: t });
+                if (SocialMetricSnapshot) await SocialMetricSnapshot.destroy({ where: { post_id: postIds }, transaction: t });
+                if (SocialContentAnalysis) await SocialContentAnalysis.destroy({ where: { post_id: postIds }, transaction: t });
+                if (SocialPostComment) await SocialPostComment.destroy({ where: { post_id: postIds }, transaction: t });
+            }
+            await SocialMediaPost.destroy({ where: { campana_id: campId }, transaction: t });
+        }
+
+        // 3. Limpiar métricas directas por campana_id
+        if (SocialMetricSnapshot) await SocialMetricSnapshot.destroy({ where: { campana_id: campId }, transaction: t });
+        if (SocialContentAnalysis) await SocialContentAnalysis.destroy({ where: { campana_id: campId }, transaction: t });
+        if (SocialExperiment) await SocialExperiment.destroy({ where: { campana_id: campId }, transaction: t });
+        if (SocialPostComment) await SocialPostComment.destroy({ where: { campana_id: campId }, transaction: t });
+        if (SocialNegativeComment) await SocialNegativeComment.destroy({ where: { campana_id: campId }, transaction: t });
+        if (SocialTeamAccount) await SocialTeamAccount.destroy({ where: { campana_id: campId }, transaction: t });
+
+        // 4. Limpiar Ataques de Contrincantes y Contrincantes
+        if (SocialCompetitorAttack) await SocialCompetitorAttack.destroy({ where: { campana_id: campId }, transaction: t });
+        if (SocialCompetitor) await SocialCompetitor.destroy({ where: { campana_id: campId }, transaction: t });
+
+        // 5. Limpiar Día D, Testigos y Logística
+        if (DiaDMesaReporte) await DiaDMesaReporte.destroy({ where: { campana_id: campId }, transaction: t });
+        if (TestigoElectoral) await TestigoElectoral.destroy({ where: { campana_id: campId }, transaction: t });
+        if (LogisticaDespacho) await LogisticaDespacho.destroy({ where: { campana_id: campId }, transaction: t });
+        if (LogisticaVehiculo) await LogisticaVehiculo.destroy({ where: { campana_id: campId }, transaction: t });
+
+        // 6. Limpiar Call Center, Necesidades, Gobernanza, Apoyos y WhatsApp
+        if (CallCenterLog) await CallCenterLog.destroy({ where: { campana_id: campId }, transaction: t });
+        if (NecesidadCiudadana) await NecesidadCiudadana.destroy({ where: { campana_id: campId }, transaction: t });
+        if (CompromisoGestion) await CompromisoGestion.destroy({ where: { campana_id: campId }, transaction: t });
+        if (Apoyo) await Apoyo.destroy({ where: { campana_id: campId }, transaction: t });
+        if (WhatsAppMessage) await WhatsAppMessage.destroy({ where: { campana_id: campId }, transaction: t });
+
+        // 7. Desvincular Votantes, Usuarios y Subcampañas (SET NULL)
+        await Voter.update({ campana_id: null }, { where: { campana_id: campId }, transaction: t });
+        if (User) await User.update({ campana_id: null }, { where: { campana_id: campId }, transaction: t });
+        await Campaign.update({ parent_campaign_id: null }, { where: { parent_campaign_id: campId }, transaction: t });
+
+        // 8. Eliminar la campaña definitivamente
+        await campaign.destroy({ transaction: t });
+
+        await t.commit();
+        res.json({ message: 'Campaña y registros asociados eliminados exitosamente' });
     } catch (error) {
+        await t.rollback();
         console.error('Error al eliminar campaña:', error);
-        res.status(500).json({ message: 'Error al eliminar campaña', error: error.message });
+        res.status(500).json({ message: 'Error al eliminar campaña: ' + (error.message || error) });
     }
 };
 
