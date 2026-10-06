@@ -15,15 +15,16 @@ async function testEndpoints() {
 
     const tests = [
         { name: 'Campañas (GET /api/campaigns)', url: `${baseUrl}/campaigns` },
-        { name: 'Alertas y Notificaciones (GET /api/notifications/alerts)', url: `${baseUrl}/notifications/alerts` },
+        { name: 'Alertas y Notificaciones (GET /api/notifications)', url: `${baseUrl}/notifications` },
         { name: 'Reuniones (GET /api/reuniones)', url: `${baseUrl}/reuniones` },
         { name: 'Votantes (GET /api/voters?limit=5)', url: `${baseUrl}/voters?limit=5` },
         { name: 'Contrincantes (GET /api/social/competitors)', url: `${baseUrl}/social/competitors` },
-        { name: 'Ataques Contrincantes (GET /api/social/competitor-attacks)', url: `${baseUrl}/social/competitor-attacks` },
+        { name: 'Ataques Contrincantes (GET /api/social/competitors/attacks)', url: `${baseUrl}/social/competitors/attacks` },
         { name: 'Vehículos Logística (GET /api/logistica/vehiculos)', url: `${baseUrl}/logistica/vehiculos` },
         { name: 'Despachos Logística (GET /api/logistica/despachos)', url: `${baseUrl}/logistica/despachos` },
         { name: 'Necesidades Ciudadanas (GET /api/necesidades)', url: `${baseUrl}/necesidades` },
-        { name: 'Día D Mesas (GET /api/dia-d/reportes-mesa)', url: `${baseUrl}/dia-d/reportes-mesa` }
+        { name: 'Día D Resumen (GET /api/dia-d/summary)', url: `${baseUrl}/dia-d/summary` },
+        { name: 'Gobernanza Compromisos (GET /api/campaigns/1/compromisos)', url: `${baseUrl}/campaigns/1/compromisos` }
     ];
 
     let passed = 0;
