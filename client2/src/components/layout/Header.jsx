@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useCampaign } from '../../context/CampaignContext';
 import CampaignSelector from './CampaignSelector';
 import CampaignClock from '../common/CampaignClock';
+import NotificationCenter from './NotificationCenter';
 
 const Header = ({ onMenuClick }) => {
     const { user } = useAuth();
@@ -35,12 +36,7 @@ const Header = ({ onMenuClick }) => {
 
             {/* Right: User/Notifications */}
             <div className="flex items-center space-x-6">
-                <div className="relative cursor-pointer hover:scale-110 transition-transform">
-                    <Bell size={20} className="text-white" />
-                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#00B894] text-white text-[10px] font-bold rounded-full flex items-center justify-center border border-[#2D3436]">
-                        3
-                    </span>
-                </div>
+                <NotificationCenter />
                 <div className="text-right hidden sm:block">
                     <div className="text-white font-bold text-sm uppercase leading-none">
                         {user?.email?.split('@')[0] || 'USUARIO'}

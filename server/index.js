@@ -80,6 +80,7 @@ const diaDRoutes = require('./routes/diaDRoutes');
 const logisticaRoutes = require('./routes/logisticaRoutes');
 const callCenterRoutes = require('./routes/callCenterRoutes');
 const necesidadesRoutes = require('./routes/necesidadesRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
 
 app.use(cors());
 app.use(express.json({ limit: '25mb' }));
@@ -123,6 +124,7 @@ app.use('/api/dia-d', diaDRoutes);
 app.use('/api/logistica', logisticaRoutes);
 app.use('/api/callcenter', callCenterRoutes);
 app.use('/api/necesidades', necesidadesRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Ruta pública de Revisor y Trazabilidad por el Link del Candidato
 app.get('/r/:postId', async (req, res) => {
