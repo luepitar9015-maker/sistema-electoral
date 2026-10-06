@@ -144,22 +144,23 @@ async function testSocialOscarVillamizar() {
         const attack = await SocialCompetitorAttack.create({
             competitor_id: competitor.id,
             campana_id: campaign.id,
-            target_entidad: 'senador',
-            red_social: 'twitter',
+            adversario_nombre: 'Oposición Radical Santander (@oposicion_santander_26)',
+            plataforma: 'twitter',
             url_publicacion: 'https://x.com/oposicion_stder/status/178945612389',
-            autor_handle: compHandle,
+            blanco_ataque: 'senador',
+            descripcion_blanco: 'Ataque a la gestión y votación del Senador Oscar Villamizar en el Congreso',
             contenido_ataque: 'El senador Oscar Villamizar sigue votando en contra de las reformas del pueblo y defendiendo a los mismos de siempre en el Congreso. ¿Por qué le da la espalda a los campesinos y a los trabajadores de Santander?',
-            impacto_viral: 'alto',
-            falso_o_desinformacion: true,
-            sospecha_red_bots: true,
-            estado: 'en_analisis',
-            severidad: aiStrategy.severidad || 82,
-            recomendacion_estrategica: aiStrategy.estrategia_sugerida,
+            tema_ataque: 'Incoherencia Política',
+            nivel_amenaza: 'alto',
+            es_fake_news: true,
+            posible_red_bots: true,
+            tactica_recomendada: 'contraatacar',
+            analisis_estrategico: aiStrategy.estrategia_sugerida || 'Ataque coordinado de desprestigio legislativo. Responder con balance oficial de proyectos y respaldo gremial.',
             guion_candidato: aiStrategy.guion_candidato,
-            guion_voceros_prensa: aiStrategy.guion_voceros,
+            guion_voceros: aiStrategy.guion_voceros,
             guion_tropa_digital: aiStrategy.guion_tropa_digital,
-            guion_debate_en_vivo: aiStrategy.guion_debates,
-            fecha_ataque: new Date().toISOString()
+            guion_debates: aiStrategy.guion_debates,
+            estado: 'en_monitoreo'
         });
 
         console.log(`  ✅ Ataque registrado en War Room [ID ${attack.id}] con respuesta IA multicanal.`);
