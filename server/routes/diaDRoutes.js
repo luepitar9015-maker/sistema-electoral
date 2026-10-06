@@ -45,4 +45,11 @@ router.delete('/testigos/:id', diaDController.deleteTestigo);
 router.get('/mesas-reportes', diaDController.getMesaReportes);
 router.post('/mesas-reportes', upload.single('acta_e14'), diaDController.reportarMesaE14);
 
+// 5. Comparador Auditor E-14 (Testigos vs. Boletines Registraduría)
+router.get('/comparador-e14', diaDController.getAuditoriaE14);
+router.put('/comparador-e14/:id/boletin', diaDController.updateBoletinMesa);
+router.post('/comparador-e14/importar-boletines', diaDController.bulkImportBoletines);
+router.get('/comparador-e14/:id/reclamacion', diaDController.generarReclamacionJuridica);
+router.put('/comparador-e14/:id/marcar-reclamacion', diaDController.marcarReclamacionRadicada);
+
 module.exports = router;

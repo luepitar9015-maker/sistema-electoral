@@ -90,6 +90,35 @@ const DiaDMesaReporte = sequelize.define('DiaDMesaReporte', {
             key: 'id'
         }
     },
+    // Columnas para Auditoría E-14 vs. Boletines Registraduría
+    boletin_registraduria_votos: {
+        type: DataTypes.INTEGER,
+        defaultValue: null
+    },
+    boletin_numero: {
+        type: DataTypes.STRING,
+        defaultValue: null
+    },
+    diferencia_votos: {
+        type: DataTypes.INTEGER,
+        defaultValue: 0
+    },
+    estado_auditoria: {
+        type: DataTypes.STRING,
+        defaultValue: 'pendiente_boletin' // 'conciliado', 'alerta_roja', 'alerta_amarilla', 'pendiente_boletin'
+    },
+    reclamacion_radicada: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false
+    },
+    reclamacion_folio: {
+        type: DataTypes.STRING,
+        defaultValue: null
+    },
+    reclamacion_notas: {
+        type: DataTypes.TEXT,
+        defaultValue: null
+    },
     observaciones: {
         type: DataTypes.TEXT,
         allowNull: true

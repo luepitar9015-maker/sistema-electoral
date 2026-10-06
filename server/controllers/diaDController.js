@@ -375,3 +375,259 @@ exports.getMesaReportes = async (req, res) => {
         return res.status(500).json({ message: 'Error al obtener reportes de mesas' });
     }
 };
+
+// =========================================================================
+// MÓDULO COMPARADOR AUDITOR E-14 (TESTIGOS VS. BOLETINES REGISTRADURÍA)
+// =========================================================================
+
+// 1. Obtener dashboard y lista de auditoría E-14
+exports.getAuditoriaE14 = async (req, res) => {
+    try {
+        const campana_id = req.campaignId || req.query.campana_id;
+        if (!campana_id) return res.status(400).json({ message: 'ID de campaña requerido' });
+
+        const { estado, search, puesto } = req.query;
+        const whereClause = { campana_id };
+
+        if (estado && estado !== 'todos') {
+            whereClause.estado_auditoria = estado;
+        }
+        if (puesto && puesto !== 'todos') {
+            whereClause.puesto_votacion = puesto;
+        }
+        if (search && search.trim()) {
+            const clean = `%${search.trim().toLowerCase()}%`;
+            whereClause[Op.or] = [
+                { puesto_votacion: { [Op.like]: clean } },
+                { mesa: { [Op.like]: clean } },
+                { boletin_numero: { [Op.like]: clean } }
+            ];
+        }
+
+        const reportes = await DiaDMesaReporte.findAll({
+            where: whereClause,
+            order: [
+                ['estado_auditoria', 'ASC'], // 'alerta_roja' first
+                ['diferencia_votos', 'DESC'],
+                ['puesto_votacion', 'ASC'],
+                ['mesa', 'ASC']
+            ]
+        });
+
+        // Totales globales para KPIs
+        const todos = await DiaDMesaReporte.findAll({ where: { campana_id } });
+        const totalMesas = todos.length;
+        const mesasConciliadas = todos.filter(t => t.estado_auditoria === 'conciliado').length;
+        const mesasAlertaRoja = todos.filter(t => t.estado_auditoria === 'alerta_roja').length;
+        const mesasAlertaAmarilla = todos.filter(t => t.estado_auditoria === 'alerta_amarilla').length;
+        const mesasPendientes = todos.filter(t => t.estado_auditoria === 'pendiente_boletin' || t.boletin_registraduria_votos === null).length;
+        const votosDisputaRecuperables = todos.reduce((acc, t) => acc + (t.diferencia_votos > 0 ? t.diferencia_votos : 0), 0);
+        const reclamacionesRadicadas = todos.filter(t => t.reclamacion_radicada).length;
+
+        // Lista única de puestos para selector
+        const puestosUnicos = [...new Set(todos.map(t => t.puesto_votacion))].filter(Boolean).sort();
+
+        return res.json({
+            kpis: {
+                total_mesas: totalMesas,
+                mesas_conciliadas: mesasConciliadas,
+                mesas_alerta_roja: mesasAlertaRoja,
+                mesas_alerta_amarilla: mesasAlertaAmarilla,
+                mesas_pendientes: mesasPendientes,
+                votos_disputa_recuperables: votosDisputaRecuperables,
+                reclamaciones_radicadas: reclamacionesRadicadas,
+                porcentaje_auditoria_completada: totalMesas > 0 ? Math.round(((totalMesas - mesasPendientes) / totalMesas) * 100) : 0
+            },
+            puestos: puestosUnicos,
+            reportes
+        });
+    } catch (error) {
+        console.error('Error al obtener auditoría E-14:', error);
+        return res.status(500).json({ message: 'Error al consultar auditoría E-14', error: error.message });
+    }
+};
+
+// 2. Registrar o actualizar datos del boletín oficial de la Registraduría para una mesa
+exports.updateBoletinMesa = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { boletin_numero, boletin_registraduria_votos, observaciones } = req.body;
+
+        const reporte = await DiaDMesaReporte.findByPk(id);
+        if (!reporte) return res.status(404).json({ message: 'Reporte de mesa no encontrado' });
+
+        const votosReg = boletin_registraduria_votos !== '' && boletin_registraduria_votos !== null 
+            ? parseInt(boletin_registraduria_votos, 10) 
+            : null;
+
+        reporte.boletin_numero = boletin_numero || reporte.boletin_numero;
+        reporte.boletin_registraduria_votos = votosReg;
+
+        if (observaciones !== undefined) {
+            reporte.observaciones = observaciones;
+        }
+
+        if (votosReg !== null) {
+            const dif = (reporte.votos_candidato_principal || 0) - votosReg;
+            reporte.diferencia_votos = dif;
+
+            if (dif > 0) {
+                reporte.estado_auditoria = 'alerta_roja'; // ¡Faltan votos en el boletín!
+            } else if (dif < 0) {
+                reporte.estado_auditoria = 'alerta_amarilla'; // Boletín reporta más que testigo
+            } else {
+                reporte.estado_auditoria = 'conciliado';
+            }
+        } else {
+            reporte.estado_auditoria = 'pendiente_boletin';
+            reporte.diferencia_votos = 0;
+        }
+
+        await reporte.save();
+
+        return res.json({
+            message: 'Datos de boletín oficial actualizados y discrepancia recalculada',
+            reporte
+        });
+    } catch (error) {
+        console.error('Error al actualizar boletín:', error);
+        return res.status(500).json({ message: 'Error al actualizar boletín de mesa' });
+    }
+};
+
+// 3. Importación masiva de preconteo / boletines de la Registraduría (CSV o Array JSON)
+exports.bulkImportBoletines = async (req, res) => {
+    try {
+        const campana_id = req.campaignId || req.body.campana_id;
+        const { boletin_global_numero, registros } = req.body; // registros: [{ puesto, mesa, votos_registraduria }]
+
+        if (!Array.isArray(registros) || registros.length === 0) {
+            return res.status(400).json({ message: 'Se requiere una lista de registros para importar' });
+        }
+
+        let actualizados = 0;
+        let noEncontrados = 0;
+
+        for (const reg of registros) {
+            const { puesto, mesa, votos_registraduria } = reg;
+            if (!puesto || !mesa) continue;
+
+            const reporte = await DiaDMesaReporte.findOne({
+                where: {
+                    campana_id,
+                    puesto_votacion: puesto.trim(),
+                    mesa: String(mesa).trim()
+                }
+            });
+
+            if (reporte) {
+                const votosNum = parseInt(votos_registraduria, 10) || 0;
+                reporte.boletin_numero = boletin_global_numero || reporte.boletin_numero || 'Boletín Oficial';
+                reporte.boletin_registraduria_votos = votosNum;
+                const dif = (reporte.votos_candidato_principal || 0) - votosNum;
+                reporte.diferencia_votos = dif;
+
+                if (dif > 0) reporte.estado_auditoria = 'alerta_roja';
+                else if (dif < 0) reporte.estado_auditoria = 'alerta_amarilla';
+                else reporte.estado_auditoria = 'conciliado';
+
+                await reporte.save();
+                actualizados++;
+            } else {
+                noEncontrados++;
+            }
+        }
+
+        return res.json({
+            success: true,
+            message: `Procesamiento completado: ${actualizados} mesas auditadas con éxito. (${noEncontrados} mesas no registradas previamente por testigos).`,
+            actualizados,
+            noEncontrados
+        });
+    } catch (error) {
+        console.error('Error en importación masiva de boletines:', error);
+        return res.status(500).json({ message: 'Error al importar boletines oficiales' });
+    }
+};
+
+// 4. Generar texto de Reclamación Jurídica Formal (Código Electoral Colombiano)
+exports.generarReclamacionJuridica = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const reporte = await DiaDMesaReporte.findByPk(id, {
+            include: [{ model: Campaign, attributes: ['nombre', 'candidato', 'partido_politico', 'tipo_cargo'] }]
+        });
+        if (!reporte) return res.status(404).json({ message: 'Reporte de mesa no encontrado' });
+
+        const camp = reporte.Campaign || {};
+        const fechaHoy = new Date().toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' });
+
+        const textoReclamacion = `SEÑORES:
+COMISIÓN ESCRUTADORA AUXILIAR / MUNICIPAL DE ${reporte.municipio ? reporte.municipio.toUpperCase() : 'ESTE MUNICIPIO'}
+DEPARTAMENTO DE ${reporte.departamento ? reporte.departamento.toUpperCase() : 'ESTE DEPARTAMENTO'}
+REGISTRADURÍA NACIONAL DEL ESTADO CIVIL
+
+REF: RECLAMACIÓN FORMAL Y SOLICITUD DE APERTURA DE SOBRE Y RECUENTO DE VOTOS EN MESA POR DISCREPANCIA GRAVE ENTRE ACTA E-14 Y PRECONTEO DE TRANSMISIÓN.
+(Fundamento: Artículos 164 numerales 2 y 3, 192 y concordantes del Código Electoral Colombiano - Decreto 2241 de 1986 y Ley 1475 de 2011).
+
+Yo, en calidad de Testigo Electoral / Representante Judicial de la campaña política "${camp.nombre || 'DE NUESTRO CANDIDATO'}" respaldando la candidatura de ${camp.candidato || 'NUESTRO CANDIDATO'} al cargo de ${camp.tipo_cargo ? camp.tipo_cargo.toUpperCase() : 'ELECCIÓN POPULAR'}, por medio del presente escrito formulo ante esta Honorable Comisión Escrutadora RECLAMACIÓN FORMAL con base en los siguientes:
+
+HECHOS:
+1. En la jornada electoral del día de comicios, se surtió la votación y escrutinio de mesa en el PUESTO: "${reporte.puesto_votacion}", MESA NÚMERO: ${reporte.mesa}.
+2. Concluida la labor de los jurados de votación a las 16:00 horas, se diligenció y suscribió el FORMULARIO OFICIAL E-14 (Claveros / Transmisión), en el cual consta de manera fehaciente que la candidatura de ${camp.candidato} obtuvo un total de ${reporte.votos_candidato_principal} VOTOS LEGÍTIMAMENTE SUFRAGADOS.
+3. No obstante lo anterior, en el preconteo oficial y boletines de divulgación emitidos (${reporte.boletin_numero || 'Boletín Oficial Transmitido'}), la Registraduría publicó únicamente ${reporte.boletin_registraduria_votos !== null ? reporte.boletin_registraduria_votos : 0} VOTOS, generándose una DISCREPANCIA LESIVA Y FALTANTE DE ${reporte.diferencia_votos} VOTOS EN DETRIMENTO DE NUESTRA CANDIDATURA.
+4. Anexo al presente líbelo como plena prueba la FOTOGRAFÍA Y COPIA DIGITAL DEL FORMULARIO E-14 obtenida directamente por nuestro testigo en la mesa con el registro de las firmas de los jurados.
+
+PETICIÓN:
+PRIMERO: Que de conformidad con el artículo 164 del Código Electoral, se proceda de inmediato a la APERTURA DEL PAQUETE ELECTORAL DE LA MESA ${reporte.mesa} DEL PUESTO "${reporte.puesto_votacion}".
+SEGUNDO: Que se realice el RECUENTO VOTO A VOTO de los sufragios depositados en la urna para subsanar el error de transmisión o digitación y se consigne en el Formulario E-24 la cifra real de ${reporte.votos_candidato_principal} votos constatados en el Acta E-14.
+
+PRUEBAS:
+- Copia digital certificada y fotográfica del Acta E-14 original de la mesa ${reporte.mesa}.
+- Registro comparativo de inconsistencia del boletín.
+
+Atentamente,
+
+________________________________________________
+TESTIGO / APODERADO JUDICIAL DE CAMPAÑA
+C.C. ___________________ de ___________________
+Fecha de radicación: ${fechaHoy}`;
+
+        return res.json({
+            id: reporte.id,
+            puesto: reporte.puesto_votacion,
+            mesa: reporte.mesa,
+            votos_e14: reporte.votos_candidato_principal,
+            votos_boletin: reporte.boletin_registraduria_votos,
+            diferencia: reporte.diferencia_votos,
+            acta_e14_url: reporte.acta_e14_url,
+            texto_reclamacion: textoReclamacion
+        });
+    } catch (error) {
+        console.error('Error al generar reclamación:', error);
+        return res.status(500).json({ message: 'Error al generar reclamación jurídica' });
+    }
+};
+
+// 5. Marcar reclamación como radicada
+exports.marcarReclamacionRadicada = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { reclamacion_folio, reclamacion_notas } = req.body;
+
+        const reporte = await DiaDMesaReporte.findByPk(id);
+        if (!reporte) return res.status(404).json({ message: 'Reporte de mesa no encontrado' });
+
+        reporte.reclamacion_radicada = true;
+        reporte.reclamacion_folio = reclamacion_folio || `REC-${Date.now()}`;
+        if (reclamacion_notas) reporte.reclamacion_notas = reclamacion_notas;
+        await reporte.save();
+
+        return res.json({
+            message: 'Reclamación jurídica marcada como radicada exitosamente',
+            reporte
+        });
+    } catch (error) {
+        return res.status(500).json({ message: 'Error al marcar radicado de reclamación' });
+    }
+};

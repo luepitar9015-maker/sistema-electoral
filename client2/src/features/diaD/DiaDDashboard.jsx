@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { 
     Vote, Users, Award, FileText, CheckCircle2, Clock, 
     AlertCircle, Search, Filter, Phone, MessageSquare, 
-    Camera, RefreshCw, Wifi, WifiOff, Upload, Plus, Eye, ChevronRight
+    Camera, RefreshCw, Wifi, WifiOff, Upload, Plus, Eye, ChevronRight, Scale
 } from 'lucide-react';
 import { API } from '../../config/api';
 import { offlineSync } from '../../utils/offlineSync';
+import AuditorE14Comparador from './AuditorE14Comparador';
 
 export default function DiaDDashboard() {
     const [activeTab, setActiveTab] = useState('gotv'); // 'gotv', 'escrutinio', 'testigos'
@@ -439,7 +440,22 @@ export default function DiaDDashboard() {
                     }`}
                 >
                     <Users className="w-4 h-4" />
-                    <span>3. Red de Testigos Electorales</span>
+                    <span>3. Red de Testigos</span>
+                </button>
+
+                <button
+                    onClick={() => setActiveTab('auditoria')}
+                    className={`flex items-center gap-2 py-3 px-5 text-sm font-semibold border-b-2 transition ${
+                        activeTab === 'auditoria'
+                            ? 'border-rose-500 text-rose-400 bg-slate-800/40 rounded-t-lg'
+                            : 'border-transparent text-slate-400 hover:text-slate-200'
+                    }`}
+                >
+                    <Scale className="w-4 h-4 text-rose-400" />
+                    <span>4. Auditor E-14 vs. Registraduría</span>
+                    <span className="px-2 py-0.5 text-[10px] font-black uppercase rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/30">
+                        Escrutinio
+                    </span>
                 </button>
             </div>
 
@@ -726,6 +742,11 @@ export default function DiaDDashboard() {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* TAB 4: COMPARADOR AUDITOR E-14 VS REGISTRADURÍA */}
+            {activeTab === 'auditoria' && (
+                <AuditorE14Comparador campaignId={summary?.campana_id} />
             )}
 
             {/* MODAL REPORTAR ACTA E-14 */}
