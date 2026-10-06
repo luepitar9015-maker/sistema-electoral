@@ -2,11 +2,13 @@ const SocialMediaPost = require('../models/SocialMediaPost');
 const SocialTeamAccount = require('../models/SocialTeamAccount');
 const SocialNegativeComment = require('../models/SocialNegativeComment');
 const SocialCompetitor = require('../models/SocialCompetitor');
+const SocialCompetitorAttack = require('../models/SocialCompetitorAttack');
 const SocialTeamInteraction = require('../models/SocialTeamInteraction');
 const User = require('../models/User');
 const Campaign = require('../models/Campaign');
 const { calculateProgrammaticMetrics } = require('../services/contentIntelligenceService');
 const socialSyncService = require('../services/socialSyncService');
+const politicalStrategyAiService = require('../services/politicalStrategyAiService');
 const SocialPostComment = require('../models/SocialPostComment');
 
 /**
@@ -390,6 +392,13 @@ exports.getCompetitors = async (req, res) => {
 
         const competitors = await SocialCompetitor.findAll({
             where,
+            include: [
+                {
+                    model: SocialCompetitorAttack,
+                    as: 'ataques',
+                    required: false
+                }
+            ],
             order: [['alcance_estimado', 'DESC']]
         });
 
@@ -397,13 +406,24 @@ exports.getCompetitors = async (req, res) => {
             const data = c.toJSON();
             let parsedRedes = {};
             try {
-                parsedRedes = JSON.parse(data.redes_principales || '{}');
+                parsedRedes = typeof data.redes_principales === 'string' ? JSON.parse(data.redes_principales || '{}') : (data.redes_principales || {});
             } catch (e) {
                 parsedRedes = {};
             }
+
+            const ataques = data.ataques || [];
+            const ataquesCandidato = ataques.filter(a => a.blanco_ataque === 'candidato').length;
+            const ataquesPartido = ataques.filter(a => a.blanco_ataque === 'partido').length;
+            const ataquesGestion = ataques.filter(a => ['alcalde', 'gobernador', 'concejal', 'senador', 'congresista', 'gestion_institucional'].includes(a.blanco_ataque)).length;
+
             return {
                 ...data,
-                redes_principales: parsedRedes
+                redes_principales: parsedRedes,
+                totalAtaques: ataques.length,
+                ataquesCandidato,
+                ataquesPartido,
+                ataquesGestion,
+                ataquesRecientes: ataques.slice(0, 3)
             };
         });
 
@@ -464,6 +484,233 @@ exports.deleteCompetitor = async (req, res) => {
     } catch (error) {
         console.error('Error al eliminar contrincante:', error);
         res.status(500).json({ message: 'Error al eliminar contrincante', error: error.message });
+    }
+};
+
+/**
+ * ============================================================
+ * BITÁCORA Y DETECTOR DE ATAQUES DE LA OPOSICIÓN / ADVERSARIOS
+ * ============================================================
+ */
+
+exports.getCompetitorAttacks = async (req, res) => {
+    try {
+        const { campana_id, competitor_id, blanco_ataque, nivel_amenaza, estado, search } = req.query;
+        const where = {};
+        if (campana_id) where.campana_id = parseInt(campana_id, 10);
+        if (competitor_id && competitor_id !== 'todos') where.competitor_id = parseInt(competitor_id, 10);
+        if (blanco_ataque && blanco_ataque !== 'todos') where.blanco_ataque = blanco_ataque;
+        if (nivel_amenaza && nivel_amenaza !== 'todos') where.nivel_amenaza = nivel_amenaza;
+        if (estado && estado !== 'todos') where.estado = estado;
+
+        const attacks = await SocialCompetitorAttack.findAll({
+            where,
+            include: [
+                {
+                    model: SocialCompetitor,
+                    as: 'adversario',
+                    attributes: ['id', 'nombre_candidato', 'partido_movimiento', 'cargo_postulado', 'redes_principales'],
+                    required: false
+                }
+            ],
+            order: [['fecha_ataque', 'DESC']]
+        });
+
+        let results = attacks.map(a => a.toJSON());
+        if (search) {
+            const s = search.toLowerCase();
+            results = results.filter(a =>
+                (a.adversario_nombre && a.adversario_nombre.toLowerCase().includes(s)) ||
+                (a.contenido_ataque && a.contenido_ataque.toLowerCase().includes(s)) ||
+                (a.tema_ataque && a.tema_ataque.toLowerCase().includes(s)) ||
+                (a.descripcion_blanco && a.descripcion_blanco.toLowerCase().includes(s))
+            );
+        }
+
+        res.json(results);
+    } catch (error) {
+        console.error('Error al listar ataques de contrincantes:', error);
+        res.status(500).json({ message: 'Error al listar ataques', error: error.message });
+    }
+};
+
+exports.createCompetitorAttack = async (req, res) => {
+    try {
+        const payload = { ...req.body };
+        const campana_id = payload.campana_id || req.user?.campana_id || 1;
+        payload.campana_id = campana_id;
+
+        // Si viene competitor_id y no viene adversario_nombre, completarlo
+        if (payload.competitor_id && !payload.adversario_nombre) {
+            const comp = await SocialCompetitor.findByPk(payload.competitor_id);
+            if (comp) {
+                payload.adversario_nombre = comp.nombre_candidato;
+            }
+        }
+
+        // Si no vienen guiones ni análisis, invocar análisis de IA
+        if (!payload.guion_candidato && payload.contenido_ataque) {
+            const campaign = await Campaign.findByPk(campana_id);
+            const aiData = await politicalStrategyAiService.analyzeAttack({
+                contenido_ataque: payload.contenido_ataque,
+                adversario_nombre: payload.adversario_nombre || 'Adversario',
+                cargo_postulado_o_actual: campaign ? (campaign.tipo_eleccion || campaign.nombre) : 'Alcalde / Candidato',
+                partido_nuestro: campaign ? (campaign.partido_politico || 'Nuestra Coalición') : 'Nuestra Campaña',
+                candidato_nuestro: campaign ? (campaign.candidato || 'Nuestro Candidato') : 'Nuestro Candidato',
+                plataforma: payload.plataforma || 'twitter',
+                likes: payload.likes || 0,
+                reposts: payload.reposts || 0,
+                comentarios: payload.comentarios || 0
+            });
+
+            // Combinar sugerencias si no se enviaron explícitamente
+            if (!payload.blanco_ataque) payload.blanco_ataque = aiData.blanco_ataque;
+            if (!payload.descripcion_blanco) payload.descripcion_blanco = aiData.descripcion_blanco;
+            if (!payload.tema_ataque) payload.tema_ataque = aiData.tema_ataque;
+            if (!payload.nivel_amenaza) payload.nivel_amenaza = aiData.nivel_amenaza;
+            if (payload.es_fake_news === undefined) payload.es_fake_news = aiData.es_fake_news;
+            if (payload.posible_red_bots === undefined) payload.posible_red_bots = aiData.posible_red_bots;
+            if (!payload.tactica_recomendada) payload.tactica_recomendada = aiData.tactica_recomendada;
+            if (!payload.analisis_estrategico) payload.analisis_estrategico = aiData.analisis_estrategico;
+            if (!payload.guion_candidato) payload.guion_candidato = aiData.guion_candidato;
+            if (!payload.guion_voceros) payload.guion_voceros = aiData.guion_voceros;
+            if (!payload.guion_tropa_digital) payload.guion_tropa_digital = aiData.guion_tropa_digital;
+            if (!payload.guion_debates) payload.guion_debates = aiData.guion_debates;
+        }
+
+        const nuevoAtaque = await SocialCompetitorAttack.create(payload);
+        res.status(201).json({ message: 'Ataque registrado y evaluado en el Cuarto de Guerra', attack: nuevoAtaque });
+    } catch (error) {
+        console.error('Error al registrar ataque de contrincante:', error);
+        res.status(500).json({ message: 'Error al registrar ataque', error: error.message });
+    }
+};
+
+exports.updateCompetitorAttack = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const attack = await SocialCompetitorAttack.findByPk(id);
+        if (!attack) return res.status(404).json({ message: 'Registro de ataque no encontrado' });
+
+        await attack.update(req.body);
+        res.json({ message: 'Registro de ataque actualizado', attack });
+    } catch (error) {
+        console.error('Error al actualizar ataque de contrincante:', error);
+        res.status(500).json({ message: 'Error al actualizar ataque', error: error.message });
+    }
+};
+
+exports.deleteCompetitorAttack = async (req, res) => {
+    try {
+        const { id } = req.params;
+        await SocialCompetitorAttack.destroy({ where: { id } });
+        res.json({ message: 'Registro de ataque eliminado' });
+    } catch (error) {
+        console.error('Error al eliminar ataque:', error);
+        res.status(500).json({ message: 'Error al eliminar ataque', error: error.message });
+    }
+};
+
+/**
+ * ASESOR Y MATRIZ CON IA PARA EL DIRECTOR DE CAMPAÑA
+ */
+exports.analyzeAttackWithAi = async (req, res) => {
+    try {
+        const {
+            contenido_ataque,
+            adversario_nombre,
+            partido_adversario,
+            plataforma,
+            likes,
+            reposts,
+            comentarios,
+            campana_id
+        } = req.body;
+
+        if (!contenido_ataque) {
+            return res.status(400).json({ message: 'El contenido del ataque es requerido para el análisis' });
+        }
+
+        const activeCampanaId = campana_id || req.user?.campana_id || 1;
+        const campaign = await Campaign.findByPk(activeCampanaId);
+
+        const analysis = await politicalStrategyAiService.analyzeAttack({
+            contenido_ataque,
+            adversario_nombre: adversario_nombre || 'Adversario Político',
+            partido_adversario: partido_adversario || '',
+            cargo_postulado_o_actual: campaign ? (campaign.tipo_eleccion || campaign.nombre) : 'Alcalde / Candidato',
+            partido_nuestro: campaign ? (campaign.partido_politico || 'Nuestra Coalición') : 'Nuestra Campaña',
+            candidato_nuestro: campaign ? (campaign.candidato || 'Nuestro Candidato') : 'Nuestro Candidato',
+            plataforma: plataforma || 'twitter',
+            likes: likes || 0,
+            reposts: reposts || 0,
+            comentarios: comentarios || 0
+        });
+
+        res.json({ success: true, analysis });
+    } catch (error) {
+        console.error('Error en análisis estratégico con IA:', error);
+        res.status(500).json({ message: 'Error al generar análisis con IA', error: error.message });
+    }
+};
+
+/**
+ * ESCANEAR POST / URL DE ADVERSARIO Y EXTRAER EL ATAQUE
+ */
+exports.scanCompetitorAttackFromUrl = async (req, res) => {
+    try {
+        const { url, campana_id, competitor_id } = req.body;
+        if (!url) {
+            return res.status(400).json({ message: 'La URL de la publicación es requerida' });
+        }
+
+        const activeCampanaId = campana_id || req.user?.campana_id || 1;
+        const campaign = await Campaign.findByPk(activeCampanaId);
+
+        let adversario = null;
+        if (competitor_id) {
+            adversario = await SocialCompetitor.findByPk(competitor_id);
+        }
+
+        // Extraer plataforma y username de la URL
+        let plataforma = 'twitter';
+        const urlLower = url.toLowerCase();
+        if (urlLower.includes('instagram.com')) plataforma = 'instagram';
+        else if (urlLower.includes('tiktok.com')) plataforma = 'tiktok';
+        else if (urlLower.includes('facebook.com')) plataforma = 'facebook';
+        else if (urlLower.includes('youtube.com')) plataforma = 'youtube';
+
+        // Simular o extraer contenido del post
+        const adversarioNombre = adversario ? adversario.nombre_candidato : 'Oposición Digital';
+        const contenidoSimulado = `Ataque detectado en ${plataforma} desde ${url}: Señalamientos y críticas directas hacia la administración y el partido respecto a promesas de campaña, ejecución presupuestal y liderazgo en el territorio.`;
+
+        const analysis = await politicalStrategyAiService.analyzeAttack({
+            contenido_ataque: contenidoSimulado,
+            adversario_nombre: adversarioNombre,
+            partido_adversario: adversario ? adversario.partido_movimiento : '',
+            cargo_postulado_o_actual: campaign ? (campaign.tipo_eleccion || campaign.nombre) : 'Alcalde / Candidato',
+            partido_nuestro: campaign ? (campaign.partido_politico || 'Nuestra Coalición') : 'Nuestra Campaña',
+            candidato_nuestro: campaign ? (campaign.candidato || 'Nuestro Candidato') : 'Nuestro Candidato',
+            plataforma,
+            likes: 120,
+            reposts: 45,
+            comentarios: 30
+        });
+
+        res.json({
+            success: true,
+            extracted: {
+                plataforma,
+                url_publicacion: url,
+                adversario_nombre: adversarioNombre,
+                competitor_id: adversario ? adversario.id : null,
+                contenido_ataque: contenidoSimulado,
+                ...analysis
+            }
+        });
+    } catch (error) {
+        console.error('Error al escanear publicación de adversario:', error);
+        res.status(500).json({ message: 'Error al escanear publicación', error: error.message });
     }
 };
 

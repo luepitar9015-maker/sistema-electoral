@@ -18,6 +18,7 @@ const SocialMediaPost = require('./models/SocialMediaPost');
 const SocialTeamAccount = require('./models/SocialTeamAccount');
 const SocialNegativeComment = require('./models/SocialNegativeComment');
 const SocialCompetitor = require('./models/SocialCompetitor');
+const SocialCompetitorAttack = require('./models/SocialCompetitorAttack');
 const SocialTeamInteraction = require('./models/SocialTeamInteraction');
 const SocialMetricSnapshot = require('./models/SocialMetricSnapshot');
 const SocialContentAnalysis = require('./models/SocialContentAnalysis');
@@ -41,6 +42,12 @@ Reunion.belongsTo(Campaign, { foreignKey: 'campana_id', as: 'campana' });
 // Asociaciones de Redes Sociales
 SocialMediaPost.hasMany(SocialTeamInteraction, { foreignKey: 'post_id', as: 'interacciones_equipo', onDelete: 'CASCADE' });
 SocialTeamInteraction.belongsTo(SocialMediaPost, { foreignKey: 'post_id' });
+
+// Asociaciones de Contrincantes y Ataques
+SocialCompetitor.hasMany(SocialCompetitorAttack, { foreignKey: 'competitor_id', as: 'ataques', onDelete: 'CASCADE' });
+SocialCompetitorAttack.belongsTo(SocialCompetitor, { foreignKey: 'competitor_id', as: 'adversario' });
+Campaign.hasMany(SocialCompetitorAttack, { foreignKey: 'campana_id', as: 'ataques_adversarios' });
+SocialCompetitorAttack.belongsTo(Campaign, { foreignKey: 'campana_id' });
 
 // Asociaciones de Media Lab / Inteligencia de Contenido
 SocialMediaPost.hasMany(SocialMetricSnapshot, { foreignKey: 'post_id', as: 'snapshots', onDelete: 'CASCADE' });

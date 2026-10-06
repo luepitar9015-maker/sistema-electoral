@@ -54,6 +54,14 @@ router.post('/competitors', socialController.createCompetitor);
 router.put('/competitors/:id', socialController.updateCompetitor);
 router.delete('/competitors/:id', socialController.deleteCompetitor);
 
+// Bitácora de Ataques de la Oposición y War Room
+router.get('/competitors/attacks', socialController.getCompetitorAttacks);
+router.post('/competitors/attacks', socialController.createCompetitorAttack);
+router.put('/competitors/attacks/:id', socialController.updateCompetitorAttack);
+router.delete('/competitors/attacks/:id', socialController.deleteCompetitorAttack);
+router.post('/competitors/attacks/analyze-ai', socialController.analyzeAttackWithAi);
+router.post('/competitors/attacks/scan-url', socialController.scanCompetitorAttackFromUrl);
+
 // Asesor Virtual de Viralidad con Inteligencia Artificial
 router.post('/advisor/viral-analysis', socialController.getViralAdvisorAnalysis);
 router.post('/advisor/ask', socialController.chatWithViralAdvisor);

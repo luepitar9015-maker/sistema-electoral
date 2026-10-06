@@ -14,6 +14,7 @@ import { API } from '../config/api';
 import ContentIntelligenceDashboard from '../features/social/ContentIntelligenceDashboard';
 import TeamDatabaseUploadModal from '../features/social/TeamDatabaseUploadModal';
 import PostCommentsModal from '../features/social/PostCommentsModal';
+import CompetitorWarRoom from '../features/social/CompetitorWarRoom';
 
 const PLATAFORMAS_INFO = {
     facebook:  { label: 'Facebook',  color: 'bg-blue-600 text-white', border: 'border-blue-500', light: 'bg-blue-50 text-blue-700' },
@@ -1928,92 +1929,13 @@ export default function SocialMediaPage() {
             {/* PESTAÑA 4: RADAR DE CONTRINCANTES & OPOSICIÓN */}
             {/* ========================================================= */}
             {activeTab === 'oposicion' && (
-                <div className="space-y-4">
-                    <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <div>
-                            <h3 className="font-black text-base uppercase text-slate-900">
-                                Radar de Contrincantes & Estrategias de la Oposición
-                            </h3>
-                            <p className="text-xs text-gray-500">
-                                Análisis de los discursos de los rivales, sus líneas de ataque contra nuestra campaña y tácticas de neutralización en debates.
-                            </p>
-                        </div>
-                        <button
-                            onClick={() => setModalCompetitorOpen(true)}
-                            className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white font-bold text-xs uppercase rounded-xl hover:bg-slate-800 transition-all shadow"
-                        >
-                            <Plus size={16} />
-                            <span>Agregar Contrincante</span>
-                        </button>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {competitors.map(comp => (
-                            <div key={comp.id} className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm space-y-4 flex flex-col justify-between">
-                                <div className="space-y-3">
-                                    <div className="flex items-center justify-between gap-2">
-                                        <span className={`text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full ${
-                                            comp.nivel_amenaza === 'muy_alto' ? 'bg-red-100 text-red-800 border border-red-300' :
-                                            comp.nivel_amenaza === 'alto' ? 'bg-orange-100 text-orange-800 border border-orange-300' :
-                                            'bg-amber-100 text-amber-800 border border-amber-200'
-                                        }`}>
-                                            Amenaza {comp.nivel_amenaza?.replace('_', ' ')?.toUpperCase()}
-                                        </span>
-
-                                        <span className="text-[10px] font-bold text-gray-500">
-                                            {comp.partido_movimiento}
-                                        </span>
-                                    </div>
-
-                                    <div>
-                                        <h3 className="font-black text-base text-slate-900 leading-snug">
-                                            {comp.nombre_candidato}
-                                        </h3>
-                                        <p className="text-xs text-gray-500 font-medium">
-                                            Cargo: {comp.cargo_postulado}
-                                        </p>
-                                    </div>
-
-                                    {/* Audiencia */}
-                                    <div className="grid grid-cols-2 gap-2 text-center text-xs">
-                                        <div className="bg-gray-50 p-2 rounded-xl">
-                                            <span className="text-[9px] font-bold text-gray-400 uppercase block">Alcance Opositor</span>
-                                            <span className="font-black text-slate-800">{(comp.alcance_estimado || 0).toLocaleString()}</span>
-                                        </div>
-                                        <div className="bg-gray-50 p-2 rounded-xl">
-                                            <span className="text-[9px] font-bold text-gray-400 uppercase block">Seguidores Redes</span>
-                                            <span className="font-black text-purple-700">{(comp.seguidores_totales || 0).toLocaleString()}</span>
-                                        </div>
-                                    </div>
-
-                                    {/* Narrativa de Ataque */}
-                                    <div className="space-y-2 text-xs">
-                                        <div className="p-3 bg-amber-50 rounded-2xl border border-amber-200">
-                                            <span className="text-[10px] font-black uppercase text-amber-800 block">
-                                                🎯 Su Narrativa & Líneas de Ataque:
-                                            </span>
-                                            <p className="text-amber-950 font-bold mt-0.5">{comp.narrativa_principal}</p>
-                                            <p className="text-gray-600 text-[11px] mt-1">{comp.lineas_de_ataque}</p>
-                                        </div>
-
-                                        <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-200">
-                                            <span className="text-[10px] font-black uppercase text-emerald-800 block">
-                                                🛡️ Nuestra Contra-Estrategia:
-                                            </span>
-                                            <p className="text-emerald-950 font-bold mt-0.5">{comp.contra_estrategia_sugerida}</p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {comp.ultima_movida && (
-                                    <div className="pt-2 border-t border-gray-100 text-[11px] text-gray-500">
-                                        <strong>Última movida:</strong> {comp.ultima_movida}
-                                    </div>
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                </div>
+                <CompetitorWarRoom
+                    competitors={competitors}
+                    activeCampaign={activeCampaign}
+                    authHeaders={authHeaders}
+                    API={API}
+                    onRefreshData={fetchAllData}
+                />
             )}
 
             {/* ========================================================= */}
