@@ -7,11 +7,15 @@ import {
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useCampaign } from '../../context/CampaignContext';
 
 const Sidebar = ({ isOpen, setIsOpen }) => {
     const location = useLocation();
     const navigate = useNavigate();
     const { user, logout } = useAuth();
+    const { activeCampaign } = useCampaign();
+
+    const primaryColor = activeCampaign?.color || '#00B894';
 
     // Módulos generales del sistema
     const allMenuItems = [
@@ -114,54 +118,123 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
             ${isOpen ? 'translate-x-0' : '-translate-x-full'}
             md:relative md:translate-x-0
         `}>
-            {/* Perfil de Usuario */}
-            <div className="p-6 flex flex-col items-center border-b border-gray-700/50">
-                <div className="w-16 h-16 bg-gradient-to-br from-[#00B894] to-emerald-800 rounded-2xl flex items-center justify-center mb-2.5 text-white font-black text-xl shadow-lg">
-                    {user?.nombre?.charAt(0) || user?.email?.charAt(0).toUpperCase() || 'U'}
+            {/* Perfil de Usuario e Identidad de Campaña */}
+            <div className="p-5 flex flex-col items-center border-b border-gray-700/60 bg-gray-900/40">
+                {/* Logo de Campaña / Partido o Foto del Político */}
+                <div className="relative mb-2">
+                    {activeCampaign?.logo_campana ? (
+                        <div className="w-16 h-16 rounded-2xl p-1 bg-white/10 border-2 shadow-xl flex items-center justify-center overflow-hidden" style={{ borderColor: primaryColor }}>
+                            <img 
+                                src={activeCampaign.logo_campana} 
+                                alt="Logo Campaña" 
+                                className="w-full h-full object-contain"
+                                onError={(e) => { e.target.style.display = 'none'; }}
+                            />
+                        </div>
+                    ) : activeCampaign?.foto_candidato ? (
+                        <div className="w-16 h-16 rounded-2xl border-2 shadow-xl overflow-hidden" style={{ borderColor: primaryColor }}>
+                            <img 
+                                src={activeCampaign.foto_candidato} 
+                                alt="Foto Político" 
+                                className="w-full h-full object-cover"
+                                onError={(e) => { e.target.style.display = 'none'; }}
+                            />
+                        </div>
+                    ) : (
+                        <div 
+                            className="w-16 h-16 rounded-2xl flex items-center justify-center text-white font-black text-2xl shadow-xl transition-all"
+                            style={{ backgroundColor: primaryColor }}
+                        >
+                            {activeCampaign?.candidato?.charAt(0) || user?.nombre?.charAt(0) || 'C'}
+                        </div>
+                    )}
+
+                    {/* Mini badge flotante con foto o partido si hay ambos */}
+                    {activeCampaign?.foto_candidato && activeCampaign?.logo_campana && (
+                        <img 
+                            src={activeCampaign.foto_candidato} 
+                            alt="Candidato" 
+                            className="w-6 h-6 rounded-full border border-white absolute -bottom-1 -right-1 object-cover shadow"
+                        />
+                    )}
                 </div>
-                <h3 className="text-[#00B894] font-bold text-base text-center leading-tight">
-                    {user?.nombre || user?.email?.split('@')[0].toUpperCase()}
+
+                {/* Nombre de la Campaña / Candidato */}
+                <h3 className="font-black text-sm text-white text-center leading-tight">
+                    {activeCampaign?.candidato || activeCampaign?.nombre || 'SISTEMA ELECTORAL'}
                 </h3>
-                <span className="text-[9px] font-black uppercase tracking-wider bg-gray-800 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full mt-1.5 text-center">
-                    {getRoleBadge(user?.role)}
+
+                {/* Partido Político Badge Dinámico */}
+                {activeCampaign?.partido_politico && (
+                    <span 
+                        className="text-[9px] font-black uppercase tracking-wider text-white px-2.5 py-0.5 rounded-full mt-1.5 text-center shadow-sm"
+                        style={{ backgroundColor: primaryColor }}
+                    >
+                        {activeCampaign.partido_politico}
+                    </span>
+                )}
+
+                {/* Eslogan Oficial */}
+                {activeCampaign?.eslogan && (
+                    <p className="text-[10px] text-gray-400 italic text-center mt-1 max-w-[200px] truncate leading-tight">
+                        "{activeCampaign.eslogan}"
+                    </p>
+                )}
+
+                {/* Rol del Usuario Logueado */}
+                <span className="text-[9px] font-mono text-gray-500 uppercase mt-2">
+                    {user?.nombre || user?.email?.split('@')[0]} • {getRoleBadge(user?.role)}
                 </span>
             </div>
 
             {/* Navegación */}
             <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
-                <div className="mb-3 px-4 flex items-center justify-between text-[#00B894]">
+                <div className="mb-3 px-4 flex items-center justify-between" style={{ color: primaryColor }}>
                     <span className="text-[10px] font-black uppercase tracking-widest">Módulos del Sistema</span>
                     <Circle size={7} fill="currentColor" />
                 </div>
 
-                {menuItems.map((item, index) => (
-                    <Link
-                        key={index}
-                        to={item.path}
-                        className={`flex items-center justify-between px-4 py-3 border-l-4 transition-all group ${isActive(item.path)
-                                ? 'border-[#00B894] bg-gray-800 text-white'
-                                : 'border-transparent hover:bg-gray-800 hover:border-gray-600'
+                {menuItems.map((item, index) => {
+                    const active = isActive(item.path);
+                    return (
+                        <Link
+                            key={index}
+                            to={item.path}
+                            className={`flex items-center justify-between px-4 py-3 border-l-4 transition-all group ${
+                                active
+                                    ? 'bg-gray-800 text-white shadow-sm'
+                                    : 'border-transparent hover:bg-gray-800/60 hover:border-gray-600'
                             }`}
-                    >
-                        <div className="flex items-center gap-3">
-                            <item.icon size={18} className={isActive(item.path) ? 'text-[#00B894]' : 'text-gray-400 group-hover:text-white'} />
-                            <span className="font-bold text-sm tracking-wide">{item.label}</span>
-                        </div>
-                        {isActive(item.path) && <ChevronRight size={14} className="text-[#00B894]" />}
-                    </Link>
-                ))}
+                            style={{ borderLeftColor: active ? primaryColor : 'transparent' }}
+                        >
+                            <div className="flex items-center gap-3">
+                                <item.icon 
+                                    size={18} 
+                                    className={`transition-colors ${active ? '' : 'text-gray-400 group-hover:text-white'}`}
+                                    style={{ color: active ? primaryColor : undefined }}
+                                />
+                                <span className="font-bold text-sm tracking-wide">{item.label}</span>
+                            </div>
+                            {active && <ChevronRight size={14} style={{ color: primaryColor }} />}
+                        </Link>
+                    );
+                })}
             </nav>
 
             {/* Buscador Inferior y Botón Salir */}
-            <div className="p-6 space-y-4">
+            <div className="p-5 space-y-3 border-t border-gray-700/40">
                 <div className="relative">
                     <input
                         type="text"
-                        placeholder="Buscar..."
-                        className="w-full bg-[#E0E0E0] text-gray-800 rounded-full py-2 pl-4 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-[#00B894]"
+                        placeholder="Buscar en el sistema..."
+                        className="w-full bg-[#1e293b] text-gray-200 border border-slate-700 rounded-full py-2 pl-4 pr-10 text-xs focus:outline-none focus:ring-2"
+                        style={{ '--tw-ring-color': primaryColor }}
                     />
-                    <button className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1 bg-gray-600 rounded-full text-white hover:bg-[#00B894] transition-colors">
-                        <Search size={12} />
+                    <button 
+                        className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1.5 rounded-full text-white transition-colors"
+                        style={{ backgroundColor: primaryColor }}
+                    >
+                        <Search size={11} />
                     </button>
                 </div>
 
