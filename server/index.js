@@ -35,10 +35,6 @@ const CallCenterLog = require('./models/CallCenterLog');
 const NecesidadCiudadana = require('./models/NecesidadCiudadana');
 const CompromisoGestion = require('./models/CompromisoGestion');
 
-// Asociaciones de Gobernanza & Casa Política
-Campaign.hasMany(CompromisoGestion, { foreignKey: 'campana_id', as: 'compromisos_gestion', onDelete: 'CASCADE' });
-CompromisoGestion.belongsTo(Campaign, { foreignKey: 'campana_id', as: 'campana' });
-
 // Asociaciones de Reuniones
 Reunion.hasMany(ReunionAsistente, { foreignKey: 'reunion_id', as: 'asistentes', onDelete: 'CASCADE' });
 ReunionAsistente.belongsTo(Reunion, { foreignKey: 'reunion_id' });
