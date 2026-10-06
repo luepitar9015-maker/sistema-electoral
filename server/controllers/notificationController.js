@@ -86,22 +86,24 @@ exports.getLiveAlerts = async (req, res) => {
 
             const eventos = await Reunion.findAll({
                 where: whereReunion,
-                order: [['fecha_hora', 'ASC']],
+                order: [['fecha', 'ASC'], ['hora_inicio', 'ASC']],
                 limit: 4
             });
 
             for (const ev of eventos) {
                 const asistentes = await ReunionAsistente.count({ where: { reunion_id: ev.id } });
-                const meta = ev.aforo_esperado || 100;
+                const meta = ev.aforo_estimado || 100;
                 const porcentaje = Math.round((asistentes / meta) * 100);
 
                 if (porcentaje < 70) {
+                    const fechaTexto = ev.fecha ? `${ev.fecha} ${ev.hora_inicio || ''}` : 'Próximamente';
+                    const lugarTexto = ev.lugar_nombre || ev.direccion || ev.municipio || 'Sede';
                     alerts.push({
                         id: `evento-${ev.id}`,
                         categoria: 'eventos',
                         nivel: 'preventivo',
                         titulo: `📢 Aforo Evento: "${ev.titulo || 'Encuentro Ciudadano'}"`,
-                        mensaje: `Programado para ${new Date(ev.fecha_hora).toLocaleDateString()} en ${ev.lugar || 'Sede'}. Aforo al ${porcentaje}% (${asistentes}/${meta}). Se sugiere activar llamadas en Call Center.`,
+                        mensaje: `Programado para ${fechaTexto} en ${lugarTexto}. Aforo al ${porcentaje}% (${asistentes}/${meta}). Se sugiere activar llamadas en Call Center.`,
                         fecha: ev.createdAt,
                         ruta: '/callcenter',
                         tab: 'eventos',
