@@ -3,7 +3,7 @@ import {
     LayoutDashboard, Users, FileText, UserPlus, LogOut,
     Search, User as UserIcon, Circle, ChevronRight, List, Database, Flag,
     MessageSquare, Sparkles, CalendarDays, Share2, Vote, Compass, Calculator,
-    Truck, Headphones, Building2
+    Truck, Headphones, Building2, Landmark
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -20,6 +20,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
     // Módulos generales del sistema
     const allMenuItems = [
         { icon: LayoutDashboard, label: 'INICIO',               path: '/dashboard' },
+        { icon: Landmark,       label: 'CASA POLÍTICA / MANDATO', path: '/gobernanza', badge: 'MANDATO' },
         { icon: Vote,           label: 'OPERACIÓN DÍA D',      path: '/dia-d',       badge: 'GOTV' },
         { icon: Truck,          label: 'FLOTA Y TRANSPORTE',   path: '/logistica',   badge: 'LOGÍSTICA' },
         { icon: Headphones,     label: 'CALL CENTER GOTV',     path: '/callcenter',  badge: 'EN VIVO' },
@@ -40,10 +41,11 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
     const ROLE_ALLOWED_PATHS = {
         superadmin: ['*'],
         admin: ['*'],
+        director_estrategico: ['*'],
         candidato: ['*'],
         gerente: ['*'],
         coordinador_zonal: [
-            '/dashboard', '/territorio', '/voters', '/register', 
+            '/dashboard', '/gobernanza', '/territorio', '/voters', '/register', 
             '/necesidades', '/meetings', '/dia-d', '/reports'
         ],
         comunicaciones_prensa: [
@@ -66,14 +68,14 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
         ]
     };
 
-    const allowed = ROLE_ALLOWED_PATHS[user?.role] || ['/dashboard', '/voters', '/register'];
+    const allowed = ROLE_ALLOWED_PATHS[user?.role] || ['/dashboard', '/gobernanza', '/voters', '/register'];
     const menuItems = allMenuItems.filter(item => {
         if (allowed.includes('*')) return true;
         return allowed.includes(item.path);
     });
 
     // Módulo de usuarios exclusivo para superadmin y admin
-    if (user?.role === 'superadmin' || user?.role === 'admin') {
+    if (user?.role === 'superadmin' || user?.role === 'admin' || user?.role === 'director_estrategico') {
         menuItems.push({ icon: Users, label: 'USUARIOS / ROLES', path: '/users' });
     }
 
@@ -89,6 +91,8 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
             case 'superadmin':
             case 'admin':
                 return 'SUPERUSUARIO / SOPORTE';
+            case 'director_estrategico':
+                return 'DIRECTOR ESTRATÉGICO & CASA POLÍTICA';
             case 'candidato':
                 return 'CANDIDATO DE CAMPAÑA';
             case 'gerente':

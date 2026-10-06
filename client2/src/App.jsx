@@ -20,6 +20,7 @@ import LogisticaFlotaDashboard from './features/logistica/LogisticaFlotaDashboar
 import CallCenterOperator from './features/callcenter/CallCenterOperator';
 import NecesidadesPage from './pages/NecesidadesPage';
 import ParticipaCiudadano from './pages/ParticipaCiudadano';
+import GovernancePage from './pages/GovernancePage';
 
 const ProtectedRoute = ({ children, requireAdmin }) => {
     const { user, loading } = useAuth();
@@ -41,6 +42,7 @@ function AppRoutes() {
             <Route path="/" element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
                 <Route index element={<Navigate to="/dashboard" />} />
                 <Route path="dashboard" element={<Dashboard />} />
+                <Route path="gobernanza" element={<GovernancePage />} />
                 {/* Rutas operativas avanzadas */}
                 <Route path="dia-d" element={<DiaDDashboard />} />
                 <Route path="logistica" element={<LogisticaFlotaDashboard />} />

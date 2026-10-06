@@ -18,13 +18,13 @@ router.delete('/:id/coequiperos/:childId', verifyRole(['superadmin', 'admin', 'g
 
 // Rendición de Cuentas y Compromisos de Gobierno (4 Años de Mandato)
 router.get('/:id/compromisos', campaignController.getCompromisosGestion);
-router.post('/:id/compromisos', verifyRole(['superadmin', 'admin', 'gerente']), campaignController.createCompromisoGestion);
-router.put('/:id/compromisos/:compromisoId', verifyRole(['superadmin', 'admin', 'gerente']), campaignController.updateCompromisoGestion);
-router.delete('/:id/compromisos/:compromisoId', verifyRole(['superadmin', 'admin']), campaignController.deleteCompromisoGestion);
+router.post('/:id/compromisos', verifyRole(['superadmin', 'admin', 'gerente', 'director_estrategico']), campaignController.createCompromisoGestion);
+router.put('/:id/compromisos/:compromisoId', verifyRole(['superadmin', 'admin', 'gerente', 'director_estrategico']), campaignController.updateCompromisoGestion);
+router.delete('/:id/compromisos/:compromisoId', verifyRole(['superadmin', 'admin', 'director_estrategico']), campaignController.deleteCompromisoGestion);
 
 // Creación, edición y borrado restringidos por rol
-router.post('/', verifyRole(['superadmin', 'admin']), campaignController.createCampaign);
-router.put('/:id', verifyRole(['superadmin', 'admin', 'gerente']), campaignController.updateCampaign);
+router.post('/', verifyRole(['superadmin', 'admin', 'director_estrategico']), campaignController.createCampaign);
+router.put('/:id', verifyRole(['superadmin', 'admin', 'gerente', 'director_estrategico']), campaignController.updateCampaign);
 router.delete('/:id', verifyRole(['superadmin', 'admin']), campaignController.deleteCampaign);
 
 module.exports = router;

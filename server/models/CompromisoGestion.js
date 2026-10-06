@@ -65,6 +65,27 @@ const CompromisoGestion = sequelize.define('CompromisoGestion', {
     evidencia_url: {
         type: DataTypes.TEXT,
         allowNull: true
+    },
+    // Gobernanza territorial y roles
+    cargo_responsable: {
+        type: DataTypes.STRING, // 'alcalde', 'concejal', 'diputado', 'senador', 'congresista', 'gobernador'
+        defaultValue: 'alcalde'
+    },
+    secretaria_o_comision: {
+        type: DataTypes.STRING, // ej: "Secretaría de Obras", "Ministerio de Vivienda", "Comisión 1ra"
+        allowNull: true
+    },
+    lider_comunal_enlace: {
+        type: DataTypes.STRING, // Nombre del líder de JAC / vereda / concejal aliado
+        allowNull: true
+    },
+    porcentaje_avance: {
+        type: DataTypes.INTEGER,
+        defaultValue: 0
+    },
+    impacto_electoral_futuro: {
+        type: DataTypes.STRING, // 'vital_para_reeleccion', 'alto', 'medio', 'general'
+        defaultValue: 'alto'
     }
 }, {
     tableName: 'CompromisosGestion',

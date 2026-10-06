@@ -607,7 +607,12 @@ exports.createCompromisoGestion = async (req, res) => {
             fecha_inicio,
             fecha_cumplimiento,
             beneficiarios_estimados,
-            evidencia_url
+            evidencia_url,
+            cargo_responsable,
+            secretaria_o_comision,
+            lider_comunal_enlace,
+            porcentaje_avance,
+            impacto_electoral_futuro
         } = req.body;
 
         if (!titulo || !descripcion) {
@@ -627,7 +632,12 @@ exports.createCompromisoGestion = async (req, res) => {
             fecha_inicio: fecha_inicio || null,
             fecha_cumplimiento: fecha_cumplimiento || null,
             beneficiarios_estimados: beneficiarios_estimados ? parseInt(beneficiarios_estimados, 10) : 0,
-            evidencia_url: evidencia_url || null
+            evidencia_url: evidencia_url || null,
+            cargo_responsable: cargo_responsable || 'alcalde',
+            secretaria_o_comision: secretaria_o_comision || null,
+            lider_comunal_enlace: lider_comunal_enlace || null,
+            porcentaje_avance: porcentaje_avance !== undefined ? parseInt(porcentaje_avance, 10) : 0,
+            impacto_electoral_futuro: impacto_electoral_futuro || 'alto'
         });
 
         return res.status(201).json({ message: 'Compromiso de gestión creado exitosamente', compromiso: nuevo });
