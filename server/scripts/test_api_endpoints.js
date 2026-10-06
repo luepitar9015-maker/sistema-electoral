@@ -1,6 +1,5 @@
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '../.env') });
-const axios = require('axios');
 const jwt = require('jsonwebtoken');
 
 const secretKey = process.env.JWT_SECRET || 'secreto_para_firmar_tokens_jwt_seguro_2026';
@@ -9,7 +8,10 @@ const token = jwt.sign({ id: 1, role: 'superadmin', username: 'admin' }, secretK
 async function testEndpoints() {
     console.log('🧪 Iniciando verificación de Endpoints del Sistema...');
     const baseUrl = 'http://localhost:5000/api';
-    const headers = { Authorization: `Bearer ${token}` };
+    const headers = { 
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+    };
 
     const tests = [
         { name: 'Campañas (GET /api/campaigns)', url: `${baseUrl}/campaigns` },
@@ -29,14 +31,18 @@ async function testEndpoints() {
 
     for (const test of tests) {
         try {
-            const res = await axios.get(test.url, { headers });
-            const dataLen = Array.isArray(res.data) ? `[${res.data.length} items]` : typeof res.data === 'object' ? `[OK objeto]` : '';
-            console.log(`  ✅ ${test.name}: HTTP ${res.status} ${dataLen}`);
-            passed++;
+            const res = await fetch(test.url, { headers });
+            const data = await res.json();
+            const dataLen = Array.isArray(data) ? `[${data.length} items]` : typeof data === 'object' ? `[OK objeto]` : '';
+            if (res.ok) {
+                console.log(`  ✅ ${test.name}: HTTP ${res.status} ${dataLen}`);
+                passed++;
+            } else {
+                console.error(`  ❌ ${test.name}: HTTP ${res.status} -> ${data.message || JSON.stringify(data)}`);
+                failed++;
+            }
         } catch (err) {
-            const status = err.response ? err.response.status : 'ERR';
-            const msg = err.response?.data?.message || err.message;
-            console.error(`  ❌ ${test.name}: HTTP ${status} -> ${msg}`);
+            console.error(`  ❌ ${test.name}: ERROR -> ${err.message}`);
             failed++;
         }
     }
