@@ -129,15 +129,16 @@ async function testSocialOscarVillamizar() {
 
         // Generar análisis con el motor de IA de Estrategia
         console.log('  🤖 Generando 4 Guiones Tácticos de IA (Candidato, Prensa, Tropa Digital, Debate)...');
-        const aiStrategy = await politicalStrategyAiService.analyzeAttackAndGenerateScripts({
-            candidatoNombre: campaign.candidato,
-            cargo: campaign.tipo_cargo,
-            partido: campaign.partido_politico || 'Centro Democrático',
-            targetEntidad: 'senador',
-            autorAtaque: compHandle,
-            redSocial: 'twitter',
-            contenidoAtaque: 'El senador Oscar Villamizar sigue votando en contra de las reformas del pueblo y defendiendo a los mismos de siempre en el Congreso. ¿Por qué le da la espalda a los campesinos y a los trabajadores de Santander?',
-            metricas: { retweets: 480, likes: 1350, comentarios: 320 }
+        const aiStrategy = await politicalStrategyAiService.analyzeAttack({
+            contenido_ataque: 'El senador Oscar Villamizar sigue votando en contra de las reformas del pueblo y defendiendo a los mismos de siempre en el Congreso. ¿Por qué le da la espalda a los campesinos y a los trabajadores de Santander?',
+            adversario_nombre: 'Oposición Radical Santander',
+            candidato_nuestro: campaign.candidato,
+            partido_nuestro: campaign.partido_politico || 'Centro Democrático',
+            cargo_postulado_o_actual: 'Senador',
+            plataforma: 'twitter',
+            likes: 1350,
+            reposts: 480,
+            comentarios: 320
         });
 
         const attack = await SocialCompetitorAttack.create({
@@ -152,12 +153,12 @@ async function testSocialOscarVillamizar() {
             falso_o_desinformacion: true,
             sospecha_red_bots: true,
             estado: 'en_analisis',
-            severidad: 82,
+            severidad: aiStrategy.severidad || 82,
             recomendacion_estrategica: aiStrategy.estrategia_sugerida,
             guion_candidato: aiStrategy.guion_candidato,
-            guion_voceros_prensa: aiStrategy.guion_voceros_prensa,
+            guion_voceros_prensa: aiStrategy.guion_voceros,
             guion_tropa_digital: aiStrategy.guion_tropa_digital,
-            guion_debate_en_vivo: aiStrategy.guion_debate_en_vivo,
+            guion_debate_en_vivo: aiStrategy.guion_debates,
             fecha_ataque: new Date().toISOString()
         });
 
