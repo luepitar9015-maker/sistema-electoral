@@ -29,14 +29,15 @@ async function testCreateAndDelete() {
         });
 
         const created = await createRes.json();
-        console.log('  1. Campaña de prueba creada:', created.id, created.nombre);
+        const campaignData = created.campaign || created;
+        console.log('  1. Campaña de prueba creada:', campaignData.id, campaignData.nombre);
 
-        if (!created.id) {
-            throw new Error('No se pudo crear la campaña de prueba');
+        if (!campaignData.id) {
+            throw new Error('No se pudo crear la campaña de prueba: ' + JSON.stringify(created));
         }
 
         // 2. Eliminar la campaña recién creada
-        const deleteRes = await fetch(`${baseUrl}/${created.id}`, {
+        const deleteRes = await fetch(`${baseUrl}/${campaignData.id}`, {
             method: 'DELETE',
             headers
         });
