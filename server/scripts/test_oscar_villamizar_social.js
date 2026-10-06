@@ -104,24 +104,28 @@ async function testSocialOscarVillamizar() {
         // 5. Simular y registrar un ataque en el Radar de Oposición & War Room
         console.log('\n🎯 Simulando detección en el Radar de Oposición (War Room)...');
         let competitor = await SocialCompetitor.findOne({
-            where: { campana_id: campaign.id, red_social: 'twitter' }
+            where: { campana_id: campaign.id, nombre_candidato: 'Oposición Radical Santander' }
         });
 
         if (!competitor) {
             competitor = await SocialCompetitor.create({
                 campana_id: campaign.id,
-                nombre: 'Oposición Radical Santander',
-                partido: 'Pacto Histórico / Oposición Regional',
-                red_social: 'twitter',
-                handle: '@oposicion_santander_26',
-                url_perfil: 'https://x.com/oposicion_stder',
+                nombre_candidato: 'Oposición Radical Santander',
+                partido_movimiento: 'Pacto Histórico / Oposición Regional',
+                cargo_postulado: 'Senado 2026',
+                redes_principales: JSON.stringify({ twitter: '@oposicion_santander_26', instagram: '@oposicion_stder' }),
                 alcance_estimado: 45000,
+                seguidores_totales: 28000,
                 nivel_amenaza: 'alto',
                 narrativa_principal: 'Ataques a la gestión legislativa sobre orden público y reformas sociales',
-                activo: true
+                lineas_de_ataque: 'Seguridad, votaciones en comisiones, gasto público',
+                puntos_debiles: 'Falta de propuestas concretas para el sector productivo de Santander',
+                contra_estrategia_sugerida: 'Contratacar con cifras oficiales de gestión y respaldo gremial'
             });
-            console.log('  ✓ Creado perfil opositor en Radar: @oposicion_santander_26');
+            console.log('  ✓ Creado perfil opositor en Radar: Oposición Radical Santander');
         }
+
+        const compHandle = '@oposicion_santander_26';
 
         // Generar análisis con el motor de IA de Estrategia
         console.log('  🤖 Generando 4 Guiones Tácticos de IA (Candidato, Prensa, Tropa Digital, Debate)...');
@@ -130,7 +134,7 @@ async function testSocialOscarVillamizar() {
             cargo: campaign.tipo_cargo,
             partido: campaign.partido_politico || 'Centro Democrático',
             targetEntidad: 'senador',
-            autorAtaque: competitor.handle,
+            autorAtaque: compHandle,
             redSocial: 'twitter',
             contenidoAtaque: 'El senador Oscar Villamizar sigue votando en contra de las reformas del pueblo y defendiendo a los mismos de siempre en el Congreso. ¿Por qué le da la espalda a los campesinos y a los trabajadores de Santander?',
             metricas: { retweets: 480, likes: 1350, comentarios: 320 }
@@ -142,7 +146,7 @@ async function testSocialOscarVillamizar() {
             target_entidad: 'senador',
             red_social: 'twitter',
             url_publicacion: 'https://x.com/oposicion_stder/status/178945612389',
-            autor_handle: competitor.handle,
+            autor_handle: compHandle,
             contenido_ataque: 'El senador Oscar Villamizar sigue votando en contra de las reformas del pueblo y defendiendo a los mismos de siempre en el Congreso. ¿Por qué le da la espalda a los campesinos y a los trabajadores de Santander?',
             impacto_viral: 'alto',
             falso_o_desinformacion: true,
