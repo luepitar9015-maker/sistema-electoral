@@ -49,31 +49,28 @@ async function testSocialOscarVillamizar() {
                 campana_id: campaign.id,
                 nombre_miembro: 'Carlos Gómez (Coordinador Avanzada)',
                 usuario_handle: '@avanzada_villamizar_stder',
-                red_social: 'twitter',
-                rol_equipo: 'Líder Territorial Avanzada',
-                telefono: '3157894512',
+                plataforma: 'twitter',
+                rol_equipo: 'Líder Avanzada',
                 nivel_participacion: 'Muy Activo',
-                activo: true
+                observaciones: 'Coordinador Avanzada Bucaramanga'
             },
             {
                 campana_id: campaign.id,
                 nombre_miembro: 'María Paula Rueda (Comité Juvenil)',
                 usuario_handle: '@juventudes_cd_bucaramanga',
-                red_social: 'instagram',
-                rol_equipo: 'Juventudes Departamentales',
-                telefono: '3189965412',
+                plataforma: 'instagram',
+                rol_equipo: 'Activista Digital',
                 nivel_participacion: 'Muy Activo',
-                activo: true
+                observaciones: 'Juventudes Departamentales'
             },
             {
                 campana_id: campaign.id,
                 nombre_miembro: 'Andrés Flórez (Equipo Digital)',
                 usuario_handle: '@comunicaciones_villamizar',
-                red_social: 'twitter',
-                rol_equipo: 'Comunicaciones y Prensa',
-                telefono: '3201458796',
+                plataforma: 'twitter',
+                rol_equipo: 'Activista Digital',
                 nivel_participacion: 'Activo',
-                activo: true
+                observaciones: 'Comunicaciones y Prensa'
             }
         ];
 
