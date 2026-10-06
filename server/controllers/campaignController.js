@@ -84,48 +84,64 @@ exports.getCampaigns = async (req, res) => {
         });
 
 
-        // Obtener conteo de votantes y líderes por campaña
-        const voterCounts = await Voter.findAll({
-            attributes: [
-                'campana_id',
-                [sequelize.fn('COUNT', sequelize.col('id')), 'totalVoters'],
-                [sequelize.literal("SUM(CASE WHEN isLeader = 1 THEN 1 ELSE 0 END)"), 'totalLeaders'],
-                [sequelize.literal("SUM(CASE WHEN lugar_votacion IS NOT NULL AND lugar_votacion != '' THEN 1 ELSE 0 END)"), 'withPuesto']
-            ],
-            group: ['campana_id'],
-            raw: true
-        });
+        // Obtener conteo de votantes y líderes por campaña de forma segura y compatible
+        const countMap = {};
+        try {
+            const isPg = sequelize.getDialect() === 'postgres';
+            const leaderSql = isPg
+                ? 'SUM(CASE WHEN "isLeader" = true OR "isLeader"::text = \'1\' THEN 1 ELSE 0 END)'
+                : 'SUM(CASE WHEN isLeader = 1 OR isLeader = true THEN 1 ELSE 0 END)';
+            const puestoSql = isPg
+                ? 'SUM(CASE WHEN "lugar_votacion" IS NOT NULL AND "lugar_votacion" != \'\' THEN 1 ELSE 0 END)'
+                : 'SUM(CASE WHEN lugar_votacion IS NOT NULL AND lugar_votacion != \'\' THEN 1 ELSE 0 END)';
+
+            const voterCounts = await Voter.findAll({
+                attributes: [
+                    'campana_id',
+                    [sequelize.fn('COUNT', sequelize.col('id')), 'totalVoters'],
+                    [sequelize.literal(leaderSql), 'totalLeaders'],
+                    [sequelize.literal(puestoSql), 'withPuesto']
+                ],
+                group: ['campana_id'],
+                raw: true
+            });
+
+            voterCounts.forEach(c => {
+                if (c.campana_id) {
+                    countMap[c.campana_id] = {
+                        totalVoters: parseInt(c.totalVoters || 0, 10),
+                        totalLeaders: parseInt(c.totalLeaders || 0, 10),
+                        withPuesto: parseInt(c.withPuesto || 0, 10),
+                        totalApoyos: 0
+                    };
+                }
+            });
+        } catch (voterErr) {
+            console.warn('⚠️ [getCampaigns] Error contando votantes agregados, usando conteo simple:', voterErr.message);
+        }
 
         // Obtener conteo de apoyos por campaña
-        const apoyoCounts = await Apoyo.findAll({
-            attributes: [
-                'campana_id',
-                [sequelize.fn('COUNT', sequelize.col('id')), 'totalApoyos']
-            ],
-            group: ['campana_id'],
-            raw: true
-        });
+        try {
+            const apoyoCounts = await Apoyo.findAll({
+                attributes: [
+                    'campana_id',
+                    [sequelize.fn('COUNT', sequelize.col('id')), 'totalApoyos']
+                ],
+                group: ['campana_id'],
+                raw: true
+            });
 
-        const countMap = {};
-        voterCounts.forEach(c => {
-            if (c.campana_id) {
-                countMap[c.campana_id] = {
-                    totalVoters: parseInt(c.totalVoters || 0, 10),
-                    totalLeaders: parseInt(c.totalLeaders || 0, 10),
-                    withPuesto: parseInt(c.withPuesto || 0, 10),
-                    totalApoyos: 0
-                };
-            }
-        });
-
-        apoyoCounts.forEach(a => {
-            if (a.campana_id) {
-                if (!countMap[a.campana_id]) {
-                    countMap[a.campana_id] = { totalVoters: 0, totalLeaders: 0, withPuesto: 0, totalApoyos: 0 };
+            apoyoCounts.forEach(c => {
+                if (c.campana_id) {
+                    if (!countMap[c.campana_id]) {
+                        countMap[c.campana_id] = { totalVoters: 0, totalLeaders: 0, withPuesto: 0, totalApoyos: 0 };
+                    }
+                    countMap[c.campana_id].totalApoyos = parseInt(c.totalApoyos || 0, 10);
                 }
-                countMap[a.campana_id].totalApoyos = parseInt(a.totalApoyos || 0, 10);
-            }
-        });
+            });
+        } catch (apoyoErr) {
+            console.warn('⚠️ [getCampaigns] Error contando apoyos:', apoyoErr.message);
+        }
 
         const results = campaigns.map(camp => {
             const counts = countMap[camp.id] || { totalVoters: 0, totalLeaders: 0, withPuesto: 0, totalApoyos: 0 };
@@ -215,8 +231,13 @@ exports.createCampaign = async (req, res) => {
             fecha_elecciones
         } = req.body;
 
-        if (!nombre || !tipo_cargo || !candidato) {
-            return res.status(400).json({ message: 'Nombre de campaña, tipo de cargo y candidato son requeridos' });
+        let finalNombre = nombre;
+        if (!finalNombre || !finalNombre.trim()) {
+            finalNombre = `Campaña ${candidato || 'Oficial'} - ${(tipo_cargo || '').toUpperCase()}`;
+        }
+
+        if (!tipo_cargo || !candidato) {
+            return res.status(400).json({ message: 'El tipo de cargo y el candidato son requeridos' });
         }
 
         const nivel_territorial = determineNivelTerritorial(tipo_cargo);
@@ -247,7 +268,7 @@ exports.createCampaign = async (req, res) => {
         }
 
         const newCampaign = await Campaign.create({
-            nombre,
+            nombre: finalNombre,
             tipo_cargo,
             nivel_territorial,
             departamento: finalDepto,

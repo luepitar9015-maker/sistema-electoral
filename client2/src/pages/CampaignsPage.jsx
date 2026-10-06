@@ -159,10 +159,16 @@ export default function CampaignsPage() {
         setFormError('');
 
         try {
+            const payload = { ...formData };
+            if (!payload.nombre || !payload.nombre.trim()) {
+                const cargoObj = CARGOS.find(c => c.id === payload.tipo_cargo);
+                payload.nombre = `${cargoObj?.nombre || 'Campaña'} - ${payload.candidato || 'Oficial'}`;
+            }
+
             if (editingCampaign) {
-                await axios.put(`${API}/campaigns/${editingCampaign.id}`, formData, authHeaders);
+                await axios.put(`${API}/campaigns/${editingCampaign.id}`, payload, authHeaders);
             } else {
-                await axios.post(`${API}/campaigns`, formData, authHeaders);
+                await axios.post(`${API}/campaigns`, payload, authHeaders);
             }
             await refreshCampaigns();
             setModalOpen(false);
@@ -766,11 +772,10 @@ export default function CampaignsPage() {
                                     </label>
                                     <input
                                         type="text"
-                                        placeholder="Ej. Alcaldía de Medellín 2026 - Medellín Adelante"
+                                        placeholder="Ej. Alcaldía de Medellín 2026 - Medellín Adelante (Opcional, se autogenera)"
                                         value={formData.nombre}
                                         onChange={(e) => setFormData(prev => ({ ...prev, nombre: e.target.value }))}
                                         className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs font-bold text-gray-800 focus:outline-none focus:border-[#00B894]"
-                                        required
                                     />
                                 </div>
 
