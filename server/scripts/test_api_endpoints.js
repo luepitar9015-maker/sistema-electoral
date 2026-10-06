@@ -23,7 +23,7 @@ async function testEndpoints() {
         { name: 'Vehículos Logística (GET /api/logistica/vehiculos)', url: `${baseUrl}/logistica/vehiculos` },
         { name: 'Despachos Logística (GET /api/logistica/despachos)', url: `${baseUrl}/logistica/despachos` },
         { name: 'Necesidades Ciudadanas (GET /api/necesidades)', url: `${baseUrl}/necesidades` },
-        { name: 'Día D Resumen (GET /api/dia-d/summary)', url: `${baseUrl}/dia-d/summary` },
+        { name: 'Día D Resumen (GET /api/dia-d/summary?campana_id=1)', url: `${baseUrl}/dia-d/summary?campana_id=1` },
         { name: 'Gobernanza Compromisos (GET /api/campaigns/1/compromisos)', url: `${baseUrl}/campaigns/1/compromisos` }
     ];
 
