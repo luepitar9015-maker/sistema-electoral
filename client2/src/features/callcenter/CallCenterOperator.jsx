@@ -322,69 +322,67 @@ export default function CallCenterOperator() {
     return (
         <div className="min-h-screen bg-slate-900 text-slate-100 p-3 md:p-6 space-y-6">
             {/* Header Principal */}
-            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center pb-5 border-b border-slate-800 gap-4">
-                <div className="flex items-center gap-3">
-                    <div className="p-3 bg-gradient-to-tr from-indigo-600 via-purple-600 to-pink-600 rounded-2xl shadow-xl shadow-indigo-500/20 text-white">
-                        <Headphones className="w-7 h-7" />
-                    </div>
-                    <div>
-                        <div className="flex items-center gap-2">
-                            <h1 className="text-2xl font-black bg-gradient-to-r from-white via-slate-100 to-indigo-300 bg-clip-text text-transparent">
-                                Central de Telemarketing Electoral & Convocatoria
-                            </h1>
-                            <span className="px-2 py-0.5 text-[10px] font-black uppercase rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                                Omnicanal 365
-                            </span>
-                        </div>
-                        <p className="text-xs text-slate-400 mt-0.5">
-                            Convocatoria comunitaria por nicho residencial, movilización territorial y bitácora auditable de aforo
-                        </p>
-                    </div>
+            <div className="flex items-center gap-3.5 pb-2 border-b border-slate-800/80">
+                <div className="p-3 bg-gradient-to-tr from-indigo-600 via-purple-600 to-pink-600 rounded-2xl shadow-xl shadow-indigo-500/20 text-white shrink-0">
+                    <Headphones className="w-7 h-7" />
                 </div>
-
-                {/* Selector de Modos de Operación */}
-                <div className="flex p-1 bg-slate-800/90 rounded-xl border border-slate-700 text-xs font-bold gap-1 self-stretch sm:self-auto">
-                    <button
-                        onClick={() => setActiveMode('evento')}
-                        className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg transition ${
-                            activeMode === 'evento'
-                                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg'
-                                : 'text-slate-400 hover:text-white'
-                        }`}
-                    >
-                        <Calendar className="w-3.5 h-3.5" />
-                        <span>1. Convocatoria a Eventos</span>
-                        {eventos.length > 0 && (
-                            <span className="px-1.5 py-0.2 bg-white/20 text-[10px] rounded-full">
-                                {eventos.length}
-                            </span>
-                        )}
-                    </button>
-
-                    <button
-                        onClick={() => setActiveMode('auditoria')}
-                        className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg transition ${
-                            activeMode === 'auditoria'
-                                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg'
-                                : 'text-slate-400 hover:text-white'
-                        }`}
-                    >
-                        <Award className="w-3.5 h-3.5" />
-                        <span>2. Auditoría y Puerta</span>
-                    </button>
-
-                    <button
-                        onClick={() => setActiveMode('gotv')}
-                        className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg transition ${
-                            activeMode === 'gotv'
-                                ? 'bg-gradient-to-r from-amber-600 to-orange-600 text-white shadow-lg'
-                                : 'text-slate-400 hover:text-white'
-                        }`}
-                    >
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>3. GOTV Día D</span>
-                    </button>
+                <div>
+                    <div className="flex items-center gap-2.5">
+                        <h1 className="text-2xl font-black bg-gradient-to-r from-white via-slate-100 to-indigo-300 bg-clip-text text-transparent">
+                            Central de Telemarketing Electoral & Convocatoria
+                        </h1>
+                        <span className="px-2.5 py-0.5 text-[10px] font-black uppercase rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                            Omnicanal 365
+                        </span>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                        Convocatoria comunitaria por nicho residencial, movilización territorial y bitácora auditable de aforo
+                    </p>
                 </div>
+            </div>
+
+            {/* Barra de Navegación de Modos Operativos (Full Width, Integrada en la Interfaz) */}
+            <div className="flex flex-wrap items-center gap-2 p-1.5 bg-slate-800/80 border border-slate-700/80 rounded-2xl shadow-lg backdrop-blur">
+                <button
+                    onClick={() => setActiveMode('evento')}
+                    className={`flex-1 min-w-[220px] flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl text-xs font-bold transition-all ${
+                        activeMode === 'evento'
+                            ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-600/30 ring-1 ring-white/20'
+                            : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                    }`}
+                >
+                    <Calendar className="w-4 h-4 text-indigo-300" />
+                    <span className="text-sm">1. Convocatoria a Eventos</span>
+                    {eventos.length > 0 && (
+                        <span className="px-2 py-0.5 bg-white/20 text-[11px] rounded-full font-bold">
+                            {eventos.length} activos
+                        </span>
+                    )}
+                </button>
+
+                <button
+                    onClick={() => setActiveMode('auditoria')}
+                    className={`flex-1 min-w-[220px] flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl text-xs font-bold transition-all ${
+                        activeMode === 'auditoria'
+                            ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-600/30 ring-1 ring-white/20'
+                            : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                    }`}
+                >
+                    <Award className="w-4 h-4 text-purple-300" />
+                    <span className="text-sm">2. Auditoría y Control de Puerta</span>
+                </button>
+
+                <button
+                    onClick={() => setActiveMode('gotv')}
+                    className={`flex-1 min-w-[220px] flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl text-xs font-bold transition-all ${
+                        activeMode === 'gotv'
+                            ? 'bg-gradient-to-r from-amber-600 to-orange-600 text-white shadow-lg shadow-amber-600/30 ring-1 ring-white/20'
+                            : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                    }`}
+                >
+                    <CheckCircle2 className="w-4 h-4 text-amber-300" />
+                    <span className="text-sm">3. Operación GOTV (Día D)</span>
+                </button>
             </div>
 
             {/* ========================================================================= */}
