@@ -348,19 +348,36 @@ export default function SocialMediaPage() {
         }
     }, [activeCampaign]);
 
-    // Guardar enlaces oficiales de redes sociales del candidato
+    // Guardar enlaces oficiales de redes sociales del candidato y sincronizar de inmediato
+    const [savingAndSyncingLinks, setSavingAndSyncingLinks] = useState(false);
     const handleSaveSocialLinks = async (e) => {
         e.preventDefault();
-        if (!activeCampaign?.id) return;
+        const campId = activeCampaign?.id || 5;
+        setSavingAndSyncingLinks(true);
         try {
-            await axios.put(`${API}/campaigns/${activeCampaign.id}`, socialLinksForm, authHeaders);
-            alert('¡Enlaces de redes sociales del candidato guardados exitosamente!');
-            setModalEditLinksOpen(false);
+            await axios.put(`${API}/campaigns/${campId}`, socialLinksForm, authHeaders);
             if (activeCampaign) {
                 Object.assign(activeCampaign, socialLinksForm);
             }
+            // Sincronizar automáticamente el barrido integral de todas las redes configuradas
+            const sweepRes = await axios.post(`${API}/social/candidate-sweep`, {
+                campana_id: campId
+            }, authHeaders);
+
+            await fetchAllData();
+            setModalEditLinksOpen(false);
+            setActiveTab('feed');
+            setSyncSuccessToast({
+                message: sweepRes.data.mensaje || `¡Sincronización completada! Se importaron ${sweepRes.data.postsCreated} publicaciones y ${sweepRes.data.commentsCreated} comentarios y reacciones de las redes del candidato.`,
+                platform: 'multired',
+                handle: `@${(activeCampaign?.candidato || 'OscarVillamizar').replace(/\\s+/g, '')}`
+            });
+            setTimeout(() => setSyncSuccessToast(null), 10000);
         } catch (err) {
-            alert(err.response?.data?.message || 'Error al guardar enlaces de redes');
+            console.error('Error al guardar y sincronizar enlaces:', err);
+            alert(err.response?.data?.message || 'Error al guardar y sincronizar enlaces de redes');
+        } finally {
+            setSavingAndSyncingLinks(false);
         }
     };
 
@@ -372,14 +389,16 @@ export default function SocialMediaPage() {
         }
         setSyncingProfileUrl(url);
         try {
+            const campId = activeCampaign?.id || 5;
             const res = await axios.post(`${API}/social/sync-profile`, {
                 url,
-                campana_id: activeCampaign?.id || 1
+                campana_id: campId
             }, authHeaders);
 
             await fetchAllData();
+            setActiveTab('feed');
             setSyncSuccessToast({
-                message: `Se importaron ${res.data.postsCreated} publicaciones y ${res.data.commentsCreated} comentarios. ${res.data.teamMatchedCount} interacciones corresponden a integrantes del equipo identificados.`,
+                message: `¡Extracción completa! Se importaron ${res.data.postsCreated} publicaciones y ${res.data.commentsCreated} comentarios y reacciones de ${res.data.platform.toUpperCase()}. ${res.data.teamMatchedCount} interacciones corresponden a integrantes del equipo identificados.`,
                 platform: res.data.platform,
                 handle: res.data.handle
             });
@@ -796,7 +815,7 @@ export default function SocialMediaPage() {
                                 </span>
                             </div>
                             <p className="text-xs text-gray-300 mt-0.5">
-                                Canales oficiales de <strong className="text-cyan-300 font-bold">{activeCampaign?.candidato || 'Alejandro Gaviria'}</strong> para difusión del equipo, replicación masiva y seguimiento de trazabilidad.
+                                Canales oficiales de <strong className="text-cyan-300 font-bold">{activeCampaign?.candidato || 'Oscar Villamizar'}</strong> para difusión del equipo, replicación masiva y extracción integral de publicaciones y comentarios.
                             </p>
                         </div>
                     </div>
@@ -854,10 +873,10 @@ export default function SocialMediaPage() {
                             id: 'instagram',
                             nombre: 'Instagram Oficial',
                             icon: '📸',
-                            badge: 'bg-gradient-to-r from-purple-600 via-pink-600 to-amber-500',
+                            badge: 'bg-gradient-to-r from-purple-600 via-pink-600 to-amber-500 text-white',
                             border: 'border-pink-500/30',
-                            url: activeCampaign?.link_instagram || 'https://www.instagram.com/estrategia180?stkn=ZWVrbHNpN3JiZmlo',
-                            usuario: activeCampaign?.link_instagram ? '@campana' : '@estrategia180'
+                            url: activeCampaign?.link_instagram || 'https://www.instagram.com/oscarvillamiz/?hl=es',
+                            usuario: activeCampaign?.link_instagram ? '@' + activeCampaign.link_instagram.split('/').filter(Boolean).pop().replace(/^@/, '') : '@oscarvillamiz'
                         },
                         {
                             id: 'tiktok',
@@ -865,8 +884,8 @@ export default function SocialMediaPage() {
                             icon: '🎵',
                             badge: 'bg-black text-cyan-400',
                             border: 'border-cyan-500/30',
-                            url: activeCampaign?.link_tiktok || 'https://tiktok.com/@campanacolombia',
-                            usuario: '@campanacolombia'
+                            url: activeCampaign?.link_tiktok || 'https://www.tiktok.com/@oscarvillamiz',
+                            usuario: activeCampaign?.link_tiktok ? '@' + activeCampaign.link_tiktok.split('/').filter(Boolean).pop().replace(/^@/, '') : '@oscarvillamiz'
                         },
                         {
                             id: 'facebook',
@@ -874,8 +893,8 @@ export default function SocialMediaPage() {
                             icon: '📘',
                             badge: 'bg-blue-600 text-white',
                             border: 'border-blue-500/30',
-                            url: activeCampaign?.link_facebook || 'https://facebook.com/alejandrogaviriaoficial',
-                            usuario: 'Alejandro Gaviria'
+                            url: activeCampaign?.link_facebook || 'https://www.facebook.com/OscarVillamiz/?locale=es_LA',
+                            usuario: activeCampaign?.candidato || 'Oscar Villamizar'
                         },
                         {
                             id: 'twitter',
@@ -883,8 +902,8 @@ export default function SocialMediaPage() {
                             icon: '🐦',
                             badge: 'bg-slate-800 text-white',
                             border: 'border-slate-700',
-                            url: activeCampaign?.link_twitter || 'https://x.com/agaviriau',
-                            usuario: '@agaviriau'
+                            url: activeCampaign?.link_twitter || 'https://x.com/OscarVillamiz',
+                            usuario: activeCampaign?.link_twitter ? '@' + activeCampaign.link_twitter.split('/').filter(Boolean).pop().replace(/^@/, '') : '@OscarVillamiz'
                         },
                         {
                             id: 'youtube',
@@ -892,8 +911,8 @@ export default function SocialMediaPage() {
                             icon: '▶️',
                             badge: 'bg-red-600 text-white',
                             border: 'border-red-500/30',
-                            url: activeCampaign?.link_youtube || 'https://youtube.com/@alejandrogaviria',
-                            usuario: 'Canal Oficial'
+                            url: activeCampaign?.link_youtube || 'https://www.youtube.com/@OscarVillamizarOficial',
+                            usuario: (activeCampaign?.candidato || 'Oscar Villamizar') + ' Oficial'
                         },
                         {
                             id: 'whatsapp',
@@ -901,12 +920,14 @@ export default function SocialMediaPage() {
                             icon: '💬',
                             badge: 'bg-emerald-600 text-white',
                             border: 'border-emerald-500/30',
-                            url: activeCampaign?.link_whatsapp || 'https://whatsapp.com/channel/colombiaunida',
-                            usuario: 'Comunidad Oficial'
+                            url: activeCampaign?.link_whatsapp || 'https://chat.whatsapp.com/OscarVillamizarSenado',
+                            usuario: 'Comunidad Oficial ' + (activeCampaign?.candidato || 'Oscar Villamizar')
                         }
                     ].map(r => {
                         const isCopied = copiedLinkId === r.id;
                         const isSyncing = syncingProfileUrl === r.url;
+                        const platformPosts = posts.filter(p => p.plataforma === r.id);
+                        const platformPostsCount = platformPosts.length;
                         return (
                             <div
                                 key={r.id}
@@ -932,6 +953,13 @@ export default function SocialMediaPage() {
                                     >
                                         {r.url}
                                     </a>
+
+                                    <div className="flex items-center justify-between text-[11px] pt-1">
+                                        <span className="text-gray-400 font-medium">Extraídas en el módulo:</span>
+                                        <span className={`font-mono font-bold px-2 py-0.5 rounded-md ${platformPostsCount > 0 ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' : 'bg-slate-900 text-gray-400 border border-gray-800'}`}>
+                                            {platformPostsCount} {platformPostsCount === 1 ? 'publicación' : 'publicaciones'}
+                                        </span>
+                                    </div>
                                 </div>
 
                                 <div className="space-y-2 pt-1 border-t border-gray-800/60">
@@ -968,7 +996,7 @@ export default function SocialMediaPage() {
                                             className="w-full flex items-center justify-center gap-1.5 py-1.5 px-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-xs disabled:opacity-50"
                                         >
                                             <RefreshCw size={12} className={isSyncing ? 'animate-spin' : ''} />
-                                            <span>{isSyncing ? 'Sincronizando...' : '🔄 Sincronizar Publicaciones y Comentarios'}</span>
+                                            <span>{isSyncing ? 'Sincronizando y Extrayendo...' : `⚡ Sincronizar y Extraer Todo (${platformPostsCount})`}</span>
                                         </button>
                                     )}
                                 </div>
@@ -2909,9 +2937,11 @@ export default function SocialMediaPage() {
                                 </button>
                                 <button
                                     type="submit"
-                                    className="px-5 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-bold uppercase shadow cursor-pointer"
+                                    disabled={savingAndSyncingLinks}
+                                    className="px-5 py-2.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-indigo-600 text-white rounded-xl font-black uppercase text-xs shadow-lg cursor-pointer flex items-center gap-2 hover:opacity-95 disabled:opacity-50"
                                 >
-                                    Guardar Enlaces
+                                    {savingAndSyncingLinks ? <RefreshCw size={14} className="animate-spin" /> : <Zap size={14} />}
+                                    <span>{savingAndSyncingLinks ? 'Sincronizando y Extrayendo Todo...' : '💾 Guardar y Sincronizar Todo'}</span>
                                 </button>
                             </div>
                         </form>

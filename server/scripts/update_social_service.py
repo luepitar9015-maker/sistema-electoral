@@ -1,4 +1,6 @@
-const SocialMediaPost = require('../models/SocialMediaPost');
+import os
+
+content = """const SocialMediaPost = require('../models/SocialMediaPost');
 const SocialTeamAccount = require('../models/SocialTeamAccount');
 const SocialPostComment = require('../models/SocialPostComment');
 const Campaign = require('../models/Campaign');
@@ -21,29 +23,29 @@ function normalizeHandle(handle) {
 function parseProfileUrl(url) {
   if (!url) return { platform: 'instagram', handle: '@campana', cleanUrl: '' };
 
-  const cleanUrl = url.trim().replace(/\?.*$/, '').replace(/\/$/, '');
+  const cleanUrl = url.trim().replace(/\\?.*$/, '').replace(/\\/$/, '');
   let platform = 'instagram';
   let handle = '';
 
-  if (/instagram\.com/i.test(cleanUrl)) {
+  if (/instagram\\.com/i.test(cleanUrl)) {
     platform = 'instagram';
-    const match = cleanUrl.match(/instagram\.com\/([^/?#]+)/i);
+    const match = cleanUrl.match(/instagram\\.com\\/([^/?#]+)/i);
     handle = match ? match[1] : 'oscarvillamiz';
-  } else if (/tiktok\.com/i.test(cleanUrl)) {
+  } else if (/tiktok\\.com/i.test(cleanUrl)) {
     platform = 'tiktok';
-    const match = cleanUrl.match(/tiktok\.com\/@?([^/?#]+)/i);
+    const match = cleanUrl.match(/tiktok\\.com\\/@?([^/?#]+)/i);
     handle = match ? match[1] : 'oscarvillamiz';
-  } else if (/twitter\.com|x\.com/i.test(cleanUrl)) {
+  } else if (/twitter\\.com|x\\.com/i.test(cleanUrl)) {
     platform = 'twitter';
-    const match = cleanUrl.match(/(?:twitter|x)\.com\/([^/?#]+)/i);
+    const match = cleanUrl.match(/(?:twitter|x)\\.com\\/([^/?#]+)/i);
     handle = match ? match[1] : 'OscarVillamiz';
-  } else if (/facebook\.com/i.test(cleanUrl)) {
+  } else if (/facebook\\.com/i.test(cleanUrl)) {
     platform = 'facebook';
-    const match = cleanUrl.match(/facebook\.com\/([^/?#]+)/i);
+    const match = cleanUrl.match(/facebook\\.com\\/([^/?#]+)/i);
     handle = match ? match[1] : 'OscarVillamiz';
-  } else if (/youtube\.com/i.test(cleanUrl)) {
+  } else if (/youtube\\.com/i.test(cleanUrl)) {
     platform = 'youtube';
-    const match = cleanUrl.match(/youtube\.com\/(?:@|channel\/|user\/)?([^/?#]+)/i);
+    const match = cleanUrl.match(/youtube\\.com\\/(?:@|channel\\/|user\\/)?([^/?#]+)/i);
     handle = match ? match[1] : 'OscarVillamizarOficial';
   }
 
@@ -292,7 +294,7 @@ function getOscarVillamizarPosts(platform, handle, cleanUrl, teamAccounts) {
       },
       {
         titulo: `${handle}: 4 Pilares Innegociables para el Futuro de Colombia (Carrusel)`,
-        contenido: '1️⃣ Respaldo a la Fuerza Pública y recuperación de la seguridad ciudadana.\n2️⃣ Blindaje de los recursos de la salud sin estatización destructiva.\n3️⃣ Incentivos y reducción del costo del Estado para bajar impuestos.\n4️⃣ Inversión en vías terciarias y tecnología para el agro colombiano.\n\n¿Cuál de estas prioridades consideras más urgente? Te leo en los comentarios. 👇',
+        contenido: '1️⃣ Respaldo a la Fuerza Pública y recuperación de la seguridad ciudadana.\\n2️⃣ Blindaje de los recursos de la salud sin estatización destructiva.\\n3️⃣ Incentivos y reducción del costo del Estado para bajar impuestos.\\n4️⃣ Inversión en vías terciarias y tecnología para el agro colombiano.\\n\\n¿Cuál de estas prioridades consideras más urgente? Te leo en los comentarios. 👇',
         tipo_contenido: 'imagen',
         alcance: 52100,
         impresiones: 69400,
@@ -611,7 +613,7 @@ function getGenericCandidatePosts(platform, handle, candidateName, cleanUrl, tea
   return [
     {
       titulo: `${handle}: Compromiso con el Desarrollo y el Futuro de Nuestra Región`,
-      contenido: `🇨🇴 Recorriendo cada rincón del territorio, escuchando a nuestra gente y construyendo propuestas con soluciones reales. ¡Vamos con toda la fuerza ciudadana! #${candidateName.replace(/\s+/g, '')} #CompromisoCiudadano`,
+      contenido: `🇨🇴 Recorriendo cada rincón del territorio, escuchando a nuestra gente y construyendo propuestas con soluciones reales. ¡Vamos con toda la fuerza ciudadana! #${candidateName.replace(/\\s+/g, '')} #CompromisoCiudadano`,
       tipo_contenido: 'video',
       video_duration_seconds: 60,
       alcance: 38400,
@@ -1108,3 +1110,10 @@ module.exports = {
   getPostCommentsWithAudit,
   executeFullCandidateSweep
 };
+"""
+
+target = os.path.join(os.path.dirname(__file__), '../services/socialSyncService.js')
+with open(target, 'w', encoding='utf-8') as f:
+    f.write(content)
+
+print(f"Successfully written {len(content)} characters to {target}")
