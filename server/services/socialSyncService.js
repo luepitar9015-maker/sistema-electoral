@@ -4,6 +4,7 @@ const SocialPostComment = require('../models/SocialPostComment');
 const Campaign = require('../models/Campaign');
 const Voter = require('../models/Voter');
 const { Op } = require('sequelize');
+const { getDiegoArizaPosts } = require('./diegoArizaPosts');
 
 function normalizeHandle(handle) {
   if (!handle) return '';
@@ -1324,11 +1325,17 @@ async function syncProfileFromUrl({ url, campanaId }) {
                             (campaign?.candidato && campaign.candidato.toLowerCase().includes('villamizar')) ||
                             (campaign?.nombre && campaign.nombre.toLowerCase().includes('villamizar'));
 
-  const candidateName = campaign ? campaign.candidato : 'Oscar Villamizar';
+  const isDiegoAriza = handle.toLowerCase().includes('ariza') || 
+                       (campaign?.candidato && campaign.candidato.toLowerCase().includes('ariza')) ||
+                       (campaign?.nombre && campaign.nombre.toLowerCase().includes('ariza'));
+
+  const candidateName = campaign ? campaign.candidato : (isDiegoAriza ? 'Diego Fran Ariza' : 'Oscar Villamizar');
 
   let samplePosts = [];
   if (isOscarVillamizar) {
     samplePosts = getOscarVillamizarPosts(platform, handle, cleanUrl, teamAccounts);
+  } else if (isDiegoAriza) {
+    samplePosts = getDiegoArizaPosts(platform, handle, cleanUrl, teamAccounts);
   } else {
     samplePosts = getGenericCandidatePosts(platform, handle, candidateName, cleanUrl, teamAccounts);
   }
@@ -1559,12 +1566,21 @@ async function executeFullCandidateSweep({ campanaId }) {
   const isOscarVillamizar = (campaign.candidato && campaign.candidato.toLowerCase().includes('villamizar')) ||
                             (campaign.nombre && campaign.nombre.toLowerCase().includes('villamizar'));
 
+  const isDiegoAriza = (campaign.candidato && campaign.candidato.toLowerCase().includes('ariza')) ||
+                       (campaign.nombre && campaign.nombre.toLowerCase().includes('ariza'));
+
   if (isOscarVillamizar) {
     campaign.link_facebook = 'https://www.facebook.com/OscarVillamiz/?locale=es_LA';
     campaign.link_instagram = 'https://www.instagram.com/oscarvillamiz/?hl=es';
     campaign.link_twitter = 'https://x.com/OscarVillamiz';
     campaign.link_tiktok = 'https://www.tiktok.com/@oscarvillamiz';
     campaign.link_youtube = 'https://www.youtube.com/@OscarVillamizarOficial';
+    await campaign.save();
+  } else if (isDiegoAriza) {
+    campaign.link_facebook = 'https://www.facebook.com/diegofranariza/?locale=es_LA';
+    campaign.link_instagram = 'https://www.instagram.com/diegofranariza/?hl=es';
+    campaign.link_twitter = 'https://x.com/diegofranariza?lang=es';
+    campaign.link_tiktok = 'https://www.tiktok.com/@diego.fran.ariza';
     await campaign.save();
   }
 
@@ -1639,6 +1655,67 @@ async function executeFullCandidateSweep({ campanaId }) {
       seguidores: 9700,
       nivel_participacion: 'Activo',
       repost_campana_count: 28,
+      ultimo_apoyo_fecha: new Date().toISOString()
+    }
+  ] : isDiegoAriza ? [
+    {
+      campana_id: campanaId,
+      nombre_miembro: 'Equipo Prensa y Comunicaciones Diego Ariza',
+      rol_equipo: 'Prensa y Comunicaciones Oficiales',
+      plataforma: 'twitter',
+      usuario_handle: '@prensa_diego_ariza',
+      url_perfil: 'https://x.com/prensa_diego_ariza',
+      seguidores: 12500,
+      nivel_participacion: 'Muy Activo',
+      repost_campana_count: 42,
+      ultimo_apoyo_fecha: new Date().toISOString()
+    },
+    {
+      campana_id: campanaId,
+      nombre_miembro: 'Avanzada Regional Diego Ariza',
+      rol_equipo: 'Coordinación de Avanzada y Veredas',
+      plataforma: 'facebook',
+      usuario_handle: '@avanzada_ariza_camara',
+      url_perfil: 'https://facebook.com/avanzada_ariza_camara',
+      seguidores: 15400,
+      nivel_participacion: 'Muy Activo',
+      repost_campana_count: 51,
+      ultimo_apoyo_fecha: new Date().toISOString()
+    },
+    {
+      campana_id: campanaId,
+      nombre_miembro: 'Juventudes con Diego Ariza',
+      rol_equipo: 'Líder de Juventudes y Nuevos Votantes',
+      plataforma: 'tiktok',
+      usuario_handle: '@juventudes_con_ariza',
+      url_perfil: 'https://tiktok.com/@juventudes_con_ariza',
+      seguidores: 19800,
+      nivel_participacion: 'Muy Activo',
+      repost_campana_count: 58,
+      ultimo_apoyo_fecha: new Date().toISOString()
+    },
+    {
+      campana_id: campanaId,
+      nombre_miembro: 'Colectivo Mujeres y Familias con Ariza',
+      rol_equipo: 'Coordinadora de Mujeres y Desarrollo Social',
+      plataforma: 'instagram',
+      usuario_handle: '@mujeres_con_ariza',
+      url_perfil: 'https://instagram.com/mujeres_con_ariza',
+      seguidores: 10200,
+      nivel_participacion: 'Muy Activo',
+      repost_campana_count: 36,
+      ultimo_apoyo_fecha: new Date().toISOString()
+    },
+    {
+      campana_id: campanaId,
+      nombre_miembro: 'Red Comunal y Líderes de Base',
+      rol_equipo: 'Vocería Comunal y Juntas de Acción',
+      plataforma: 'twitter',
+      usuario_handle: '@comunales_con_ariza',
+      url_perfil: 'https://x.com/comunales_con_ariza',
+      seguidores: 7600,
+      nivel_participacion: 'Activo',
+      repost_campana_count: 29,
       ultimo_apoyo_fecha: new Date().toISOString()
     }
   ] : [
