@@ -1065,15 +1065,19 @@ exports.getLiveStreamMonitor = async (req, res) => {
             }
         });
 
-        // Chat multired simulado con clasificación estratégica
+        // Chat multired simulado con clasificación estratégica adaptado al candidato
+        const camp = campana_id ? await Campaign.findByPk(campana_id) : null;
+        const candNombre = camp ? camp.candidato : 'el Candidato';
+        const primerNombre = candNombre.split(' ')[0];
+
         const comentariosEnVivo = [
             { id: 1, plataforma: 'tiktok', usuario: 'valentina_joven26', texto: '¡Excelente propuesta de empleo joven! Ojalá apoyen a los recién graduados sin experiencia.', tipo: 'apoyo', tiempo: 'hace 10s', destacada: false },
-            { id: 2, plataforma: 'facebook', usuario: 'Don Hernando Comunal', texto: '¿Candidato, qué pasará con el presupuesto para los acueductos veredales en Antioquia y Santander?', tipo: 'pregunta', tiempo: 'hace 22s', destacada: true },
-            { id: 3, plataforma: 'instagram', usuario: 'camilo.medina_col', texto: '¡Alejandro tiene las cifras claras! Saludos desde Bucaramanga 👏🔥', tipo: 'apoyo', tiempo: 'hace 45s', destacada: false },
+            { id: 2, plataforma: 'facebook', usuario: 'Don Hernando Comunal', texto: `¿${primerNombre}, qué pasará con el presupuesto para los acueductos veredales y vías en Santander?`, tipo: 'pregunta', tiempo: 'hace 22s', destacada: true },
+            { id: 3, plataforma: 'instagram', usuario: 'camilo.medina_col', texto: `¡${primerNombre} tiene las cifras claras! Saludos desde Bucaramanga 👏🔥`, tipo: 'apoyo', tiempo: 'hace 45s', destacada: false },
             { id: 4, plataforma: 'twitter', usuario: '@critico_politico', texto: '¿Y de dónde van a salir los recursos para financiar esas reformas? Queremos ver el costo fiscal.', tipo: 'pregunta', tiempo: 'hace 1m', destacada: true },
             { id: 5, plataforma: 'tiktok', usuario: 'usuario98214_bot', texto: 'Son promesas vacías, no les crean nada.', tipo: 'ataque', tiempo: 'hace 1m', destacada: false },
-            { id: 6, plataforma: 'youtube', usuario: 'Prof. Santiago Uribe', texto: 'Pregunta para el panel: ¿Cómo articular la educación técnica del SENA con la industria tecnológica?', tipo: 'pregunta', tiempo: 'hace 2m', destacada: true },
-            { id: 7, plataforma: 'facebook', usuario: 'Marta Cecilia Gómez', texto: '¡Fuerza Alejandro, las mujeres y madres comunitarias estamos contigo! ❤️🇨🇴', tipo: 'apoyo', tiempo: 'hace 2m', destacada: false }
+            { id: 6, plataforma: 'youtube', usuario: 'Prof. Santiago Uribe', texto: 'Pregunta para el panel: ¿Cómo articular la educación técnica con la industria y el agro regional?', tipo: 'pregunta', tiempo: 'hace 2m', destacada: true },
+            { id: 7, plataforma: 'facebook', usuario: 'Marta Cecilia Gómez', texto: `¡Fuerza ${primerNombre}, las mujeres y familias estamos contigo! ❤️🇨🇴`, tipo: 'apoyo', tiempo: 'hace 2m', destacada: false }
         ];
 
         res.json({
@@ -1112,6 +1116,21 @@ exports.dispatchLiveSupportAlert = async (req, res) => {
     } catch (error) {
         console.error('Error al despachar alerta de en vivo:', error);
         res.status(500).json({ message: 'Error al despachar alerta de en vivo', error: error.message });
+    }
+};
+
+/**
+ * BARRIDO INTEGRAL DE REDES SOCIALES DEL CANDIDATO DE LA CAMPAÑA
+ */
+exports.executeCandidateSweep = async (req, res) => {
+    try {
+        const { campana_id } = req.body;
+        const activeCampanaId = campana_id || req.user?.campana_id || 7;
+        const result = await socialSyncService.executeFullCandidateSweep({ campanaId: parseInt(activeCampanaId, 10) });
+        res.json(result);
+    } catch (error) {
+        console.error('Error al ejecutar barrido de redes del candidato:', error);
+        res.status(500).json({ success: false, message: 'Error al ejecutar barrido de redes', error: error.message });
     }
 };
 
@@ -1158,7 +1177,8 @@ exports.importTeamDatabase = async (req, res) => {
 exports.getPostComments = async (req, res) => {
     try {
         const { postId } = req.params;
-        const campana_id = req.query.campana_id || req.user?.campana_id || 1;
+        const post = await SocialMediaPost.findByPk(postId);
+        const campana_id = req.query.campana_id || post?.campana_id || req.user?.campana_id || 7;
         const result = await socialSyncService.getPostCommentsWithAudit(postId, campana_id);
         res.json({ success: true, ...result });
     } catch (error) {
@@ -1195,7 +1215,7 @@ exports.exportSocialExcel = async (req, res) => {
     try {
         const ExcelJS = require('exceljs');
         const Campaign = require('../models/Campaign');
-        const activeCampanaId = req.query.campana_id || req.user?.campana_id || 2;
+        const activeCampanaId = req.query.campana_id || req.user?.campana_id || 7;
         const campaign = await Campaign.findByPk(activeCampanaId);
         const candidatoNombre = campaign ? campaign.candidato : 'Candidato';
 

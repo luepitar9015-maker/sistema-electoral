@@ -10,11 +10,23 @@ const Campaign = require('../models/Campaign');
 async function exportFiles() {
     console.log('📦 Generando archivos de exportación para las redes de Oscar Villamizar...');
 
+    const { Op } = require('sequelize');
     const campaign = await Campaign.findOne({
-        where: { candidato: 'OSCAR VILLAMIZAR' }
-    }) || await Campaign.findByPk(2);
+        where: {
+            [Op.or]: [
+                { candidato: 'Oscar Villamizar' },
+                { candidato: 'OSCAR VILLAMIZAR' },
+                { nombre: { [Op.like]: '%Villamizar%' } }
+            ]
+        }
+    });
 
-    const campId = campaign ? campaign.id : 2;
+    if (!campaign) {
+        throw new Error('Campaña de Oscar Villamizar no encontrada');
+    }
+
+    const campId = campaign.id;
+    console.log(`  - Campaña identificada: [ID ${campId}] ${campaign.nombre}`);
 
     const posts = await SocialMediaPost.findAll({
         where: { campana_id: campId },

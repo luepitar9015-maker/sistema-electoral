@@ -1,0 +1,1006 @@
+{
+  "campana": {
+    "id": 7,
+    "candidato": "Oscar Villamizar",
+    "cargo": "senado",
+    "fecha_exportacion": "2026-10-07T00:33:52.257Z",
+    "redes_oficiales": {
+      "facebook": "https://www.facebook.com/OscarVillamiz/?locale=es_LA",
+      "instagram": "https://www.instagram.com/oscarvillamiz/?hl=es",
+      "twitter": "https://x.com/OscarVillamiz"
+    }
+  },
+  "estadisticas_generales": {
+    "total_publicaciones": 15,
+    "total_alcance": 970700,
+    "total_likes": 67210,
+    "total_comentarios": 74,
+    "apoyos_equipo_identificados": 36
+  },
+  "publicaciones": [
+    {
+      "id": 27,
+      "plataforma": "facebook",
+      "autor": "Oscar Villamizar",
+      "titulo": "🔴 EN VIVO FACEBOOK: Rueda de Prensa y Balance de Gestión Legislativa",
+      "enlace": "https://www.facebook.com/OscarVillamiz/videos/989110522319245/",
+      "tipo_contenido": "live",
+      "metricas": {
+        "alcance": 84600,
+        "impresiones": 104200,
+        "reproducciones": 38900,
+        "likes": 5420,
+        "comentarios": 6,
+        "compartidos": 2120
+      },
+      "tema_estrategico": "Rendición de Cuentas y Debate en Vivo",
+      "contenido": "Conéctate a la transmisión especial donde rendimos cuentas de los debates de control político, proyectos de ley radicados y la agenda de visitas a las 6 provincias de Santander. ¡Preguntas abiertas sin censura! #OscarVillamizEnVivo",
+      "comentarios": [
+        {
+          "usuario": "@ciudadano_san_gil_firme",
+          "nombre": "Gabriel Morales",
+          "texto": "Saludos desde San Gil. Gracias por no olvidarse de las provincias.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": false,
+          "equipo_rol": null,
+          "likes": 76
+        },
+        {
+          "usuario": "@red_digital_floridablanca",
+          "nombre": "Brigada Digital Floridablanca",
+          "texto": "Replicando el stream en vivo en 15 grupos comunitarios del área metropolitana.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": true,
+          "equipo_rol": "Activismo Digital y Redes",
+          "likes": 95
+        },
+        {
+          "usuario": "@mujeres_con_villamizar",
+          "nombre": "Colectivo Mujeres con Villamizar",
+          "texto": "Excelente balance legislativo. Un senador que sí trabaja y rinde cuentas con la frente en alto.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": true,
+          "equipo_rol": "Coordinadora Mujeres y Familia",
+          "likes": 112
+        },
+        {
+          "usuario": "@periodista_regional_bga",
+          "nombre": "Noticias Bucaramanga Hoy",
+          "texto": "Senador, ¿cuál será su prioridad número 1 para el departamento de Santander en la nueva legislatura?",
+          "sentimiento": "neutral",
+          "es_equipo_campana": false,
+          "equipo_rol": null,
+          "likes": 88
+        },
+        {
+          "usuario": "@juventudes_villamizar",
+          "nombre": "Juventudes CD Bucaramanga",
+          "texto": "Los jóvenes conectados en masa. ¡Vamos con toda Senador! 🔥👏",
+          "sentimiento": "positivo",
+          "es_equipo_campana": true,
+          "equipo_rol": "Líder Juventudes CD Bucaramanga",
+          "likes": 140
+        },
+        {
+          "usuario": "@avanzada_santander_cd",
+          "nombre": "Avanzada Santander CD",
+          "texto": "¡Conectados en vivo desde Bucaramanga! Más de 200 personas en la sede central siguiendo la transmisión.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": true,
+          "equipo_rol": "Coordinación de Avanzada Santander",
+          "likes": 165
+        }
+      ]
+    },
+    {
+      "id": 26,
+      "plataforma": "facebook",
+      "autor": "Oscar Villamizar",
+      "titulo": "Oscar Villamizar: Reunión de Bancada Centro Democrático - Agenda 2026",
+      "enlace": "https://www.facebook.com/OscarVillamiz/posts/987810502319112",
+      "tipo_contenido": "imagen",
+      "metricas": {
+        "alcance": 50300,
+        "impresiones": 62800,
+        "reproducciones": 0,
+        "likes": 3920,
+        "comentarios": 4,
+        "compartidos": 890
+      },
+      "tema_estrategico": "Doctrina de Partido y Proyectos Legislativos",
+      "contenido": "Trabajando en equipo con los congresistas y directivas del partido para radicar proyectos de ley que beneficien a las familias colombianas: rebaja del IVA a la canasta familiar básica, cero impuestos a empresas que contraten jóvenes de primer empleo y penas severas a extorsionistas.",
+      "comentarios": [
+        {
+          "usuario": "@critica_economica_stder",
+          "nombre": "Sergio Arciniegas",
+          "texto": "Bajar impuestos sin bajar el gasto público no es sostenible, expliquen bien cómo cuadran las cuentas.",
+          "sentimiento": "negativo",
+          "es_equipo_campana": false,
+          "equipo_rol": null,
+          "likes": 22
+        },
+        {
+          "usuario": "@militante_firme_cd",
+          "nombre": "Alonso Villarreal",
+          "texto": "Coherencia y disciplina política. Con Oscar Villamizar el Centro Democrático está bien representado.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": false,
+          "equipo_rol": null,
+          "likes": 94
+        },
+        {
+          "usuario": "@juventudes_villamizar",
+          "nombre": "Juventudes CD Bucaramanga",
+          "texto": "Esta propuesta nos da futuro a miles de egresados universitarios.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": true,
+          "equipo_rol": "Líder Juventudes CD Bucaramanga",
+          "likes": 85
+        },
+        {
+          "usuario": "@voceria_provincial_guanenta",
+          "nombre": "Vocería Provincias Guanentá y Comunera",
+          "texto": "Total sintonía con la bancada. Cero impuestos para contratar jóvenes es la clave.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": true,
+          "equipo_rol": "Vocero Regional Provincias",
+          "likes": 79
+        }
+      ]
+    },
+    {
+      "id": 25,
+      "plataforma": "facebook",
+      "autor": "Oscar Villamizar",
+      "titulo": "Oscar Villamizar: Audiencia Pública en Barrancabermeja - Empleo y Seguridad",
+      "enlace": "https://www.facebook.com/OscarVillamiz/videos/986710492319089/",
+      "tipo_contenido": "video",
+      "metricas": {
+        "alcance": 67400,
+        "impresiones": 84200,
+        "reproducciones": 51200,
+        "likes": 4210,
+        "comentarios": 4,
+        "compartidos": 1450
+      },
+      "tema_estrategico": "Transición Energética y Empleo Regional",
+      "contenido": "En el Puerto Petrolero escuchamos a los trabajadores de la industria y a los comerciantes. La transición energética debe ser técnica, gradual y sin destruir la principal fuente de regalías de los municipios santandereanos. ¡Defender el empleo de Barrancabermeja es defender a Colombia!",
+      "comentarios": [
+        {
+          "usuario": "@avanzada_santander_cd",
+          "nombre": "Avanzada Santander CD",
+          "texto": "El Magdalena Medio respalda la mano firme del Senador Oscar Villamizar.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": true,
+          "equipo_rol": "Coordinación de Avanzada Santander",
+          "likes": 92
+        },
+        {
+          "usuario": "@asojuntas_barrancabermeja",
+          "nombre": "Asojuntas Comuna 5",
+          "texto": "Barrancabermeja necesita seguridad urgente frente a las extorsiones en el comercio.",
+          "sentimiento": "neutral",
+          "es_equipo_campana": false,
+          "equipo_rol": null,
+          "likes": 64
+        },
+        {
+          "usuario": "@comunicaciones_villamizar",
+          "nombre": "Equipo Prensa y Comunicaciones Oficial",
+          "texto": "Radicamos proposición para proteger las regalías destinadas a agua potable en el Magdalena Medio.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": true,
+          "equipo_rol": "Prensa y Comunicaciones Oficiales",
+          "likes": 88
+        },
+        {
+          "usuario": "@petrolero_barranca",
+          "nombre": "Jaime Alfonso Rey",
+          "texto": "Al fin un parlamentario que dice la verdad de frente sobre el futuro de Ecopetrol y el empleo local.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": false,
+          "equipo_rol": null,
+          "likes": 135
+        }
+      ]
+    },
+    {
+      "id": 24,
+      "plataforma": "facebook",
+      "autor": "Oscar Villamizar",
+      "titulo": "Oscar Villamizar: Gran Encuentro Comunal en Bucaramanga - Escuchando el Territorio",
+      "enlace": "https://www.facebook.com/OscarVillamiz/posts/985610482319045",
+      "tipo_contenido": "imagen",
+      "metricas": {
+        "alcance": 61500,
+        "impresiones": 78900,
+        "reproducciones": 0,
+        "likes": 4780,
+        "comentarios": 5,
+        "compartidos": 1120
+      },
+      "tema_estrategico": "Acción Comunal y Territorio",
+      "contenido": "Una jornada extraordinaria junto a presidentes de Junta de Acción Comunal, ediles y líderes barriales de Bucaramanga y el área metropolitana. La confianza se gana con presencia constante y con la verdad por delante. ¡Seguimos trabajando de la mano con las comunidades!",
+      "comentarios": [
+        {
+          "usuario": "@red_digital_floridablanca",
+          "nombre": "Brigada Digital Floridablanca",
+          "texto": "Esperándolo con los líderes comunales de Floridablanca este próximo sábado.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": true,
+          "equipo_rol": "Activismo Digital y Redes",
+          "likes": 54
+        },
+        {
+          "usuario": "@comunicaciones_villamizar",
+          "nombre": "Equipo Prensa y Comunicaciones Oficial",
+          "texto": "Tomamos nota de la solicitud para la gestión ante la Secretaría de Infraestructura.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": true,
+          "equipo_rol": "Prensa y Comunicaciones Oficiales",
+          "likes": 61
+        },
+        {
+          "usuario": "@lider_barrio_mutis",
+          "nombre": "Luz Dary Quintero",
+          "texto": "Senador, por favor gestione la recuperación de la cancha y el salón comunal del Mutis.",
+          "sentimiento": "neutral",
+          "es_equipo_campana": false,
+          "equipo_rol": null,
+          "likes": 48
+        },
+        {
+          "usuario": "@avanzada_santander_cd",
+          "nombre": "Avanzada Santander CD",
+          "texto": "Impresionante respaldo en la Comuna 1 y Comuna 2. ¡Santander firme!",
+          "sentimiento": "positivo",
+          "es_equipo_campana": true,
+          "equipo_rol": "Coordinación de Avanzada Santander",
+          "likes": 95
+        },
+        {
+          "usuario": "@comuna_norte_bucaramanga",
+          "nombre": "Comité Comuna Norte Bucaramanga",
+          "texto": "Muchas gracias por la visita a nuestra sede comunitaria. El compromiso es mutuo.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": false,
+          "equipo_rol": null,
+          "likes": 87
+        }
+      ]
+    },
+    {
+      "id": 23,
+      "plataforma": "facebook",
+      "autor": "Oscar Villamizar",
+      "titulo": "Oscar Villamizar: Intervención en Plenaria del Senado - Presupuesto y Austeridad",
+      "enlace": "https://www.facebook.com/OscarVillamiz/videos/984210452319012/",
+      "tipo_contenido": "video",
+      "metricas": {
+        "alcance": 96200,
+        "impresiones": 118400,
+        "reproducciones": 73400,
+        "likes": 6850,
+        "comentarios": 6,
+        "compartidos": 2890
+      },
+      "tema_estrategico": "Austeridad Fiscal y Control Presupuestal",
+      "contenido": "Comparto con los santandereanos y con todos los colombianos mi postura argumentada en la plenaria del Senado frente al presupuesto nacional. Defender lo que funciona y corregir lo que falla es el verdadero camino republicano. No vamos a permitir que se use el presupuesto como chequera política en año preelectoral.",
+      "comentarios": [
+        {
+          "usuario": "@mujeres_con_villamizar",
+          "nombre": "Colectivo Mujeres con Villamizar",
+          "texto": "Compartido en más de 20 grupos comunales de mujeres de Santander.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": true,
+          "equipo_rol": "Coordinadora Mujeres y Familia",
+          "likes": 85
+        },
+        {
+          "usuario": "@militante_opositor_bga",
+          "nombre": "Javier Suárez",
+          "texto": "No se opongan a los cambios que el pueblo votó en las urnas.",
+          "sentimiento": "negativo",
+          "es_equipo_campana": false,
+          "equipo_rol": null,
+          "likes": 25
+        },
+        {
+          "usuario": "@asociacion_pacientes_col",
+          "nombre": "Asociación de Pacientes",
+          "texto": "Gracias por alzar la voz por nosotros en el Congreso de la República.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": false,
+          "equipo_rol": null,
+          "likes": 110
+        },
+        {
+          "usuario": "@comerciante_san_andresito",
+          "nombre": "Víctor Hugo Parra",
+          "texto": "Desde San Andresito La Isla en Bucaramanga cuenta con todo el gremio comercial.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": false,
+          "equipo_rol": null,
+          "likes": 98
+        },
+        {
+          "usuario": "@avanzada_santander_cd",
+          "nombre": "Avanzada Santander CD",
+          "texto": "Orgullo santandereano en el Congreso. ¡Así se defiende la patria!",
+          "sentimiento": "positivo",
+          "es_equipo_campana": true,
+          "equipo_rol": "Coordinación de Avanzada Santander",
+          "likes": 122
+        },
+        {
+          "usuario": "@liderazgo_social_santander",
+          "nombre": "Líderes Sociales Santander",
+          "texto": "Excelente exposición Senador. Clara, contundente y con cifras verificables.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": false,
+          "equipo_rol": null,
+          "likes": 154
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "plataforma": "instagram",
+      "autor": "@oscarvillamiz",
+      "titulo": "@oscarvillamiz: Posición Clara frente a la Reforma a la Salud (Reel)",
+      "enlace": "https://www.instagram.com/reel/C5L490yT_05/",
+      "tipo_contenido": "video",
+      "metricas": {
+        "alcance": 88400,
+        "impresiones": 108200,
+        "reproducciones": 64800,
+        "likes": 6110,
+        "comentarios": 5,
+        "compartidos": 2340
+      },
+      "tema_estrategico": "Salud Pública y Protección al Paciente",
+      "contenido": "No permitiremos que destruyan un sistema que atiende a millones para volver al desastre del Seguro Social. Hay que mejorar los tiempos de citas y dignificar al personal médico, pero sin expropiar el derecho de los colombianos a elegir su EPS. ¡La salud es sagrada! 🩺🏥 #DefensaDeLaSalud",
+      "comentarios": [
+        {
+          "usuario": "@critica_salud_publica",
+          "nombre": "Gustavo Adolfo Pinzón",
+          "texto": "Las EPS se robaron billones en el pasado, hay que depurarlas caiga quien caiga.",
+          "sentimiento": "negativo",
+          "es_equipo_campana": false,
+          "equipo_rol": null,
+          "likes": 32
+        },
+        {
+          "usuario": "@paciente_oncologico_col",
+          "nombre": "Sandra Milena Castro",
+          "texto": "Senador, gracias de corazón por no dejarnos solos en esta incertidumbre con los medicamentos.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": false,
+          "equipo_rol": null,
+          "likes": 130
+        },
+        {
+          "usuario": "@comunicaciones_villamizar",
+          "nombre": "Equipo Prensa y Comunicaciones Oficial",
+          "texto": "Compartimos el resumen del debate en Comisión Séptima disponible en la biografía.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": true,
+          "equipo_rol": "Prensa y Comunicaciones Oficiales",
+          "likes": 68
+        },
+        {
+          "usuario": "@medico_uis_bucaramanga",
+          "nombre": "Dr. Alejandro Peña",
+          "texto": "Como médico especialista coincido: el giro directo y la politización destruirán los hospitales.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": false,
+          "equipo_rol": null,
+          "likes": 115
+        },
+        {
+          "usuario": "@mujeres_con_villamizar",
+          "nombre": "Colectivo Mujeres con Villamizar",
+          "texto": "Millones de pacientes con enfermedades raras y crónicas agradecemos esta defensa sin tregua.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": true,
+          "equipo_rol": "Coordinadora Mujeres y Familia",
+          "likes": 142
+        }
+      ]
+    },
+    {
+      "id": 21,
+      "plataforma": "instagram",
+      "autor": "@oscarvillamiz",
+      "titulo": "@oscarvillamiz: Recorrido Campesino en San Gil y Provincias Guanentá (Galería)",
+      "enlace": "https://www.instagram.com/p/C5I278mP_04/",
+      "tipo_contenido": "imagen",
+      "metricas": {
+        "alcance": 52100,
+        "impresiones": 64500,
+        "reproducciones": 0,
+        "likes": 4320,
+        "comentarios": 4,
+        "compartidos": 980
+      },
+      "tema_estrategico": "Sector Agropecuario y Provincias",
+      "contenido": "Madrugando con los caficultores y productores del sur de Santander. El campo es el corazón de nuestra economía; sin vías terciarias dignas y sin alivio a los insumos agrícolas, no hay soberanía alimentaria. ¡Firme compromiso con el campo santandereano! ☕🌾 #ProvinciasDeSantander #Guanenta #Comunera",
+      "comentarios": [
+        {
+          "usuario": "@turismo_barichara",
+          "nombre": "Hostal Barichara Colonial",
+          "texto": "La seguridad y las vías son la vida del turismo en Guanentá. Cuenta con el gremio.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": false,
+          "equipo_rol": null,
+          "likes": 53
+        },
+        {
+          "usuario": "@avanzada_santander_cd",
+          "nombre": "Avanzada Santander CD",
+          "texto": "Un candidato que camina la trocha y mira a la gente a los ojos. ¡Gran jornada!",
+          "sentimiento": "positivo",
+          "es_equipo_campana": true,
+          "equipo_rol": "Coordinación de Avanzada Santander",
+          "likes": 72
+        },
+        {
+          "usuario": "@caficultor_sangileno",
+          "nombre": "Don Pedro Pablo Rueda",
+          "texto": "Gracias por venir a la finca a tomar café con nosotros y escuchar las quejas de los abonos.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": false,
+          "equipo_rol": null,
+          "likes": 84
+        },
+        {
+          "usuario": "@voceria_provincial_guanenta",
+          "nombre": "Vocería Provincias Guanentá y Comunera",
+          "texto": "San Gil, Barichara, Curití y Socorro están firmes con el Senador Oscar Villamizar.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": true,
+          "equipo_rol": "Vocero Regional Provincias",
+          "likes": 96
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "plataforma": "instagram",
+      "autor": "@oscarvillamiz",
+      "titulo": "@oscarvillamiz: Diálogo con Jóvenes Emprendedores en Floridablanca (Reel)",
+      "enlace": "https://www.instagram.com/reel/C5F034kL_03/",
+      "tipo_contenido": "video",
+      "metricas": {
+        "alcance": 57800,
+        "impresiones": 71200,
+        "reproducciones": 46200,
+        "likes": 3940,
+        "comentarios": 5,
+        "compartidos": 1150
+      },
+      "tema_estrategico": "Emprendimiento Juvenil y Oportunidades",
+      "contenido": "La juventud santandereana no quiere limosnas, quiere oportunidades reales: créditos blandos para emprender, capacitación en tecnología y menos trabas burocráticas para abrir empresa. ¡Desde el Senado impulsaremos la Ley de Emprendimiento Juvenil Sin Trabas! 🚀💡 #JóvenesConVillamizar",
+      "comentarios": [
+        {
+          "usuario": "@avanzada_santander_cd",
+          "nombre": "Avanzada Santander CD",
+          "texto": "La avanzada juvenil del partido es la más fuerte del departamento. ¡Vamos por la victoria!",
+          "sentimiento": "positivo",
+          "es_equipo_campana": true,
+          "equipo_rol": "Coordinación de Avanzada Santander",
+          "likes": 82
+        },
+        {
+          "usuario": "@estudiante_unab",
+          "nombre": "Natalia Gómez",
+          "texto": "¿Habrá becas de posgrado en el exterior para investigación científica en Santander?",
+          "sentimiento": "neutral",
+          "es_equipo_campana": false,
+          "equipo_rol": null,
+          "likes": 38
+        },
+        {
+          "usuario": "@red_digital_floridablanca",
+          "nombre": "Brigada Digital Floridablanca",
+          "texto": "Tremenda convocatoria en el auditorio. Floridablanca presente con el Senador.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": true,
+          "equipo_rol": "Activismo Digital y Redes",
+          "likes": 74
+        },
+        {
+          "usuario": "@startupero_santandereano",
+          "nombre": "Felipe Celis",
+          "texto": "Reducir el papeleo para registrar una SAS y exonerar de impuestos el primer año sería un golazo.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": false,
+          "equipo_rol": null,
+          "likes": 67
+        },
+        {
+          "usuario": "@juventudes_villamizar",
+          "nombre": "Juventudes CD Bucaramanga",
+          "texto": "¡Energía total en Floridablanca! Los jóvenes queremos trabajar y salir adelante con mérito.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": true,
+          "equipo_rol": "Líder Juventudes CD Bucaramanga",
+          "likes": 110
+        }
+      ]
+    },
+    {
+      "id": 19,
+      "plataforma": "instagram",
+      "autor": "@oscarvillamiz",
+      "titulo": "@oscarvillamiz: 4 Pilares Innegociables para el Futuro de Colombia (Carrusel)",
+      "enlace": "https://www.instagram.com/p/C5DE12xF_02/",
+      "tipo_contenido": "carrusel",
+      "metricas": {
+        "alcance": 68500,
+        "impresiones": 82400,
+        "reproducciones": 0,
+        "likes": 4890,
+        "comentarios": 5,
+        "compartidos": 1320
+      },
+      "tema_estrategico": "Pilares Programáticos y Doctrina Política",
+      "contenido": "1️⃣ Respaldo a la Fuerza Pública y recuperación de la seguridad ciudadana.\n2️⃣ Blindaje de los recursos de la salud sin estatización destructiva.\n3️⃣ Incentivos y reducción del costo del Estado para bajar impuestos.\n4️⃣ Inversión en vías terciarias y tecnología para el agro colombiano.\n\n¿Cuál de estas prioridades consideras más urgente? Te leo en los comentarios.",
+      "comentarios": [
+        {
+          "usuario": "@duda_ciudadana_bga",
+          "nombre": "Luz Marina Osorio",
+          "texto": "¿Cómo garantizarán que los recursos de vías terciarias no se queden en contratos corruptos?",
+          "sentimiento": "neutral",
+          "es_equipo_campana": false,
+          "equipo_rol": null,
+          "likes": 36
+        },
+        {
+          "usuario": "@agro_san_vicente",
+          "nombre": "Cacao San Vicente de Chucurí",
+          "texto": "Las vías terciarias nos salvarían a miles de familias cacaoteras. Apoyamos ese pilar.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": false,
+          "equipo_rol": null,
+          "likes": 71
+        },
+        {
+          "usuario": "@mujeres_con_villamizar",
+          "nombre": "Colectivo Mujeres con Villamizar",
+          "texto": "El pilar de salud es vital para proteger los tratamientos de nuestros hijos y abuelos.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": true,
+          "equipo_rol": "Coordinadora Mujeres y Familia",
+          "likes": 94
+        },
+        {
+          "usuario": "@empresario_girondeno",
+          "nombre": "Rodrigo Barajas",
+          "texto": "La seguridad es el pilar número 1. Sin seguridad nadie invierte un solo peso en Colombia.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": false,
+          "equipo_rol": null,
+          "likes": 85
+        },
+        {
+          "usuario": "@comunicaciones_villamizar",
+          "nombre": "Equipo Prensa y Comunicaciones Oficial",
+          "texto": "Línea programática impecable. El partido respalda con total convicción estos 4 pilares.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": true,
+          "equipo_rol": "Prensa y Comunicaciones Oficiales",
+          "likes": 132
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "plataforma": "instagram",
+      "autor": "@oscarvillamiz",
+      "titulo": "@oscarvillamiz: En Santander y en Colombia la libertad se defiende con carácter (Reel)",
+      "enlace": "https://www.instagram.com/reel/C5A8B9cD_01/",
+      "tipo_contenido": "video",
+      "metricas": {
+        "alcance": 79200,
+        "impresiones": 94300,
+        "reproducciones": 58400,
+        "likes": 5620,
+        "comentarios": 6,
+        "compartidos": 1840
+      },
+      "tema_estrategico": "Presencia Territorial y Liderazgo Regional",
+      "contenido": "Un mensaje directo desde el territorio: Recorriendo nuestras provincias santandereanas. La gente trabajadora no pide promesas vacías, exige vías transitables, seguridad para cosechar y apoyo decidido a las microempresas. ¡Seguimos firmes construyendo futuro con valores y determinación! 🇨🇴⛰️ #OscarVillamizar #SantanderFirme #Senado2026",
+      "comentarios": [
+        {
+          "usuario": "@critico_digital_colombia",
+          "nombre": "Usuario Anónimo",
+          "texto": "Mucho video en redes pero queremos ver votaciones a favor del pueblo.",
+          "sentimiento": "negativo",
+          "es_equipo_campana": false,
+          "equipo_rol": null,
+          "likes": 18
+        },
+        {
+          "usuario": "@empresario_calzado_stder",
+          "nombre": "Jairo Forero",
+          "texto": "Los industriales del calzado de Santander estamos con usted, necesitamos protección arancelaria.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": false,
+          "equipo_rol": null,
+          "likes": 73
+        },
+        {
+          "usuario": "@juventudes_villamizar",
+          "nombre": "Juventudes CD Bucaramanga",
+          "texto": "¡El video quedó brutal! Rodándolo en todos los grupos de jóvenes de la universidad.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": true,
+          "equipo_rol": "Líder Juventudes CD Bucaramanga",
+          "likes": 88
+        },
+        {
+          "usuario": "@familia_productora_lebrija",
+          "nombre": "Esperanza Duarte",
+          "texto": "Venga a Lebrija a apoyar a los productores de piña y aves que tenemos problemas con los insumos.",
+          "sentimiento": "neutral",
+          "es_equipo_campana": false,
+          "equipo_rol": null,
+          "likes": 52
+        },
+        {
+          "usuario": "@red_digital_floridablanca",
+          "nombre": "Brigada Digital Floridablanca",
+          "texto": "Desde el área metropolitana de Bucaramanga y Floridablanca cuenta con todo el respaldo popular 🔥",
+          "sentimiento": "positivo",
+          "es_equipo_campana": true,
+          "equipo_rol": "Activismo Digital y Redes",
+          "likes": 118
+        },
+        {
+          "usuario": "@avanzada_santander_cd",
+          "nombre": "Avanzada Santander CD",
+          "texto": "¡Excelente liderazgo Senador! Santander necesita voceros con carácter en el Congreso.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": true,
+          "equipo_rol": "Coordinación de Avanzada Santander",
+          "likes": 145
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "plataforma": "twitter",
+      "autor": "@OscarVillamiz",
+      "titulo": "@OscarVillamiz: Pronunciamiento Bancada - Garantías Electorales 2026",
+      "enlace": "https://x.com/OscarVillamiz/status/1768129841984013320",
+      "tipo_contenido": "texto",
+      "metricas": {
+        "alcance": 46700,
+        "impresiones": 60400,
+        "reproducciones": 0,
+        "likes": 2980,
+        "comentarios": 4,
+        "compartidos": 910
+      },
+      "tema_estrategico": "Transparencia y Garantías Democráticas",
+      "contenido": "Exigimos al Ministerio del Interior y a las autoridades electorales blindar las mesas de votación en zonas rurales de Santander, Norte de Santander y Bolívar. La democracia no se negocia con grupos al margen de la ley. ¡Voto libre y transparente! 🗳️🇨🇴",
+      "comentarios": [
+        {
+          "usuario": "@profesor_derecho_uis",
+          "nombre": "Dr. Hernán Barco",
+          "texto": "Clave el pronunciamiento. El control judicial y la veeduría internacional deben activarse.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": false,
+          "equipo_rol": null,
+          "likes": 29
+        },
+        {
+          "usuario": "@avanzada_santander_cd",
+          "nombre": "Avanzada Santander CD",
+          "texto": "La estructura de testigos del Centro Democrático está lista y coordinada en cada municipio.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": true,
+          "equipo_rol": "Coordinación de Avanzada Santander",
+          "likes": 62
+        },
+        {
+          "usuario": "@veedor_electoral_col",
+          "nombre": "Misión Observación Cívica",
+          "texto": "Coincidimos plenamente: se requiere biometría en el 100% de los puestos de votación.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": false,
+          "equipo_rol": null,
+          "likes": 38
+        },
+        {
+          "usuario": "@voceria_provincial_guanenta",
+          "nombre": "Vocería Provincias Guanentá y Comunera",
+          "texto": "Capacitación inmediata a todos nuestros testigos electorales en Santander.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": true,
+          "equipo_rol": "Vocero Regional Provincias",
+          "likes": 47
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "plataforma": "twitter",
+      "autor": "@OscarVillamiz",
+      "titulo": "@OscarVillamiz: En Plenaria - Defensa del Ahorro Pensional Colombiano",
+      "enlace": "https://x.com/OscarVillamiz/status/1767431289984013204",
+      "tipo_contenido": "texto",
+      "metricas": {
+        "alcance": 53200,
+        "impresiones": 71500,
+        "reproducciones": 0,
+        "likes": 3890,
+        "comentarios": 4,
+        "compartidos": 1280
+      },
+      "tema_estrategico": "Defensa Pensional y Derechos Laborales",
+      "contenido": "El ahorro de toda una vida de los trabajadores colombianos no le pertenece al gobierno de turno para financiar subsidios electorales. En la plenaria del Senado defenderemos el ahorro individual y el derecho de cada ciudadano a elegir su futuro. #PensiónDigna #NoAlDespojo",
+      "comentarios": [
+        {
+          "usuario": "@juventudes_villamizar",
+          "nombre": "Juventudes CD Bucaramanga",
+          "texto": "Los jóvenes cotizantes no queremos pagar las deudas del Estado sin garantía de pensión futura.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": true,
+          "equipo_rol": "Líder Juventudes CD Bucaramanga",
+          "likes": 59
+        },
+        {
+          "usuario": "@pacto_santander_critica",
+          "nombre": "Activista Progresista",
+          "texto": "El sistema actual dejó a millones sin pensión, la reforma busca justicia social.",
+          "sentimiento": "negativo",
+          "es_equipo_campana": false,
+          "equipo_rol": null,
+          "likes": 21
+        },
+        {
+          "usuario": "@ahorrador_colombiano",
+          "nombre": "Carlos E. Mantilla",
+          "texto": "Firme Senador, no podemos permitir que estatizen los fondos privados de pensión.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": false,
+          "equipo_rol": null,
+          "likes": 63
+        },
+        {
+          "usuario": "@mujeres_con_villamizar",
+          "nombre": "Colectivo Mujeres con Villamizar",
+          "texto": "Las madres y trabajadoras merecemos la certeza de que nuestro esfuerzo estará asegurado.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": true,
+          "equipo_rol": "Coordinadora Mujeres y Familia",
+          "likes": 81
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "plataforma": "twitter",
+      "autor": "@OscarVillamiz",
+      "titulo": "@OscarVillamiz: Exigencia a Invías y ANI por la Ruta del Cacao",
+      "enlace": "https://x.com/OscarVillamiz/status/1766891234984013110",
+      "tipo_contenido": "texto",
+      "metricas": {
+        "alcance": 62300,
+        "impresiones": 81000,
+        "reproducciones": 0,
+        "likes": 4110,
+        "comentarios": 5,
+        "compartidos": 1490
+      },
+      "tema_estrategico": "Infraestructura Vial y Conectividad",
+      "contenido": "No más excusas con la infraestructura de Santander. Los derrumbes y cierres en la vía Bucaramanga - Barrancabermeja tienen asfixiado el transporte de carga y a miles de familias trabajadoras. Radicamos citación urgente al Ministro de Transporte para exigir cronograma de obras definitivo. ¡Santander se respeta! 🚧🇨🇴",
+      "comentarios": [
+        {
+          "usuario": "@barrancabermeja_unida",
+          "nombre": "Comité Cívico Barrancabermeja",
+          "texto": "Apoyo total desde el Puerto. El aislamiento vial frena el desarrollo de toda la región.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": false,
+          "equipo_rol": null,
+          "likes": 76
+        },
+        {
+          "usuario": "@comunicaciones_villamizar",
+          "nombre": "Equipo Prensa y Comunicaciones Oficial",
+          "texto": "En este enlace pueden consultar el derecho de petición radicado ante la ANI y Mintransporte.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": true,
+          "equipo_rol": "Prensa y Comunicaciones Oficiales",
+          "likes": 54
+        },
+        {
+          "usuario": "@habitante_lebrija",
+          "nombre": "Martha Rueda",
+          "texto": "El peaje sigue cobrando como si la vía estuviera perfecta. Exigimos tarifas diferenciales ya.",
+          "sentimiento": "neutral",
+          "es_equipo_campana": false,
+          "equipo_rol": null,
+          "likes": 48
+        },
+        {
+          "usuario": "@avanzada_santander_cd",
+          "nombre": "Avanzada Santander CD",
+          "texto": "Santander merece vías de primer nivel. Seguimos vigilantes con el Senador Villamizar.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": true,
+          "equipo_rol": "Coordinación de Avanzada Santander",
+          "likes": 67
+        },
+        {
+          "usuario": "@gremio_transportadores_stder",
+          "nombre": "Asociación Transportadores Santander",
+          "texto": "Excelente gestión Senador. Llevamos semanas perdiendo millones en fletes por la desidia de Invías.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": false,
+          "equipo_rol": null,
+          "likes": 112
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "plataforma": "twitter",
+      "autor": "@OscarVillamiz",
+      "titulo": "@OscarVillamiz: Control Político a las Finanzas Públicas y Empleo",
+      "enlace": "https://x.com/OscarVillamiz/status/1766023412984013045",
+      "tipo_contenido": "enlace",
+      "metricas": {
+        "alcance": 44100,
+        "impresiones": 59800,
+        "reproducciones": 0,
+        "likes": 2750,
+        "comentarios": 5,
+        "compartidos": 830
+      },
+      "tema_estrategico": "Economía, Empleo y Finanzas Públicas",
+      "contenido": "El bolsillo de los colombianos y de los emprendedores santandereanos no puede ser la caja menor de la improvisación fiscal. Radicamos solicitud de debate al Ministerio de Hacienda: ¡Votaremos NO a cualquier reforma que asfixie la inversión privada y destruya puestos de trabajo! #TrabajoDigno #DefensaEconómica",
+      "comentarios": [
+        {
+          "usuario": "@economista_regional",
+          "nombre": "Dr. Jaime Valdivieso",
+          "texto": "Argumento técnico intachable. La curva de Laffer demuestra que subir tasas destruye el recaudo.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": false,
+          "equipo_rol": null,
+          "likes": 44
+        },
+        {
+          "usuario": "@estudiante_uis_debate",
+          "nombre": "Camilo Rodríguez",
+          "texto": "¿Cuáles son las alternativas que propone el Centro Democrático para financiar el déficit?",
+          "sentimiento": "neutral",
+          "es_equipo_campana": false,
+          "equipo_rol": null,
+          "likes": 19
+        },
+        {
+          "usuario": "@red_digital_floridablanca",
+          "nombre": "Brigada Digital Floridablanca",
+          "texto": "Amplificando el mensaje en todos los canales digitales de Santander.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": true,
+          "equipo_rol": "Activismo Digital y Redes",
+          "likes": 39
+        },
+        {
+          "usuario": "@comerciante_cabecera",
+          "nombre": "Mauricio Silva Gómez",
+          "texto": "Gracias por defender al comercio formal, ya no aguantamos más cargas tributarias en Bucaramanga.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": false,
+          "equipo_rol": null,
+          "likes": 53
+        },
+        {
+          "usuario": "@comunicaciones_villamizar",
+          "nombre": "Equipo Prensa y Comunicaciones Oficial",
+          "texto": "Compartimos el hilo oficial con las 5 razones técnicas por las que esta reforma frena el crecimiento.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": true,
+          "equipo_rol": "Prensa y Comunicaciones Oficiales",
+          "likes": 88
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "plataforma": "twitter",
+      "autor": "@OscarVillamiz",
+      "titulo": "@OscarVillamiz: Firmeza en el Senado frente a la Seguridad y Orden Público",
+      "enlace": "https://x.com/OscarVillamiz/status/1765439812984013001",
+      "tipo_contenido": "texto",
+      "metricas": {
+        "alcance": 58400,
+        "impresiones": 74200,
+        "reproducciones": 0,
+        "likes": 3420,
+        "comentarios": 6,
+        "compartidos": 1140
+      },
+      "tema_estrategico": "Seguridad Nacional y Orden Público",
+      "contenido": "🇨🇴 Desde la Comisión Primera del Senado lo dejamos muy claro: ¡No hay paz sin autoridad! Las familias de Santander, el Catatumbo y el Magdalena Medio no pueden seguir sometidas por la delincuencia. Exigimos garantías inmediatas y respaldo institucional para nuestra Fuerza Pública. ¡A Colombia se le defiende con hechos y apego a la Constitución! #FirmezaDemocrática #CentroDemocrático #OscarVillamizar",
+      "comentarios": [
+        {
+          "usuario": "@opositor_critico_26",
+          "nombre": "Observador Crítico",
+          "texto": "Siempre el mismo discurso sobre seguridad, deberían enfocarse más en la reforma agraria.",
+          "sentimiento": "negativo",
+          "es_equipo_campana": false,
+          "equipo_rol": null,
+          "likes": 14
+        },
+        {
+          "usuario": "@veeduria_comunera",
+          "nombre": "Veeduría Provincia Guanentá",
+          "texto": "La seguridad en las zonas rurales del sur de Santander ha mejorado con la presión del Senado.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": false,
+          "equipo_rol": null,
+          "likes": 28
+        },
+        {
+          "usuario": "@voceria_provincial_guanenta",
+          "nombre": "Vocería Provincias Guanentá y Comunera",
+          "texto": "Importante debate en el Congreso. Estaremos atentos a las conclusiones de la comisión.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": true,
+          "equipo_rol": "Vocero Regional Provincias",
+          "likes": 35
+        },
+        {
+          "usuario": "@ciudadano_santander_real",
+          "nombre": "Germán Darío Plata",
+          "texto": "Senador, por favor haga control estricto a las vías de Santander, la Ruta del Cacao tiene tramos abandonados.",
+          "sentimiento": "neutral",
+          "es_equipo_campana": false,
+          "equipo_rol": null,
+          "likes": 41
+        },
+        {
+          "usuario": "@juventudes_villamizar",
+          "nombre": "Juventudes CD Bucaramanga",
+          "texto": "Firmeza y coherencia. Los jóvenes santandereanos apoyamos la defensa de la institucionalidad.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": true,
+          "equipo_rol": "Líder Juventudes CD Bucaramanga",
+          "likes": 72
+        },
+        {
+          "usuario": "@avanzada_santander_cd",
+          "nombre": "Avanzada Santander CD",
+          "texto": "¡Total respaldo al Senador Villamizar! En las provincias de Santander se necesita mano firme y presencia estatal.",
+          "sentimiento": "positivo",
+          "es_equipo_campana": true,
+          "equipo_rol": "Coordinación de Avanzada Santander",
+          "likes": 94
+        }
+      ]
+    }
+  ],
+  "radar_oposicion_ataques": [
+    {
+      "id": 4,
+      "adversario": "Bancada de Oposición y Radicales en Santander",
+      "plataforma": "twitter",
+      "blanco_ataque": "Seguridad y Firmeza",
+      "contenido": "Afirman que exigir presencia militar en Santander es \"discurso del pasado\" y buscan desviar la atención de los atentados en la región.",
+      "nivel_amenaza": "alto",
+      "es_fake_news": false,
+      "tactica_recomendada": "Contraataque con cifras oficiales de extorsión y testimonios de comerciantes de Barrancabermeja y Bucaramanga.",
+      "guiones_estrategicos_ia": {
+        "candidato": "La seguridad no es de izquierda ni de derecha: es un derecho fundamental consagrado en la Constitución. Quienes llaman a la delincuencia \"gestores de paz\" traicionan a los colombianos honestos.",
+        "voceros": "El Senador Villamizar es la voz de los santandereanos que madrugan a trabajar y no aceptan ser extorsionados. Los hechos demuestran que donde no hay autoridad, reina el crimen.",
+        "tropa_digital": "🇨🇴 ¡Santander no se arrodilla! Exigir seguridad para nuestras familias no es discurso, es una necesidad urgente. #SantanderSeguro #ConVillamizarFirme",
+        "debate_en_vivo": "Cifras en mano: en los últimos dos años la extorsión en el Magdalena Medio subió más del 40%. ¿Eso es lo que llaman cambio? No vamos a permitir que conviertan a Santander en tierra de nadie."
+      }
+    }
+  ]
+}

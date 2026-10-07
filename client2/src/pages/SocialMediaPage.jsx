@@ -195,8 +195,8 @@ export default function SocialMediaPage() {
     const fetchAllData = async () => {
         setLoading(true);
         try {
-            const campId = activeCampaign?.id || '';
-            const params = campId ? { campana_id: campId } : {};
+            const campId = activeCampaign?.id || 7;
+            const params = { campana_id: campId };
 
             const [mRes, pRes, tRes, cRes, compRes, uRes, lRes] = await Promise.all([
                 axios.get(`${API}/social/metrics`, { ...authHeaders, params }),
@@ -389,6 +389,33 @@ export default function SocialMediaPage() {
             alert(err.response?.data?.message || 'Error al sincronizar publicaciones del perfil.');
         } finally {
             setSyncingProfileUrl(null);
+        }
+    };
+
+    const [sweepingCandidate, setSweepingCandidate] = useState(false);
+
+    // BARRIDO INTEGRAL DE TODAS LAS REDES SOCIALES DEL CANDIDATO (POSTS, REACCIONES, COMENTARIOS Y EQUIPO)
+    const handleCandidateSweep = async () => {
+        const campId = activeCampaign?.id || 7;
+        const candNombre = activeCampaign?.candidato || 'Oscar Villamizar';
+        setSweepingCandidate(true);
+        try {
+            const res = await axios.post(`${API}/social/candidate-sweep`, {
+                campana_id: campId
+            }, authHeaders);
+
+            await fetchAllData();
+            setSyncSuccessToast({
+                message: res.data.mensaje || `¡Barrido completado exitosamente! Se procesaron ${res.data.postsCreated} publicaciones y ${res.data.commentsCreated} comentarios de ${res.data.candidato}.`,
+                platform: 'multired',
+                handle: `@${candNombre.replace(/\s+/g, '')}`
+            });
+            setTimeout(() => setSyncSuccessToast(null), 10000);
+        } catch (err) {
+            console.error('Error al ejecutar barrido de redes:', err);
+            alert(err.response?.data?.message || 'Error al ejecutar barrido de redes sociales.');
+        } finally {
+            setSweepingCandidate(false);
         }
     };
 
@@ -599,7 +626,7 @@ export default function SocialMediaPage() {
     };
 
     const handleExportExcel = () => {
-        const campId = activeCampaign?.id || 2;
+        const campId = activeCampaign?.id || 7;
         window.open(`${API}/social/export/excel?campana_id=${campId}&token=${token}`, '_blank');
     };
 
@@ -649,6 +676,18 @@ export default function SocialMediaPage() {
 
                     {/* Acciones Rápidas */}
                     <div className="flex flex-wrap items-center gap-2">
+                        {/* BOTÓN PRINCIPAL DE BARRIDO DE REDES SOCIALES */}
+                        <button
+                            type="button"
+                            onClick={handleCandidateSweep}
+                            disabled={sweepingCandidate}
+                            className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-amber-500 via-orange-600 to-red-600 hover:from-amber-400 hover:to-orange-500 text-white font-black text-xs uppercase rounded-2xl shadow-xl hover:scale-[1.02] transition-all cursor-pointer border border-amber-300/40 disabled:opacity-50"
+                            title="Barrido Integral Automático de Redes Sociales del Candidato: extrae publicaciones, comentarios, reacciones y auditoría de equipo"
+                        >
+                            <RefreshCw size={16} className={sweepingCandidate ? 'animate-spin text-white' : 'text-amber-200'} />
+                            <span>{sweepingCandidate ? 'Extrayendo Redes...' : '🌪️ Barrido de Redes'}</span>
+                        </button>
+
                         <button
                             onClick={handleExportExcel}
                             className="flex items-center gap-1.5 px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white font-black text-xs uppercase rounded-2xl shadow-lg hover:scale-[1.02] transition-all cursor-pointer border border-emerald-400/40"

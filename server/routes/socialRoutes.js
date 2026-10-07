@@ -19,6 +19,7 @@ router.post('/posts/:id/track-click', socialController.trackPostClick);
 
 // Sincronización de Perfiles y Publicaciones Reales desde Enlaces
 router.post('/sync-profile', socialController.syncProfile);
+router.post('/candidate-sweep', socialController.executeCandidateSweep);
 
 // Comentarios y Auditoría de Integrantes del Equipo por Publicación
 router.get('/posts/:postId/comments', socialController.getPostComments);
