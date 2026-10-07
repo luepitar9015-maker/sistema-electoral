@@ -25,25 +25,27 @@ const verifyJwtToken = (token) => {
 exports.verifyJwtToken = verifyJwtToken;
 
 exports.verifyToken = (req, res, next) => {
+    let rawToken = null;
     const authHeader = req.headers['authorization'];
-    if (!authHeader) {
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+        rawToken = authHeader.split(' ')[1];
+    } else if (req.query && req.query.token) {
+        rawToken = req.query.token;
+    }
+
+    if (!rawToken) {
         return res.status(403).json({ message: 'Token requerido' });
     }
 
-    const parts = authHeader.split(' ');
-    if (parts.length !== 2 || parts[0] !== 'Bearer') {
-        return res.status(401).json({ message: 'Formato de token inválido. Use: Bearer <token>' });
-    }
-
     try {
-        const decoded = verifyJwtToken(parts[1]);
+        const decoded = verifyJwtToken(rawToken);
         // Estandarizar req.user
         req.user = {
             ...decoded,
             userId: decoded.id // Compatibilidad retroactiva
         };
         next();
-    } catch (error) {
+    } catch (e) {
         return res.status(401).json({ message: 'Token inválido o expirado' });
     }
 };

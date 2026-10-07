@@ -1188,3 +1188,159 @@ exports.replyToComment = async (req, res) => {
     }
 };
 
+/**
+ * EXPORTACIÓN A EXCEL DE PUBLICACIONES, COMENTARIOS Y WAR ROOM
+ */
+exports.exportSocialExcel = async (req, res) => {
+    try {
+        const ExcelJS = require('exceljs');
+        const Campaign = require('../models/Campaign');
+        const activeCampanaId = req.query.campana_id || req.user?.campana_id || 2;
+        const campaign = await Campaign.findByPk(activeCampanaId);
+        const candidatoNombre = campaign ? campaign.candidato : 'Candidato';
+
+        const posts = await SocialMediaPost.findAll({
+            where: { campana_id: activeCampanaId },
+            order: [['createdAt', 'DESC']]
+        });
+
+        const postIds = posts.map(p => p.id);
+        const comments = await SocialPostComment.findAll({
+            where: { post_id: postIds },
+            order: [['createdAt', 'DESC']]
+        });
+
+        const attacks = await SocialCompetitorAttack.findAll({
+            where: { campana_id: activeCampanaId },
+            order: [['createdAt', 'DESC']]
+        });
+
+        const workbook = new ExcelJS.Workbook();
+        workbook.creator = 'Sistema Electoral Estratégico';
+        workbook.created = new Date();
+
+        // 1. Hoja: Publicaciones Oficiales
+        const sheetPosts = workbook.addWorksheet('Publicaciones Oficiales');
+        sheetPosts.columns = [
+            { header: 'ID', key: 'id', width: 8 },
+            { header: 'Plataforma', key: 'plataforma', width: 14 },
+            { header: 'Autor', key: 'autor', width: 22 },
+            { header: 'Título de la Publicación', key: 'titulo', width: 45 },
+            { header: 'Tipo Contenido', key: 'tipo', width: 14 },
+            { header: 'Alcance', key: 'alcance', width: 12 },
+            { header: 'Impresiones', key: 'impresiones', width: 14 },
+            { header: 'Reproducciones', key: 'reproducciones', width: 16 },
+            { header: 'Likes', key: 'likes', width: 10 },
+            { header: 'Comentarios', key: 'comentarios', width: 14 },
+            { header: 'Compartidos', key: 'compartidos', width: 14 },
+            { header: 'Tema Estratégico', key: 'tema', width: 30 },
+            { header: 'Enlace Oficial', key: 'url', width: 40 },
+            { header: 'Texto / Copy Completo', key: 'contenido', width: 60 }
+        ];
+
+        sheetPosts.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        sheetPosts.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF00B894' } };
+
+        posts.forEach(p => {
+            sheetPosts.addRow({
+                id: p.id,
+                plataforma: (p.plataforma || '').toUpperCase(),
+                autor: p.autor_usuario || p.autor_nombre,
+                titulo: p.titulo,
+                tipo: p.tipo_contenido,
+                alcance: p.alcance || 0,
+                impresiones: p.impresiones || 0,
+                reproducciones: p.reproducciones || 0,
+                likes: p.likes || 0,
+                comentarios: p.comentarios_conteo || 0,
+                compartidos: p.compartidos || 0,
+                tema: p.tema_estrategico || 'General',
+                url: p.url_publicacion,
+                contenido: p.contenido
+            });
+        });
+
+        // 2. Hoja: Comentarios y Auditoría del Equipo
+        const sheetComments = workbook.addWorksheet('Comentarios y Apoyo Equipo');
+        sheetComments.columns = [
+            { header: 'ID Post', key: 'post_id', width: 10 },
+            { header: 'Plataforma', key: 'plataforma', width: 14 },
+            { header: 'Usuario Red', key: 'usuario_red', width: 25 },
+            { header: 'Nombre Mostrado', key: 'nombre_usuario', width: 25 },
+            { header: 'Comentario', key: 'texto_comentario', width: 55 },
+            { header: 'Sentimiento', key: 'sentimiento', width: 14 },
+            { header: 'Tipo Reacción', key: 'tipo_reaccion', width: 16 },
+            { header: '¿Es Miembro Equipo?', key: 'es_equipo', width: 20 },
+            { header: 'Nombre en Equipo', key: 'equipo_nombre', width: 25 },
+            { header: 'Rol en Campaña', key: 'equipo_rol', width: 25 },
+            { header: 'Likes Comentario', key: 'likes', width: 16 }
+        ];
+
+        sheetComments.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        sheetComments.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F2937' } };
+
+        comments.forEach(c => {
+            sheetComments.addRow({
+                post_id: c.post_id,
+                plataforma: (c.plataforma || '').toUpperCase(),
+                usuario_red: c.usuario_red,
+                nombre_usuario: c.nombre_usuario,
+                texto_comentario: c.texto_comentario,
+                sentimiento: c.sentimiento,
+                tipo_reaccion: c.tipo_reaccion,
+                es_equipo: c.es_equipo_campana ? 'SÍ (IDENTIFICADO)' : 'NO (CIUDADANO)',
+                equipo_nombre: c.equipo_nombre || '-',
+                equipo_rol: c.equipo_rol || '-',
+                likes: c.likes_comentario || 0
+            });
+        });
+
+        // 3. Hoja: Radar de Oposición & War Room
+        const sheetAttacks = workbook.addWorksheet('Radar Oposición y War Room');
+        sheetAttacks.columns = [
+            { header: 'ID', key: 'id', width: 8 },
+            { header: 'Adversario', key: 'adversario', width: 30 },
+            { header: 'Plataforma', key: 'plataforma', width: 14 },
+            { header: 'Blanco Ataque', key: 'blanco', width: 20 },
+            { header: 'Descripción Blanco', key: 'desc_blanco', width: 35 },
+            { header: 'Contenido del Ataque', key: 'contenido', width: 60 },
+            { header: 'Nivel Amenaza', key: 'amenaza', width: 14 },
+            { header: 'Táctica Recomendada', key: 'tactica', width: 20 },
+            { header: 'Guion Candidato', key: 'guion_candidato', width: 50 },
+            { header: 'Guion Voceros', key: 'guion_voceros', width: 50 },
+            { header: 'Guion Tropa Digital', key: 'guion_tropa', width: 50 },
+            { header: 'Guion Debates en Vivo', key: 'guion_debate', width: 50 }
+        ];
+
+        sheetAttacks.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        sheetAttacks.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDC2626' } };
+
+        attacks.forEach(a => {
+            sheetAttacks.addRow({
+                id: a.id,
+                adversario: a.adversario_nombre,
+                plataforma: (a.plataforma || '').toUpperCase(),
+                blanco: a.blanco_ataque,
+                desc_blanco: a.descripcion_blanco,
+                contenido: a.contenido_ataque,
+                amenaza: a.nivel_amenaza,
+                tactica: a.tactica_recomendada,
+                guion_candidato: a.guion_candidato,
+                guion_voceros: a.guion_voceros,
+                guion_tropa: a.guion_tropa_digital,
+                guion_debate: a.guion_debates
+            });
+        });
+
+        const safeFilename = `publicaciones_${candidatoNombre.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}.xlsx`;
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"`);
+
+        await workbook.xlsx.write(res);
+        res.end();
+    } catch (error) {
+        console.error('Error al exportar publicaciones a Excel:', error);
+        res.status(500).json({ success: false, message: 'Error al exportar a Excel', error: error.message });
+    }
+};
+

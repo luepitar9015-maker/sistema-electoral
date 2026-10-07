@@ -70,4 +70,7 @@ router.post('/advisor/ask', socialController.chatWithViralAdvisor);
 router.get('/live-streams', socialController.getLiveStreamMonitor);
 router.post('/live-streams/alert', socialController.dispatchLiveSupportAlert);
 
+// Exportación de Redes Sociales a Excel / CSV
+router.get('/export/excel', socialController.exportSocialExcel);
+
 module.exports = router;

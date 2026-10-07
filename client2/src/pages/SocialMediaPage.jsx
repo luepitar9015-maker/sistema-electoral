@@ -8,7 +8,7 @@ import {
     Repeat, Plus, Search, Filter, ExternalLink, CheckCircle,
     X, Trash2, Edit3, Sparkles, Swords, BarChart3,
     Check, AlertCircle, ArrowUpRight, ShieldCheck, Video, HelpCircle,
-    Copy, Link, Bot, Zap, Lightbulb, Rocket, Clock, Send, Upload, RefreshCw
+    Copy, Link, Bot, Zap, Lightbulb, Rocket, Clock, Send, Upload, RefreshCw, Download
 } from 'lucide-react';
 import { API } from '../config/api';
 import ContentIntelligenceDashboard from '../features/social/ContentIntelligenceDashboard';
@@ -598,6 +598,11 @@ export default function SocialMediaPage() {
         }
     };
 
+    const handleExportExcel = () => {
+        const campId = activeCampaign?.id || 2;
+        window.open(`${API}/social/export/excel?campana_id=${campId}&token=${token}`, '_blank');
+    };
+
     // Filtros de posts
     const filteredPosts = useMemo(() => {
         return posts.filter(p => {
@@ -644,6 +649,14 @@ export default function SocialMediaPage() {
 
                     {/* Acciones Rápidas */}
                     <div className="flex flex-wrap items-center gap-2">
+                        <button
+                            onClick={handleExportExcel}
+                            className="flex items-center gap-1.5 px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white font-black text-xs uppercase rounded-2xl shadow-lg hover:scale-[1.02] transition-all cursor-pointer border border-emerald-400/40"
+                            title="Exportar todas las publicaciones, comentarios y radar de oposición a Excel (.xlsx)"
+                        >
+                            <Download size={16} />
+                            <span>Exportar Excel</span>
+                        </button>
                         <button
                             onClick={() => setActiveTab('inteligencia')}
                             className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 text-white font-black text-xs uppercase rounded-2xl shadow-lg hover:shadow-cyan-500/30 hover:scale-[1.02] transition-all cursor-pointer border border-cyan-400/40"
