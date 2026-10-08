@@ -6,7 +6,10 @@ async function test() {
     const res = await fetch('http://127.0.0.1:5000/api/social/posts?campana_id=7', {
         headers: { Authorization: 'Bearer ' + token }
     });
-    const posts = await res.json();
+    console.log('HTTP Status on VPS:', res.status);
+    const text = await res.text();
+    console.log('Response text on VPS:', text.slice(0, 300));
+    const posts = JSON.parse(text);
     console.log('Posts count for Campaign 7 on VPS:', posts.length);
     if (posts.length > 0) {
         console.log('First post sample:');
