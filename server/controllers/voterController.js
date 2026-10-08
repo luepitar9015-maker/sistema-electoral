@@ -462,34 +462,128 @@ exports.getTerritorialGeoData = async (req, res) => {
             attributes: ['id', 'nombres', 'apellidos', 'cedula', 'municipio', 'departamento', 'lugar_votacion', 'mesa', 'latitud', 'longitud', 'fidelidad_score', 'intencion_voto', 'ha_votado', 'lider_nombre']
         });
 
+        // Tabla de referencia de coordenadas geográficas en Colombia
+        const coordsFallback = {
+            'UIS - Campus Central': [7.1404, -73.1205],
+            'Coliseo Bicentenario': [7.1332, -73.1167],
+            'Colegio Santander': [7.1380, -73.1250],
+            'I.E. Dámaso Zapata': [7.1350, -73.1220],
+            'Colegio La Salle': [7.1180, -73.1110],
+            'Colegio José Elías Puyana': [7.0620, -73.0870],
+            'Coliseo La Cumbre': [7.0710, -73.0920],
+            'Colegio Pan de Azúcar': [7.0850, -73.1010],
+            'Colegio Balbino García': [6.9880, -73.0510],
+            'Polideportivo Villabel': [6.9920, -73.0550],
+            'Colegio San Juan de Girón': [7.0730, -73.1690],
+            'Coliseo Santa Cruz': [7.0700, -73.1650],
+            'Colegio Diego Hernández de Gallegos': [7.0650, -73.8540],
+            'Club Infantas': [7.0610, -73.8590],
+            'Colegio Camilo Torres': [7.0700, -73.8610],
+            'Colegio San José Guanentá': [6.5540, -73.1340],
+            'Coliseo Lorenzo Alcantuz': [6.5580, -73.1360],
+            'Colegio Universitario': [6.4670, -73.2610],
+            'Colegio Nacional Universitario': [6.0120, -73.6730],
+            'Corferias (Pabellón 4)': [4.6295, -74.0898],
+            'Unicentro (Entrada 5)': [4.7018, -74.0416],
+            'Plaza de las Américas': [4.6210, -74.1350],
+            'Coliseo El Campín': [4.6490, -74.0770],
+            'Colegio Cafam La Floresta': [4.6850, -74.0750],
+            'Estadio General Santander': [7.8939, -72.5078],
+            'Colegio Calasanz': [7.9010, -72.4980],
+            'Colegio Municipal': [7.8870, -72.5010],
+            'Colegio José Eusebio Caro': [8.2380, -73.3540],
+            'Colegio Provincial San José': [7.3760, -72.6480],
+            'Colegio General Santander': [7.8340, -72.4760],
+            'Plaza Mayor': [6.2425, -75.5768],
+            'Colegio San Ignacio': [6.2480, -75.5650],
+            'I.E. San Javier': [6.2520, -75.6120],
+            'Colegio Manuel Uribe Ángel': [6.1730, -75.5860],
+            'Colegio San José de las Cuchillas': [6.1550, -75.3740],
+            'Colegio de Boyacá': [5.5350, -73.3670],
+            'Coliseo San Antonio': [5.5410, -73.3590],
+            'Colegio Guillermo León Valencia': [5.8270, -73.0340],
+            // Fallback por municipios
+            'Bucaramanga': [7.1254, -73.1198],
+            'Floridablanca': [7.0622, -73.0864],
+            'Piedecuesta': [6.9877, -73.0494],
+            'Girón': [7.0682, -73.1698],
+            'Barrancabermeja': [7.0653, -73.8547],
+            'San Gil': [6.5569, -73.1332],
+            'Socorro': [6.4682, -73.2625],
+            'Vélez': [6.0125, -73.6738],
+            'Bogotá D.C.': [4.6500, -74.0800],
+            'Cúcuta': [7.8939, -72.5078],
+            'Ocaña': [8.2380, -73.3540],
+            'Pamplona': [7.3760, -72.6480],
+            'Villa del Rosario': [7.8340, -72.4760],
+            'Medellín': [6.2442, -75.5812],
+            'Envigado': [6.1730, -75.5860],
+            'Rionegro': [6.1550, -75.3740],
+            'Tunja': [5.5350, -73.3670],
+            'Duitama': [5.8270, -73.0340],
+            'Cali': [3.4516, -76.5320],
+            'Barranquilla': [10.9685, -74.7813]
+        };
+
         // Agrupación por puestos de votación
         const puestosMap = {};
         voters.forEach(v => {
             const puestoKey = `${v.municipio || ''} - ${v.lugar_votacion || 'Sin Puesto'}`;
             if (!puestosMap[puestoKey]) {
+                let initialLat = v.latitud || null;
+                let initialLng = v.longitud || null;
+
+                if (!initialLat || !initialLng) {
+                    if (v.lugar_votacion && coordsFallback[v.lugar_votacion]) {
+                        [initialLat, initialLng] = coordsFallback[v.lugar_votacion];
+                    } else if (v.municipio && coordsFallback[v.municipio]) {
+                        const base = coordsFallback[v.municipio];
+                        initialLat = base[0] + (Math.random() * 0.01 - 0.005);
+                        initialLng = base[1] + (Math.random() * 0.01 - 0.005);
+                    }
+                }
+
                 puestosMap[puestoKey] = {
                     puesto: v.lugar_votacion || 'Sin Puesto',
                     municipio: v.municipio || '',
                     departamento: v.departamento || '',
                     total_votantes: 0,
                     votos_efectivos: 0,
-                    latitud: v.latitud || null,
-                    longitud: v.longitud || null,
+                    latitud: initialLat,
+                    longitud: initialLng,
                     scores: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
                 };
             }
+
             puestosMap[puestoKey].total_votantes++;
             if (v.ha_votado) puestosMap[puestoKey].votos_efectivos++;
             const sc = v.fidelidad_score || 3;
             if (puestosMap[puestoKey].scores[sc] !== undefined) puestosMap[puestoKey].scores[sc]++;
+            
             if (!puestosMap[puestoKey].latitud && v.latitud) puestosMap[puestoKey].latitud = v.latitud;
             if (!puestosMap[puestoKey].longitud && v.longitud) puestosMap[puestoKey].longitud = v.longitud;
         });
 
+        // Asegurar que ningún puesto quede sin coordenadas si tiene municipio
+        Object.values(puestosMap).forEach(p => {
+            if (!p.latitud || !p.longitud) {
+                if (coordsFallback[p.puesto]) {
+                    [p.latitud, p.longitud] = coordsFallback[p.puesto];
+                } else if (coordsFallback[p.municipio]) {
+                    const base = coordsFallback[p.municipio];
+                    p.latitud = base[0] + (Math.random() * 0.01 - 0.005);
+                    p.longitud = base[1] + (Math.random() * 0.01 - 0.005);
+                }
+            }
+        });
+
+        const puestosArray = Object.values(puestosMap);
+        const conCoords = puestosArray.filter(p => !!p.latitud && !!p.longitud);
+
         return res.json({
-            total_geolocalizados: voters.filter(v => !!v.latitud && !!v.longitud).length,
+            total_geolocalizados: conCoords.length,
             total_votantes: voters.length,
-            puestos: Object.values(puestosMap),
+            puestos: puestosArray,
             votantes_geolocalizados: voters.filter(v => !!v.latitud && !!v.longitud)
         });
     } catch (error) {
