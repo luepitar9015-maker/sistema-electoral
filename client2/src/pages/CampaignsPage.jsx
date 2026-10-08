@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useCampaign } from '../context/CampaignContext';
 import { colombiaData } from '../data/colombiaData';
@@ -11,7 +12,8 @@ import {
     Flag, Plus, Globe, Building2, MapPin, CheckCircle,
     Users, Target, Award, Calendar, Edit3, Trash2, X,
     ChevronRight, ArrowRight, Sparkles, Filter, Upload, Image,
-    Quote, Handshake, Check, Clock, Flame, Network, Landmark, Shield
+    Quote, Handshake, Check, Clock, Flame, Network, Landmark, Shield,
+    Share2
 } from 'lucide-react';
 import { API } from '../config/api';
 
@@ -25,6 +27,7 @@ const CARGOS = [
 ];
 
 export default function CampaignsPage() {
+    const navigate = useNavigate();
     const { campaigns, activeCampaign, setActiveCampaign, refreshCampaigns } = useCampaign();
     const token = localStorage.getItem('token');
     const authHeaders = { headers: { Authorization: `Bearer ${token}` } };
@@ -57,7 +60,13 @@ export default function CampaignsPage() {
         fecha_inicio: '',
         fecha_elecciones: '',
         modo_operacion: 'electoral',
-        periodo_gobierno: '2024-2027'
+        periodo_gobierno: '2024-2027',
+        link_instagram: '',
+        link_tiktok: '',
+        link_facebook: '',
+        link_twitter: '',
+        link_youtube: '',
+        link_whatsapp: ''
     });
 
     const [municipios, setMunicipios] = useState([]);
@@ -83,7 +92,13 @@ export default function CampaignsPage() {
             fecha_inicio: new Date().toISOString().split('T')[0],
             fecha_elecciones: '2026-10-25',
             modo_operacion: 'electoral',
-            periodo_gobierno: '2024-2027'
+            periodo_gobierno: '2024-2027',
+            link_instagram: '',
+            link_tiktok: '',
+            link_facebook: '',
+            link_twitter: '',
+            link_youtube: '',
+            link_whatsapp: ''
         });
         setMunicipios([]);
         setFormError('');
@@ -109,7 +124,13 @@ export default function CampaignsPage() {
             fecha_inicio: camp.fecha_inicio ? camp.fecha_inicio.split(' ')[0] : '',
             fecha_elecciones: camp.fecha_elecciones ? camp.fecha_elecciones.split(' ')[0] : '',
             modo_operacion: camp.modo_operacion || 'electoral',
-            periodo_gobierno: camp.periodo_gobierno || '2024-2027'
+            periodo_gobierno: camp.periodo_gobierno || '2024-2027',
+            link_instagram: camp.link_instagram || '',
+            link_tiktok: camp.link_tiktok || '',
+            link_facebook: camp.link_facebook || '',
+            link_twitter: camp.link_twitter || '',
+            link_youtube: camp.link_youtube || '',
+            link_whatsapp: camp.link_whatsapp || ''
         });
         if (camp.departamento && colombiaData[camp.departamento]) {
             setMunicipios(colombiaData[camp.departamento]?.sort() || []);
@@ -472,6 +493,19 @@ export default function CampaignsPage() {
                                     ) : (
                                         <><span>Activar Campaña</span> <ChevronRight size={14} /></>
                                     )}
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setActiveCampaign(camp);
+                                        navigate('/social');
+                                    }}
+                                    className="p-2.5 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-xl border border-indigo-200/80 transition-all flex items-center gap-1.5 font-bold text-xs shadow-xs"
+                                    title={`Ver y gestionar Redes Sociales de ${camp.candidato || camp.nombre}`}
+                                >
+                                    <Share2 size={15} />
+                                    <span className="hidden sm:inline">Redes</span>
                                 </button>
 
                                 <button
@@ -982,6 +1016,102 @@ export default function CampaignsPage() {
                                             <span className="text-[10px] text-gray-500 mt-1 block">
                                                 Cuatrienio oficial de gestión pública.
                                             </span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* 7. Redes Sociales Oficiales del Candidato */}
+                                <div className="p-4 bg-indigo-50/60 border border-indigo-200 rounded-2xl space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-bold text-indigo-900 uppercase tracking-wide flex items-center gap-1.5">
+                                            <Share2 size={15} className="text-indigo-600" />
+                                            7. Redes Sociales Oficiales del Candidato
+                                        </span>
+                                        <span className="text-[10px] text-indigo-700 font-bold bg-indigo-100 px-2 py-0.5 rounded-full">
+                                            Específico por Candidato
+                                        </span>
+                                    </div>
+                                    <p className="text-[11px] text-gray-500">
+                                        Configura los enlaces directos a los perfiles oficiales de este candidato para sincronización y métricas.
+                                    </p>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                                        <div>
+                                            <label className="block text-gray-700 font-bold mb-1 uppercase text-[10px]">
+                                                📸 Instagram Oficial
+                                            </label>
+                                            <input
+                                                type="url"
+                                                placeholder="https://instagram.com/perfil"
+                                                value={formData.link_instagram}
+                                                onChange={(e) => setFormData(prev => ({ ...prev, link_instagram: e.target.value }))}
+                                                className="w-full bg-white border border-indigo-200 rounded-xl p-2 font-mono text-[11px] text-gray-800 focus:outline-none focus:border-indigo-500"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-gray-700 font-bold mb-1 uppercase text-[10px]">
+                                                🎵 TikTok Oficial
+                                            </label>
+                                            <input
+                                                type="url"
+                                                placeholder="https://tiktok.com/@perfil"
+                                                value={formData.link_tiktok}
+                                                onChange={(e) => setFormData(prev => ({ ...prev, link_tiktok: e.target.value }))}
+                                                className="w-full bg-white border border-indigo-200 rounded-xl p-2 font-mono text-[11px] text-gray-800 focus:outline-none focus:border-indigo-500"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-gray-700 font-bold mb-1 uppercase text-[10px]">
+                                                📘 Facebook Oficial
+                                            </label>
+                                            <input
+                                                type="url"
+                                                placeholder="https://facebook.com/perfil"
+                                                value={formData.link_facebook}
+                                                onChange={(e) => setFormData(prev => ({ ...prev, link_facebook: e.target.value }))}
+                                                className="w-full bg-white border border-indigo-200 rounded-xl p-2 font-mono text-[11px] text-gray-800 focus:outline-none focus:border-indigo-500"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-gray-700 font-bold mb-1 uppercase text-[10px]">
+                                                🐦 X (Twitter) Oficial
+                                            </label>
+                                            <input
+                                                type="url"
+                                                placeholder="https://x.com/perfil"
+                                                value={formData.link_twitter}
+                                                onChange={(e) => setFormData(prev => ({ ...prev, link_twitter: e.target.value }))}
+                                                className="w-full bg-white border border-indigo-200 rounded-xl p-2 font-mono text-[11px] text-gray-800 focus:outline-none focus:border-indigo-500"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-gray-700 font-bold mb-1 uppercase text-[10px]">
+                                                ▶️ YouTube Oficial
+                                            </label>
+                                            <input
+                                                type="url"
+                                                placeholder="https://youtube.com/@perfil"
+                                                value={formData.link_youtube}
+                                                onChange={(e) => setFormData(prev => ({ ...prev, link_youtube: e.target.value }))}
+                                                className="w-full bg-white border border-indigo-200 rounded-xl p-2 font-mono text-[11px] text-gray-800 focus:outline-none focus:border-indigo-500"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-gray-700 font-bold mb-1 uppercase text-[10px]">
+                                                💬 Canal de WhatsApp
+                                            </label>
+                                            <input
+                                                type="url"
+                                                placeholder="https://chat.whatsapp.com/..."
+                                                value={formData.link_whatsapp}
+                                                onChange={(e) => setFormData(prev => ({ ...prev, link_whatsapp: e.target.value }))}
+                                                className="w-full bg-white border border-indigo-200 rounded-xl p-2 font-mono text-[11px] text-gray-800 focus:outline-none focus:border-indigo-500"
+                                            />
                                         </div>
                                     </div>
                                 </div>

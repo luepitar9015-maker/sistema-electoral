@@ -24,9 +24,65 @@ const PLATAFORMAS_INFO = {
     youtube:   { label: 'YouTube',   color: 'bg-red-600 text-white', border: 'border-red-500', light: 'bg-red-50 text-red-700' }
 };
 
+const getCandidateSocialLinks = (campaign) => {
+    const candName = campaign?.candidato || campaign?.nombre || 'Candidato Oficial';
+    const isOscar = candName.toLowerCase().includes('villamizar');
+    const isDiego = candName.toLowerCase().includes('ariza');
+    const cleanSlug = candName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, '');
+
+    if (isOscar) {
+        return {
+            instagram: campaign?.link_instagram || 'https://www.instagram.com/oscarvillamiz/?hl=es',
+            instagramUser: '@oscarvillamiz',
+            tiktok: campaign?.link_tiktok || 'https://www.tiktok.com/@oscarvillamiz',
+            tiktokUser: '@oscarvillamiz',
+            facebook: campaign?.link_facebook || 'https://www.facebook.com/OscarVillamiz/?locale=es_LA',
+            facebookUser: 'Oscar Villamizar',
+            twitter: campaign?.link_twitter || 'https://x.com/OscarVillamiz',
+            twitterUser: '@OscarVillamiz',
+            youtube: campaign?.link_youtube || 'https://www.youtube.com/@OscarVillamizarOficial',
+            youtubeUser: 'Oscar Villamizar Oficial',
+            whatsapp: campaign?.link_whatsapp || 'https://chat.whatsapp.com/OscarVillamizarSenado',
+            whatsappUser: 'Comunidad Oficial Oscar Villamizar'
+        };
+    }
+
+    if (isDiego) {
+        return {
+            instagram: campaign?.link_instagram || 'https://www.instagram.com/diegofranariza',
+            instagramUser: '@diegofranariza',
+            tiktok: campaign?.link_tiktok || 'https://www.tiktok.com/@diego.fran.ariza',
+            tiktokUser: '@diego.fran.ariza',
+            facebook: campaign?.link_facebook || 'https://www.facebook.com/diegofranariza',
+            facebookUser: 'Diego Fran Ariza',
+            twitter: campaign?.link_twitter || 'https://x.com/diegofranariza',
+            twitterUser: '@diegofranariza',
+            youtube: campaign?.link_youtube || 'https://www.youtube.com/@DiegoFranArizaOficial',
+            youtubeUser: 'Diego Fran Ariza Oficial',
+            whatsapp: campaign?.link_whatsapp || 'https://chat.whatsapp.com/DiegoFranArizaCamara',
+            whatsappUser: 'Comunidad Oficial Diego Fran Ariza'
+        };
+    }
+
+    return {
+        instagram: campaign?.link_instagram || (cleanSlug ? `https://www.instagram.com/${cleanSlug}` : ''),
+        instagramUser: campaign?.link_instagram ? '@' + campaign.link_instagram.split('/').filter(Boolean).pop().replace(/^@/, '') : (cleanSlug ? `@${cleanSlug}` : '@candidato'),
+        tiktok: campaign?.link_tiktok || (cleanSlug ? `https://www.tiktok.com/@${cleanSlug}` : ''),
+        tiktokUser: campaign?.link_tiktok ? '@' + campaign.link_tiktok.split('/').filter(Boolean).pop().replace(/^@/, '') : (cleanSlug ? `@${cleanSlug}` : '@candidato'),
+        facebook: campaign?.link_facebook || (cleanSlug ? `https://www.facebook.com/${cleanSlug}` : ''),
+        facebookUser: candName,
+        twitter: campaign?.link_twitter || (cleanSlug ? `https://x.com/${cleanSlug}` : ''),
+        twitterUser: campaign?.link_twitter ? '@' + campaign.link_twitter.split('/').filter(Boolean).pop().replace(/^@/, '') : (cleanSlug ? `@${cleanSlug}` : '@candidato'),
+        youtube: campaign?.link_youtube || (cleanSlug ? `https://www.youtube.com/@${cleanSlug}Oficial` : ''),
+        youtubeUser: `${candName} Oficial`,
+        whatsapp: campaign?.link_whatsapp || (cleanSlug ? `https://chat.whatsapp.com/${cleanSlug}` : ''),
+        whatsappUser: `Comunidad Oficial ${candName}`
+    };
+};
+
 export default function SocialMediaPage() {
     const { user: currentUser } = useAuth();
-    const { campaigns, activeCampaign } = useCampaign();
+    const { campaigns, activeCampaign, setActiveCampaign } = useCampaign();
     const token = localStorage.getItem('token');
     const authHeaders = useMemo(() => ({ headers: { Authorization: `Bearer ${token}` } }), [token]);
 
@@ -40,6 +96,11 @@ export default function SocialMediaPage() {
     const [negativeComments, setNegativeComments] = useState([]);
     const [competitors, setCompetitors] = useState([]);
     const [teamUsers, setTeamUsers] = useState([]);
+    const [surveillanceComments, setSurveillanceComments] = useState([]);
+    const [surveillanceResumen, setSurveillanceResumen] = useState({});
+    const [vigilanciaFilter, setVigilanciaFilter] = useState('todos'); // 'todos' | 'equipo' | 'ciudadanos' | 'preguntas' | 'criticas'
+    const [vigilanciaPlataforma, setVigilanciaPlataforma] = useState('todas');
+    const [vigilanciaSearch, setVigilanciaSearch] = useState('');
     const [loading, setLoading] = useState(true);
 
     // Auditoría de Apoyo del Equipo en Publicaciones
@@ -195,17 +256,18 @@ export default function SocialMediaPage() {
     const fetchAllData = async () => {
         setLoading(true);
         try {
-            const campId = activeCampaign?.id || 7;
-            const params = { campana_id: campId };
+            const campId = activeCampaign?.id || campaigns?.[0]?.id;
+            const params = campId ? { campana_id: campId } : {};
 
-            const [mRes, pRes, tRes, cRes, compRes, uRes, lRes] = await Promise.all([
+            const [mRes, pRes, tRes, cRes, compRes, uRes, lRes, allComRes] = await Promise.all([
                 axios.get(`${API}/social/metrics`, { ...authHeaders, params }),
                 axios.get(`${API}/social/posts`, { ...authHeaders, params }),
                 axios.get(`${API}/social/team-accounts`, { ...authHeaders, params }),
                 axios.get(`${API}/social/negative-comments`, { ...authHeaders, params }),
                 axios.get(`${API}/social/competitors`, { ...authHeaders, params }),
                 axios.get(`${API}/social/team-users`, authHeaders),
-                axios.get(`${API}/social/live-streams`, { ...authHeaders, params }).catch(() => ({ data: { livePosts: [], resumen: {}, comentariosEnVivo: [] } }))
+                axios.get(`${API}/social/live-streams`, { ...authHeaders, params }).catch(() => ({ data: { livePosts: [], resumen: {}, comentariosEnVivo: [] } })),
+                axios.get(`${API}/social/comments`, { ...authHeaders, params }).catch(() => ({ data: { success: false, comments: [], resumen: {} } }))
             ]);
 
             setMetrics(mRes.data);
@@ -215,6 +277,8 @@ export default function SocialMediaPage() {
             setCompetitors(compRes.data);
             setTeamUsers(uRes.data || []);
             setLiveMonitorData(lRes.data || { livePosts: [], resumen: {}, comentariosEnVivo: [] });
+            setSurveillanceComments(allComRes?.data?.comments || []);
+            setSurveillanceResumen(allComRes?.data?.resumen || {});
         } catch (error) {
             console.error('Error al cargar datos de redes:', error);
         } finally {
@@ -223,8 +287,10 @@ export default function SocialMediaPage() {
     };
 
     useEffect(() => {
-        fetchAllData();
-    }, [activeCampaign?.id]);
+        if (activeCampaign?.id || (campaigns && campaigns.length > 0)) {
+            fetchAllData();
+        }
+    }, [activeCampaign?.id, campaigns?.length]);
 
     // Abrir modal de auditoría de interacciones del equipo en un post
     const handleOpenAuditModal = (post) => {
@@ -352,7 +418,11 @@ export default function SocialMediaPage() {
     const [savingAndSyncingLinks, setSavingAndSyncingLinks] = useState(false);
     const handleSaveSocialLinks = async (e) => {
         e.preventDefault();
-        const campId = activeCampaign?.id || 5;
+        const campId = activeCampaign?.id || campaigns?.[0]?.id;
+        if (!campId) {
+            alert('Por favor selecciona una campaña primero');
+            return;
+        }
         setSavingAndSyncingLinks(true);
         try {
             await axios.put(`${API}/campaigns/${campId}`, socialLinksForm, authHeaders);
@@ -370,7 +440,7 @@ export default function SocialMediaPage() {
             setSyncSuccessToast({
                 message: sweepRes.data.mensaje || `¡Sincronización completada! Se importaron ${sweepRes.data.postsCreated} publicaciones y ${sweepRes.data.commentsCreated} comentarios y reacciones de las redes del candidato.`,
                 platform: 'multired',
-                handle: `@${(activeCampaign?.candidato || 'OscarVillamizar').replace(/\\s+/g, '')}`
+                handle: `@${(activeCampaign?.candidato || 'Candidato').replace(/\\s+/g, '')}`
             });
             setTimeout(() => setSyncSuccessToast(null), 10000);
         } catch (err) {
@@ -389,7 +459,11 @@ export default function SocialMediaPage() {
         }
         setSyncingProfileUrl(url);
         try {
-            const campId = activeCampaign?.id || 5;
+            const campId = activeCampaign?.id || campaigns?.[0]?.id;
+            if (!campId) {
+                alert('No hay una campaña activa seleccionada');
+                return;
+            }
             const res = await axios.post(`${API}/social/sync-profile`, {
                 url,
                 campana_id: campId
@@ -415,8 +489,12 @@ export default function SocialMediaPage() {
 
     // BARRIDO INTEGRAL DE TODAS LAS REDES SOCIALES DEL CANDIDATO (POSTS, REACCIONES, COMENTARIOS Y EQUIPO)
     const handleCandidateSweep = async () => {
-        const campId = activeCampaign?.id || 7;
-        const candNombre = activeCampaign?.candidato || 'Oscar Villamizar';
+        const campId = activeCampaign?.id || campaigns?.[0]?.id;
+        const candNombre = activeCampaign?.candidato || 'Candidato Oficial';
+        if (!campId) {
+            alert('No hay una campaña activa seleccionada para el barrido');
+            return;
+        }
         setSweepingCandidate(true);
         try {
             const res = await axios.post(`${API}/social/candidate-sweep`, {
@@ -425,7 +503,7 @@ export default function SocialMediaPage() {
 
             await fetchAllData();
             setSyncSuccessToast({
-                message: res.data.mensaje || `¡Barrido completado exitosamente! Se procesaron ${res.data.postsCreated} publicaciones y ${res.data.commentsCreated} comentarios de ${res.data.candidato}.`,
+                message: res.data.mensaje || `¡Barrido completado exitosamente! Se procesaron ${res.data.postsCreated} publicaciones y ${res.data.commentsCreated} comentarios de ${res.data.candidato || candNombre}.`,
                 platform: 'multired',
                 handle: `@${candNombre.replace(/\s+/g, '')}`
             });
@@ -626,8 +704,8 @@ export default function SocialMediaPage() {
         try {
             const payload = {
                 ...newLiveForm,
-                campana_id: activeCampaign?.id || 1,
-                autor_nombre: activeCampaign?.candidato || 'Alejandro Gaviria',
+                campana_id: activeCampaign?.id || campaigns?.[0]?.id || 1,
+                autor_nombre: activeCampaign?.candidato || 'Candidato Oficial',
                 autor_usuario: '@' + (activeCampaign?.candidato || 'candidato').toLowerCase().replace(/\s+/g, ''),
                 fecha_publicacion: new Date().toISOString().slice(0, 16).replace('T', ' '),
                 tipo_contenido: 'live',
@@ -645,7 +723,7 @@ export default function SocialMediaPage() {
     };
 
     const handleExportExcel = () => {
-        const campId = activeCampaign?.id || 7;
+        const campId = activeCampaign?.id || campaigns?.[0]?.id || 1;
         window.open(`${API}/social/export/excel?campana_id=${campId}&token=${token}`, '_blank');
     };
 
@@ -663,6 +741,28 @@ export default function SocialMediaPage() {
         });
     }, [posts, filterPlataforma, searchTerm]);
 
+    // Filtros de vigilancia de comentarios y reacciones
+    const filteredSurveillanceComments = useMemo(() => {
+        return surveillanceComments.filter(c => {
+            if (vigilanciaFilter === 'equipo' && !c.es_equipo_campana) return false;
+            if (vigilanciaFilter === 'ciudadanos' && c.es_equipo_campana) return false;
+            if (vigilanciaFilter === 'preguntas' && c.tipo_reaccion !== 'pregunta') return false;
+            if (vigilanciaFilter === 'criticas' && !(c.sentimiento === 'negativo' || ['critica', 'ataque'].includes(c.tipo_reaccion))) return false;
+
+            if (vigilanciaPlataforma !== 'todas' && c.plataforma !== vigilanciaPlataforma) return false;
+
+            if (vigilanciaSearch.trim()) {
+                const s = vigilanciaSearch.toLowerCase();
+                const inUser = (c.usuario_red || '').toLowerCase().includes(s) || (c.nombre_usuario || '').toLowerCase().includes(s);
+                const inText = (c.texto_comentario || '').toLowerCase().includes(s);
+                const inPost = (c.post?.titulo || '').toLowerCase().includes(s);
+                const inRole = (c.equipo_rol || '').toLowerCase().includes(s) || (c.equipo_nombre || '').toLowerCase().includes(s);
+                if (!inUser && !inText && !inPost && !inRole) return false;
+            }
+            return true;
+        });
+    }, [surveillanceComments, vigilanciaFilter, vigilanciaPlataforma, vigilanciaSearch]);
+
     return (
         <div className="max-w-7xl mx-auto space-y-6 pb-12">
 
@@ -677,11 +777,25 @@ export default function SocialMediaPage() {
                                 <Radio size={12} className="animate-pulse" />
                                 Monitoreo Digital en Vivo
                             </span>
-                            {activeCampaign && (
-                                <span className="bg-white/10 text-cyan-300 text-[10px] font-bold px-3 py-1 rounded-full border border-cyan-500/30">
-                                    {activeCampaign.nombre} • {activeCampaign.candidato}
-                                </span>
-                            )}
+                            {/* Selector Destacado de Candidato en el War Room */}
+                            <div className="flex items-center gap-2 bg-slate-900/90 border border-cyan-500/50 rounded-full px-3 py-1 shadow-inner">
+                                <Users size={13} className="text-cyan-400" />
+                                <span className="text-[10px] font-black uppercase tracking-wider text-cyan-300">Candidato Activo:</span>
+                                <select
+                                    value={activeCampaign?.id || ''}
+                                    onChange={(e) => {
+                                        const selected = campaigns.find(c => c.id === parseInt(e.target.value, 10));
+                                        if (selected) setActiveCampaign(selected);
+                                    }}
+                                    className="bg-transparent text-white font-bold text-xs uppercase outline-none cursor-pointer pr-1"
+                                >
+                                    {campaigns.map(c => (
+                                        <option key={c.id} value={c.id} className="bg-slate-900 text-white font-medium">
+                                            {c.candidato || c.nombre} ({c.tipo_cargo ? c.tipo_cargo.toUpperCase() : 'CAMPAÑA'})
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
                         </div>
 
                         <h1 className="text-2xl lg:text-3xl font-black uppercase tracking-tight flex items-center gap-3">
@@ -815,7 +929,7 @@ export default function SocialMediaPage() {
                                 </span>
                             </div>
                             <p className="text-xs text-gray-300 mt-0.5">
-                                Canales oficiales de <strong className="text-cyan-300 font-bold">{activeCampaign?.candidato || 'Oscar Villamizar'}</strong> para difusión del equipo, replicación masiva y extracción integral de publicaciones y comentarios.
+                                Canales oficiales de <strong className="text-cyan-300 font-bold">{activeCampaign?.candidato || 'Candidato Oficial'}</strong> para difusión del equipo, replicación masiva y extracción integral de publicaciones y comentarios.
                             </p>
                         </div>
                     </div>
@@ -867,143 +981,173 @@ export default function SocialMediaPage() {
                 )}
 
                 {/* Grid de 6 Redes Sociales con sus Enlaces Directos y Botones de Copiar y Sincronizar */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {[
-                        {
-                            id: 'instagram',
-                            nombre: 'Instagram Oficial',
-                            icon: '📸',
-                            badge: 'bg-gradient-to-r from-purple-600 via-pink-600 to-amber-500 text-white',
-                            border: 'border-pink-500/30',
-                            url: activeCampaign?.link_instagram || 'https://www.instagram.com/oscarvillamiz/?hl=es',
-                            usuario: activeCampaign?.link_instagram ? '@' + activeCampaign.link_instagram.split('/').filter(Boolean).pop().replace(/^@/, '') : '@oscarvillamiz'
-                        },
-                        {
-                            id: 'tiktok',
-                            nombre: 'TikTok Oficial',
-                            icon: '🎵',
-                            badge: 'bg-black text-cyan-400',
-                            border: 'border-cyan-500/30',
-                            url: activeCampaign?.link_tiktok || 'https://www.tiktok.com/@oscarvillamiz',
-                            usuario: activeCampaign?.link_tiktok ? '@' + activeCampaign.link_tiktok.split('/').filter(Boolean).pop().replace(/^@/, '') : '@oscarvillamiz'
-                        },
-                        {
-                            id: 'facebook',
-                            nombre: 'Facebook Oficial',
-                            icon: '📘',
-                            badge: 'bg-blue-600 text-white',
-                            border: 'border-blue-500/30',
-                            url: activeCampaign?.link_facebook || 'https://www.facebook.com/OscarVillamiz/?locale=es_LA',
-                            usuario: activeCampaign?.candidato || 'Oscar Villamizar'
-                        },
-                        {
-                            id: 'twitter',
-                            nombre: 'X (Twitter) Oficial',
-                            icon: '🐦',
-                            badge: 'bg-slate-800 text-white',
-                            border: 'border-slate-700',
-                            url: activeCampaign?.link_twitter || 'https://x.com/OscarVillamiz',
-                            usuario: activeCampaign?.link_twitter ? '@' + activeCampaign.link_twitter.split('/').filter(Boolean).pop().replace(/^@/, '') : '@OscarVillamiz'
-                        },
-                        {
-                            id: 'youtube',
-                            nombre: 'YouTube Oficial',
-                            icon: '▶️',
-                            badge: 'bg-red-600 text-white',
-                            border: 'border-red-500/30',
-                            url: activeCampaign?.link_youtube || 'https://www.youtube.com/@OscarVillamizarOficial',
-                            usuario: (activeCampaign?.candidato || 'Oscar Villamizar') + ' Oficial'
-                        },
-                        {
-                            id: 'whatsapp',
-                            nombre: 'Canal de WhatsApp',
-                            icon: '💬',
-                            badge: 'bg-emerald-600 text-white',
-                            border: 'border-emerald-500/30',
-                            url: activeCampaign?.link_whatsapp || 'https://chat.whatsapp.com/OscarVillamizarSenado',
-                            usuario: 'Comunidad Oficial ' + (activeCampaign?.candidato || 'Oscar Villamizar')
-                        }
-                    ].map(r => {
-                        const isCopied = copiedLinkId === r.id;
-                        const isSyncing = syncingProfileUrl === r.url;
-                        const platformPosts = posts.filter(p => p.plataforma === r.id);
-                        const platformPostsCount = platformPosts.length;
-                        return (
-                            <div
-                                key={r.id}
-                                className={`bg-slate-950/80 p-3.5 rounded-2xl border ${r.border} hover:border-cyan-500/60 transition-all space-y-2.5 flex flex-col justify-between`}
-                            >
-                                <div className="space-y-1">
-                                    <div className="flex items-center justify-between">
-                                        <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${r.badge} flex items-center gap-1 shadow-xs`}>
-                                            <span>{r.icon}</span>
-                                            <span>{r.nombre}</span>
-                                        </span>
-                                        <span className="text-[10px] font-mono text-gray-400">
-                                            {r.usuario}
-                                        </span>
-                                    </div>
-
-                                    <a
-                                        href={r.url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-xs font-mono text-cyan-300 hover:text-cyan-200 hover:underline line-clamp-1 block pt-1"
-                                        title={r.url}
+                {(() => {
+                    const candLinks = getCandidateSocialLinks(activeCampaign);
+                    return (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                            {[
+                                {
+                                    id: 'instagram',
+                                    nombre: 'Instagram Oficial',
+                                    icon: '📸',
+                                    badge: 'bg-gradient-to-r from-purple-600 via-pink-600 to-amber-500 text-white',
+                                    border: 'border-pink-500/30',
+                                    url: candLinks.instagram,
+                                    usuario: candLinks.instagramUser,
+                                    configured: Boolean(activeCampaign?.link_instagram)
+                                },
+                                {
+                                    id: 'tiktok',
+                                    nombre: 'TikTok Oficial',
+                                    icon: '🎵',
+                                    badge: 'bg-black text-cyan-400',
+                                    border: 'border-cyan-500/30',
+                                    url: candLinks.tiktok,
+                                    usuario: candLinks.tiktokUser,
+                                    configured: Boolean(activeCampaign?.link_tiktok)
+                                },
+                                {
+                                    id: 'facebook',
+                                    nombre: 'Facebook Oficial',
+                                    icon: '📘',
+                                    badge: 'bg-blue-600 text-white',
+                                    border: 'border-blue-500/30',
+                                    url: candLinks.facebook,
+                                    usuario: candLinks.facebookUser,
+                                    configured: Boolean(activeCampaign?.link_facebook)
+                                },
+                                {
+                                    id: 'twitter',
+                                    nombre: 'X (Twitter) Oficial',
+                                    icon: '🐦',
+                                    badge: 'bg-slate-800 text-white',
+                                    border: 'border-slate-700',
+                                    url: candLinks.twitter,
+                                    usuario: candLinks.twitterUser,
+                                    configured: Boolean(activeCampaign?.link_twitter)
+                                },
+                                {
+                                    id: 'youtube',
+                                    nombre: 'YouTube Oficial',
+                                    icon: '▶️',
+                                    badge: 'bg-red-600 text-white',
+                                    border: 'border-red-500/30',
+                                    url: candLinks.youtube,
+                                    usuario: candLinks.youtubeUser,
+                                    configured: Boolean(activeCampaign?.link_youtube)
+                                },
+                                {
+                                    id: 'whatsapp',
+                                    nombre: 'Canal de WhatsApp',
+                                    icon: '💬',
+                                    badge: 'bg-emerald-600 text-white',
+                                    border: 'border-emerald-500/30',
+                                    url: candLinks.whatsapp,
+                                    usuario: candLinks.whatsappUser,
+                                    configured: Boolean(activeCampaign?.link_whatsapp)
+                                }
+                            ].map(r => {
+                                const isCopied = copiedLinkId === r.id;
+                                const isSyncing = syncingProfileUrl === r.url;
+                                const platformPosts = posts.filter(p => p.plataforma === r.id);
+                                const platformPostsCount = platformPosts.length;
+                                return (
+                                    <div
+                                        key={r.id}
+                                        className={`bg-slate-950/80 p-3.5 rounded-2xl border ${r.border} hover:border-cyan-500/60 transition-all space-y-2.5 flex flex-col justify-between`}
                                     >
-                                        {r.url}
-                                    </a>
+                                        <div className="space-y-1">
+                                            <div className="flex items-center justify-between">
+                                                <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${r.badge} flex items-center gap-1 shadow-xs`}>
+                                                    <span>{r.icon}</span>
+                                                    <span>{r.nombre}</span>
+                                                </span>
+                                                <span className="text-[10px] font-mono text-gray-400">
+                                                    {r.usuario}
+                                                </span>
+                                            </div>
 
-                                    <div className="flex items-center justify-between text-[11px] pt-1">
-                                        <span className="text-gray-400 font-medium">Extraídas en el módulo:</span>
-                                        <span className={`font-mono font-bold px-2 py-0.5 rounded-md ${platformPostsCount > 0 ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' : 'bg-slate-900 text-gray-400 border border-gray-800'}`}>
-                                            {platformPostsCount} {platformPostsCount === 1 ? 'publicación' : 'publicaciones'}
-                                        </span>
+                                            {r.url ? (
+                                                <a
+                                                    href={r.url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-xs font-mono text-cyan-300 hover:text-cyan-200 hover:underline line-clamp-1 block pt-1"
+                                                    title={r.url}
+                                                >
+                                                    {r.url}
+                                                </a>
+                                            ) : (
+                                                <span className="text-xs font-mono text-gray-500 italic block pt-1">
+                                                    Enlace aún no configurado
+                                                </span>
+                                            )}
+
+                                            <div className="flex items-center justify-between text-[11px] pt-1">
+                                                <span className="text-gray-400 font-medium">Extraídas en el módulo:</span>
+                                                <span className={`font-mono font-bold px-2 py-0.5 rounded-md ${platformPostsCount > 0 ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' : 'bg-slate-900 text-gray-400 border border-gray-800'}`}>
+                                                    {platformPostsCount} {platformPostsCount === 1 ? 'publicación' : 'publicaciones'}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-2 pt-1 border-t border-gray-800/60">
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <button
+                                                    type="button"
+                                                    disabled={!r.url}
+                                                    onClick={() => {
+                                                        if (!r.url) return;
+                                                        navigator.clipboard.writeText(r.url);
+                                                        setCopiedLinkId(r.id);
+                                                        setTimeout(() => setCopiedLinkId(null), 3000);
+                                                    }}
+                                                    className="flex items-center justify-center gap-1 py-1 px-2 bg-slate-900 hover:bg-slate-800 text-gray-200 rounded-xl text-[10px] font-bold border border-gray-800 transition-colors cursor-pointer disabled:opacity-40"
+                                                >
+                                                    {isCopied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+                                                    <span>{isCopied ? '¡Copiado!' : 'Copiar Link'}</span>
+                                                </button>
+
+                                                {r.url ? (
+                                                    <a
+                                                        href={r.url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="flex items-center justify-center gap-1 py-1 px-2 bg-indigo-600/80 hover:bg-indigo-600 text-white rounded-xl text-[10px] font-bold transition-colors cursor-pointer shadow-xs"
+                                                    >
+                                                        <ExternalLink size={12} />
+                                                        <span>Abrir Perfil</span>
+                                                    </a>
+                                                ) : (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setModalEditLinksOpen(true)}
+                                                        className="flex items-center justify-center gap-1 py-1 px-2 bg-amber-600/80 hover:bg-amber-600 text-white rounded-xl text-[10px] font-bold transition-colors cursor-pointer shadow-xs"
+                                                    >
+                                                        <Edit3 size={12} />
+                                                        <span>Configurar</span>
+                                                    </button>
+                                                )}
+                                            </div>
+
+                                            {r.id !== 'whatsapp' && (
+                                                <button
+                                                    type="button"
+                                                    disabled={isSyncing || !r.url}
+                                                    onClick={() => handleSyncProfile(r.url)}
+                                                    className="w-full flex items-center justify-center gap-1.5 py-1.5 px-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-xs disabled:opacity-40"
+                                                >
+                                                    <RefreshCw size={12} className={isSyncing ? 'animate-spin' : ''} />
+                                                    <span>{isSyncing ? 'Sincronizando y Extrayendo...' : `⚡ Sincronizar y Extraer Todo (${platformPostsCount})`}</span>
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
-
-                                <div className="space-y-2 pt-1 border-t border-gray-800/60">
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                navigator.clipboard.writeText(r.url);
-                                                setCopiedLinkId(r.id);
-                                                setTimeout(() => setCopiedLinkId(null), 3000);
-                                            }}
-                                            className="flex items-center justify-center gap-1 py-1 px-2 bg-slate-900 hover:bg-slate-800 text-gray-200 rounded-xl text-[10px] font-bold border border-gray-800 transition-colors cursor-pointer"
-                                        >
-                                            {isCopied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
-                                            <span>{isCopied ? '¡Copiado!' : 'Copiar Link'}</span>
-                                        </button>
-
-                                        <a
-                                            href={r.url}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="flex items-center justify-center gap-1 py-1 px-2 bg-indigo-600/80 hover:bg-indigo-600 text-white rounded-xl text-[10px] font-bold transition-colors cursor-pointer shadow-xs"
-                                        >
-                                            <ExternalLink size={12} />
-                                            <span>Abrir Perfil</span>
-                                        </a>
-                                    </div>
-
-                                    {r.id !== 'whatsapp' && (
-                                        <button
-                                            type="button"
-                                            disabled={isSyncing}
-                                            onClick={() => handleSyncProfile(r.url)}
-                                            className="w-full flex items-center justify-center gap-1.5 py-1.5 px-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-xs disabled:opacity-50"
-                                        >
-                                            <RefreshCw size={12} className={isSyncing ? 'animate-spin' : ''} />
-                                            <span>{isSyncing ? 'Sincronizando y Extrayendo...' : `⚡ Sincronizar y Extraer Todo (${platformPostsCount})`}</span>
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
+                                );
+                            })}
+                        </div>
+                    );
+                })()}
             </div>
 
             {/* Pestañas de Navegación del Módulo */}
@@ -1034,6 +1178,18 @@ export default function SocialMediaPage() {
                 >
                     <Share2 size={16} className={activeTab === 'feed' ? 'text-[#00B894]' : ''} />
                     <span>Feed & Publicaciones ({posts.length})</span>
+                </button>
+
+                <button
+                    onClick={() => setActiveTab('vigilancia')}
+                    className={`flex items-center gap-2 px-5 py-3 rounded-2xl font-black text-xs uppercase tracking-wider transition-all cursor-pointer ${
+                        activeTab === 'vigilancia'
+                            ? 'bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-800 text-white shadow-lg shadow-indigo-500/25'
+                            : 'text-indigo-800 bg-indigo-50/80 hover:bg-indigo-100 border border-indigo-200'
+                    }`}
+                >
+                    <ShieldCheck size={16} className={activeTab === 'vigilancia' ? 'text-indigo-200 animate-pulse' : 'text-indigo-600'} />
+                    <span>🛡️ Vigilancia de Redes & Reacciones ({surveillanceComments.length})</span>
                 </button>
 
                 <button
@@ -1502,19 +1658,22 @@ export default function SocialMediaPage() {
                         <div className="flex items-center gap-1.5 overflow-x-auto text-xs font-bold">
                             <button
                                 onClick={() => setFilterPlataforma('todas')}
-                                className={`px-3.5 py-1.5 rounded-xl transition-all ${filterPlataforma === 'todas' ? 'bg-slate-900 text-white' : 'text-gray-500 hover:bg-gray-100'}`}
+                                className={`px-3.5 py-1.5 rounded-xl transition-all font-black text-xs cursor-pointer ${filterPlataforma === 'todas' ? 'bg-slate-900 text-white shadow-xs' : 'text-gray-600 hover:bg-gray-100'}`}
                             >
-                                Todas
+                                Todas ({posts.length})
                             </button>
-                            {Object.entries(PLATAFORMAS_INFO).map(([key, info]) => (
-                                <button
-                                    key={key}
-                                    onClick={() => setFilterPlataforma(key)}
-                                    className={`px-3.5 py-1.5 rounded-xl transition-all ${filterPlataforma === key ? info.color : 'text-gray-600 hover:bg-gray-100'}`}
-                                >
-                                    {info.label}
-                                </button>
-                            ))}
+                            {Object.entries(PLATAFORMAS_INFO).map(([key, info]) => {
+                                const countForPlat = posts.filter(p => p.plataforma === key).length;
+                                return (
+                                    <button
+                                        key={key}
+                                        onClick={() => setFilterPlataforma(key)}
+                                        className={`px-3.5 py-1.5 rounded-xl transition-all font-bold text-xs cursor-pointer ${filterPlataforma === key ? info.color + ' ring-2 ring-indigo-500/30 font-black' : 'text-gray-600 hover:bg-gray-100'}`}
+                                    >
+                                        {info.label} ({countForPlat})
+                                    </button>
+                                );
+                            })}
                         </div>
 
                         <div className="relative flex-1 max-w-sm">
@@ -1544,26 +1703,56 @@ export default function SocialMediaPage() {
                                     <div key={p.id} className="bg-white rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-all p-5 flex flex-col justify-between space-y-4">
                                         <div className="space-y-3">
                                             {/* Cabecera del post */}
-                                            <div className="flex items-center justify-between gap-2">
-                                                <span className={`text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full ${platInfo.color}`}>
-                                                    {platInfo.label}
-                                                </span>
+                                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                    <span className={`text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full ${platInfo.color}`}>
+                                                        {platInfo.label}
+                                                    </span>
+                                                    <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200" title="Identificador único del post">
+                                                        #{p.id}
+                                                    </span>
+                                                </div>
 
-                                                {p.en_vivo ? (
-                                                    <span className="flex items-center gap-1 text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-red-100 text-red-700 animate-pulse border border-red-300">
-                                                        <Radio size={10} />
-                                                        EN VIVO AHORA
-                                                    </span>
-                                                ) : (
-                                                    <span className="text-[10px] text-gray-400 font-mono">
-                                                        {p.fecha_publicacion}
-                                                    </span>
-                                                )}
+                                                <div className="flex items-center gap-1.5">
+                                                    {p.url_publicacion && (
+                                                        <a
+                                                            href={p.url_publicacion}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-slate-900 hover:bg-black text-white text-[10px] font-black uppercase tracking-wider transition-all shadow-xs cursor-pointer group"
+                                                            title={`Abrir publicación original en ${platInfo.label}`}
+                                                        >
+                                                            <span>Abrir</span>
+                                                            <ExternalLink size={11} className="text-cyan-400 group-hover:translate-x-0.5 transition-transform" />
+                                                        </a>
+                                                    )}
+
+                                                    {p.en_vivo ? (
+                                                        <span className="flex items-center gap-1 text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-red-100 text-red-700 animate-pulse border border-red-300">
+                                                            <Radio size={10} />
+                                                            EN VIVO AHORA
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-[10px] text-gray-400 font-mono">
+                                                            {p.fecha_publicacion}
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </div>
 
                                             <div>
                                                 <h3 className="font-black text-sm text-slate-900 leading-snug line-clamp-2">
-                                                    {p.titulo}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setSelectedPostForComments(p);
+                                                            setModalCommentsOpen(true);
+                                                        }}
+                                                        className="text-left font-black text-slate-900 hover:text-indigo-600 transition-colors cursor-pointer"
+                                                        title="Clic para ver todos los comentarios y reacciones clasificados"
+                                                    >
+                                                        {(p.titulo || '').replace(/^@[a-zA-Z0-9_]+:\s*/, '')}
+                                                    </button>
                                                 </h3>
                                                 <p className="text-[11px] text-gray-500 mt-1 line-clamp-3">
                                                     {p.contenido}
@@ -1589,26 +1778,120 @@ export default function SocialMediaPage() {
                                                     <span className="font-black text-emerald-700 block">{(p.interacciones || 0).toLocaleString()}</span>
                                                 </div>
                                                 <div className="bg-gray-50 p-2 rounded-xl">
-                                                    <span className="text-[9px] font-bold text-gray-400 uppercase block">Engagement</span>
-                                                    <span className="font-black text-cyan-700 block">{p.engagement_rate || 0}%</span>
+                                                    <span className="text-[9px] font-bold text-gray-400 uppercase block">Comentarios</span>
+                                                    <span className="font-black text-indigo-700 block">💬 {(p.comentarios_conteo || 0).toLocaleString()}</span>
                                                 </div>
                                             </div>
 
-                                            {/* Desglose de Reacciones Generales */}
-                                            <div className="flex items-center justify-between text-[11px] text-gray-600 bg-gray-50/60 p-2.5 rounded-xl font-bold">
-                                                <span className="flex items-center gap-1 text-blue-600">
-                                                    👍 {(p.likes || 0).toLocaleString()}
-                                                </span>
-                                                <span className="flex items-center gap-1 text-rose-600">
-                                                    ❤️ {(p.me_encanta || 0).toLocaleString()}
-                                                </span>
-                                                <span className="flex items-center gap-1 text-amber-700">
-                                                    😡 {(p.me_enoja || 0).toLocaleString()}
-                                                </span>
-                                                <span className="flex items-center gap-1 text-gray-500">
-                                                    💬 {(p.comentarios_conteo || 0).toLocaleString()}
-                                                </span>
-                                            </div>
+                                            {/* Desglose Exacto de Reacciones Auditadas & Conteo de Comentarios */}
+                                            {(() => {
+                                                const r = p.reacciones_desglose || {
+                                                    me_encanta: p.me_encanta || 0,
+                                                    apoyo: 0,
+                                                    me_gusta: p.likes || 0,
+                                                    aplausos: 0,
+                                                    pregunta: 0,
+                                                    critica: p.me_enoja || 0,
+                                                    total: p.comentarios_conteo || 0
+                                                };
+                                                return (
+                                                    <div className="bg-slate-50/90 rounded-2xl p-2.5 border border-slate-200/80 space-y-2">
+                                                        <div className="flex items-center justify-between text-[11px] font-bold">
+                                                            <span className="text-slate-500 uppercase tracking-wider text-[9px] flex items-center gap-1">
+                                                                <MessageSquare size={11} className="text-indigo-600" />
+                                                                Reacciones & Comentarios:
+                                                            </span>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setSelectedPostForComments({ ...p, defaultFilter: 'todos' });
+                                                                    setModalCommentsOpen(true);
+                                                                }}
+                                                                className="bg-indigo-600 hover:bg-indigo-700 text-white font-black px-2 py-0.5 rounded-lg text-[10px] transition-colors cursor-pointer"
+                                                                title="Ver todos los comentarios de esta publicación"
+                                                            >
+                                                                💬 {r.total || p.comentarios_conteo || 0} comentarios
+                                                            </button>
+                                                        </div>
+
+                                                        {/* Etiquetas de Reacciones Interactivas (Clic para ver quién colocó cada reacción) */}
+                                                        <div className="flex flex-wrap items-center gap-1 text-[10px]">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setSelectedPostForComments({ ...p, defaultFilter: 'me_encanta' });
+                                                                    setModalCommentsOpen(true);
+                                                                }}
+                                                                className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 font-bold transition-all cursor-pointer"
+                                                                title="Ver quiénes colocaron ❤️ Me Encanta"
+                                                            >
+                                                                <span>❤️</span>
+                                                                <span>Me Encanta ({r.me_encanta || 0})</span>
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setSelectedPostForComments({ ...p, defaultFilter: 'apoyo' });
+                                                                    setModalCommentsOpen(true);
+                                                                }}
+                                                                className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 font-bold transition-all cursor-pointer"
+                                                                title="Ver quiénes colocaron 🔥 Apoyo Total"
+                                                            >
+                                                                <span>🔥</span>
+                                                                <span>Apoyo ({r.apoyo || 0})</span>
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setSelectedPostForComments({ ...p, defaultFilter: 'me_gusta' });
+                                                                    setModalCommentsOpen(true);
+                                                                }}
+                                                                className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 font-bold transition-all cursor-pointer"
+                                                                title="Ver quiénes colocaron 👍 Me Gusta"
+                                                            >
+                                                                <span>👍</span>
+                                                                <span>Me Gusta ({r.me_gusta || 0})</span>
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setSelectedPostForComments({ ...p, defaultFilter: 'aplausos' });
+                                                                    setModalCommentsOpen(true);
+                                                                }}
+                                                                className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-lg bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 font-bold transition-all cursor-pointer"
+                                                                title="Ver quiénes colocaron 👏 Aplausos"
+                                                            >
+                                                                <span>👏</span>
+                                                                <span>Aplausos ({r.aplausos || 0})</span>
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setSelectedPostForComments({ ...p, defaultFilter: 'preguntas' });
+                                                                    setModalCommentsOpen(true);
+                                                                }}
+                                                                className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-lg bg-cyan-50 text-cyan-700 hover:bg-cyan-100 border border-cyan-200 font-bold transition-all cursor-pointer"
+                                                                title="Ver preguntas ciudadanas"
+                                                            >
+                                                                <span>❓</span>
+                                                                <span>Preguntas ({r.pregunta || 0})</span>
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setSelectedPostForComments({ ...p, defaultFilter: 'criticas' });
+                                                                    setModalCommentsOpen(true);
+                                                                }}
+                                                                className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 font-bold transition-all cursor-pointer"
+                                                                title="Ver críticas / alertas de vigilancia"
+                                                            >
+                                                                <span>⚠️</span>
+                                                                <span>Críticas ({r.critica || 0})</span>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })()}
 
                                             {/* SEGUIMIENTO Y AUDITORÍA DEL EQUIPO (BD OFICIAL) */}
                                             <div className="bg-gradient-to-br from-indigo-50/90 to-purple-50/70 border border-indigo-100 rounded-2xl p-3 space-y-2">
@@ -1679,8 +1962,22 @@ export default function SocialMediaPage() {
                                                     className="w-full flex items-center justify-center gap-1.5 py-2 bg-gradient-to-r from-purple-600 via-indigo-600 to-indigo-700 hover:from-purple-700 hover:to-indigo-800 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-md shadow-indigo-500/20 cursor-pointer"
                                                 >
                                                     <MessageSquare size={13} />
-                                                    <span>💬 Ver Comentarios & Identificar Equipo ({p.comentarios_conteo || 0})</span>
+                                                    <span>💬 Ver Comentarios & Reacciones ({p.comentarios_conteo || 0})</span>
                                                 </button>
+
+                                                {/* Enlace directo para abrir la publicación en la red social */}
+                                                {p.url_publicacion && (
+                                                    <a
+                                                        href={p.url_publicacion}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="w-full flex items-center justify-center gap-1.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-xl text-[10px] font-black uppercase tracking-wider transition-colors border border-emerald-200 cursor-pointer"
+                                                        title="Abrir directamente en la red social externa"
+                                                    >
+                                                        <span>🌐 Abrir en {(p.plataforma || 'Red Social').toUpperCase()}</span>
+                                                        <ExternalLink size={12} />
+                                                    </a>
+                                                )}
 
                                                 {/* Botón para abrir la Auditoría de Participación del Equipo */}
                                                 <button
@@ -2016,6 +2313,356 @@ export default function SocialMediaPage() {
                     API={API}
                     onRefreshData={fetchAllData}
                 />
+            )}
+
+            {/* ========================================================= */}
+            {/* PESTAÑA: CENTRO DE VIGILANCIA DE REDES SOCIALES & REACCIONES */}
+            {/* ========================================================= */}
+            {activeTab === 'vigilancia' && (
+                <div className="space-y-5 animate-in fade-in duration-300">
+                    {/* Banner Superior */}
+                    <div className="bg-gradient-to-r from-blue-950 via-indigo-950 to-slate-900 rounded-3xl p-6 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4 border border-indigo-900/60">
+                        <div className="space-y-1 max-w-2xl">
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 text-[10px] font-black uppercase tracking-wider border border-indigo-500/30">
+                                    <ShieldCheck size={12} className="text-cyan-400" />
+                                    Centro de Vigilancia Integral & Reacciones
+                                </span>
+                                <span className="text-[10px] font-mono text-cyan-300 bg-cyan-950/80 px-2.5 py-0.5 rounded-full border border-cyan-800/60">
+                                    {surveillanceComments.length} Mensajes Monitoreados
+                                </span>
+                            </div>
+                            <h2 className="text-xl lg:text-2xl font-black uppercase tracking-tight">
+                                Monitoreo y Clasificación en Vivo de Redes Sociales
+                            </h2>
+                            <p className="text-xs text-indigo-200/80 leading-relaxed">
+                                Supervisa todos los mensajes, reacciones y comentarios en tiempo real de Instagram, TikTok, Facebook, X y YouTube.
+                                Identifica al instante activistas de tu equipo oficial, ciudadanos simpatizantes, preguntas directas y alertas críticas.
+                            </p>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={fetchAllData}
+                                className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+                            >
+                                <RefreshCw size={14} />
+                                <span>Actualizar Monitoreo</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* KPIs de Vigilancia */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                        <div
+                            onClick={() => setVigilanciaFilter('todos')}
+                            className={`p-4 rounded-3xl border transition-all cursor-pointer ${
+                                vigilanciaFilter === 'todos'
+                                    ? 'bg-slate-950 text-white border-slate-900 shadow-md ring-2 ring-indigo-500'
+                                    : 'bg-white text-slate-800 border-gray-100 hover:border-gray-200 shadow-xs'
+                            }`}
+                        >
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
+                                Total Interacciones
+                            </span>
+                            <span className="text-2xl font-black mt-1 block">
+                                {surveillanceComments.length}
+                            </span>
+                            <span className="text-[10px] text-gray-400 mt-1 block">
+                                Comentarios y reacciones
+                            </span>
+                        </div>
+
+                        <div
+                            onClick={() => setVigilanciaFilter('equipo')}
+                            className={`p-4 rounded-3xl border transition-all cursor-pointer ${
+                                vigilanciaFilter === 'equipo'
+                                    ? 'bg-emerald-950 text-emerald-100 border-emerald-900 shadow-md ring-2 ring-emerald-500'
+                                    : 'bg-emerald-50/60 text-emerald-950 border-emerald-100 hover:bg-emerald-50 shadow-xs'
+                            }`}
+                        >
+                            <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider block flex items-center gap-1">
+                                <Users size={12} />
+                                Equipo Oficial
+                            </span>
+                            <span className="text-2xl font-black mt-1 block text-emerald-900">
+                                {surveillanceResumen.equipo ?? surveillanceComments.filter(c => c.es_equipo_campana).length}
+                            </span>
+                            <span className="text-[10px] text-emerald-700 mt-1 block font-medium">
+                                Activistas identificados
+                            </span>
+                        </div>
+
+                        <div
+                            onClick={() => setVigilanciaFilter('ciudadanos')}
+                            className={`p-4 rounded-3xl border transition-all cursor-pointer ${
+                                vigilanciaFilter === 'ciudadanos'
+                                    ? 'bg-blue-950 text-blue-100 border-blue-900 shadow-md ring-2 ring-blue-500'
+                                    : 'bg-blue-50/60 text-blue-950 border-blue-100 hover:bg-blue-50 shadow-xs'
+                            }`}
+                        >
+                            <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider block flex items-center gap-1">
+                                <Users size={12} />
+                                Ciudadanos
+                            </span>
+                            <span className="text-2xl font-black mt-1 block text-blue-900">
+                                {surveillanceResumen.ciudadanos ?? surveillanceComments.filter(c => !c.es_equipo_campana).length}
+                            </span>
+                            <span className="text-[10px] text-blue-700 mt-1 block font-medium">
+                                Comunidad & votantes
+                            </span>
+                        </div>
+
+                        <div
+                            onClick={() => setVigilanciaFilter('preguntas')}
+                            className={`p-4 rounded-3xl border transition-all cursor-pointer ${
+                                vigilanciaFilter === 'preguntas'
+                                    ? 'bg-cyan-950 text-cyan-100 border-cyan-900 shadow-md ring-2 ring-cyan-500'
+                                    : 'bg-cyan-50/60 text-cyan-950 border-cyan-100 hover:bg-cyan-50 shadow-xs'
+                            }`}
+                        >
+                            <span className="text-[10px] font-bold text-cyan-600 uppercase tracking-wider block flex items-center gap-1">
+                                <HelpCircle size={12} />
+                                Preguntas
+                            </span>
+                            <span className="text-2xl font-black mt-1 block text-cyan-900">
+                                {surveillanceResumen.preguntas ?? surveillanceComments.filter(c => c.tipo_reaccion === 'pregunta').length}
+                            </span>
+                            <span className="text-[10px] text-cyan-700 mt-1 block font-medium">
+                                Dudas a resolver
+                            </span>
+                        </div>
+
+                        <div
+                            onClick={() => setVigilanciaFilter('criticas')}
+                            className={`p-4 rounded-3xl border transition-all cursor-pointer ${
+                                vigilanciaFilter === 'criticas'
+                                    ? 'bg-rose-950 text-rose-100 border-rose-900 shadow-md ring-2 ring-rose-500'
+                                    : 'bg-rose-50/60 text-rose-950 border-rose-100 hover:bg-rose-50 shadow-xs'
+                            }`}
+                        >
+                            <span className="text-[10px] font-bold text-rose-600 uppercase tracking-wider block flex items-center gap-1">
+                                <AlertTriangle size={12} />
+                                Alertas & Críticas
+                            </span>
+                            <span className="text-2xl font-black mt-1 block text-rose-900">
+                                {surveillanceResumen.criticas ?? surveillanceComments.filter(c => c.sentimiento === 'negativo' || ['critica', 'ataque'].includes(c.tipo_reaccion)).length}
+                            </span>
+                            <span className="text-[10px] text-rose-700 mt-1 block font-medium">
+                                Monitoreo de riesgo
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Filtros de Plataforma y Buscador */}
+                    <div className="bg-white p-4 rounded-3xl border border-gray-100 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
+                        <div className="flex items-center gap-1.5 overflow-x-auto text-xs font-bold">
+                            <span className="text-gray-400 uppercase text-[10px] pr-1">Red:</span>
+                            <button
+                                onClick={() => setVigilanciaPlataforma('todas')}
+                                className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                                    vigilanciaPlataforma === 'todas' ? 'bg-slate-900 text-white' : 'text-gray-500 hover:bg-gray-100'
+                                }`}
+                            >
+                                Todas
+                            </button>
+                            {Object.entries(PLATAFORMAS_INFO).map(([key, info]) => (
+                                <button
+                                    key={key}
+                                    onClick={() => setVigilanciaPlataforma(key)}
+                                    className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                                        vigilanciaPlataforma === key ? info.color : 'text-gray-600 hover:bg-gray-100'
+                                    }`}
+                                >
+                                    {info.label}
+                                </button>
+                            ))}
+                        </div>
+
+                        <div className="relative flex-1 max-w-md">
+                            <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                            <input
+                                type="text"
+                                placeholder="Buscar por usuario (@handle), nombre, mensaje o publicación..."
+                                value={vigilanciaSearch}
+                                onChange={e => setVigilanciaSearch(e.target.value)}
+                                className="w-full pl-9 pr-3 py-2 text-xs border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Lista de Comentarios y Reacciones Auditados */}
+                    {filteredSurveillanceComments.length === 0 ? (
+                        <div className="bg-white rounded-3xl p-12 text-center border border-gray-100 text-gray-400 text-xs">
+                            No se encontraron comentarios o reacciones con los filtros seleccionados.
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            {filteredSurveillanceComments.map((com) => {
+                                const platInfo = PLATAFORMAS_INFO[com.plataforma] || PLATAFORMAS_INFO.instagram;
+                                const isTeam = !!com.es_equipo_campana;
+                                const isCritica = com.sentimiento === 'negativo' || ['critica', 'ataque'].includes(com.tipo_reaccion);
+                                const isPregunta = com.tipo_reaccion === 'pregunta';
+
+                                const emojiMap = {
+                                    me_encanta: '❤️ Me Encanta',
+                                    apoyo: '🔥 Apoyo Total',
+                                    me_gusta: '👍 Me Gusta',
+                                    aplausos: '👏 Aplausos',
+                                    pregunta: '❓ Pregunta',
+                                    critica: '⚠️ Crítica'
+                                };
+
+                                return (
+                                    <div
+                                        key={com.id}
+                                        className={`bg-white rounded-3xl p-5 border transition-all hover:shadow-md space-y-3 ${
+                                            isCritica
+                                                ? 'border-rose-200 bg-rose-50/30'
+                                                : isTeam
+                                                ? 'border-emerald-200/80 bg-emerald-50/20'
+                                                : 'border-gray-100'
+                                        }`}
+                                    >
+                                        {/* Barra superior de la publicación vinculada */}
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-gray-100">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <span className={`text-[9px] font-black uppercase px-2.5 py-0.5 rounded-full ${platInfo.color}`}>
+                                                    {platInfo.label}
+                                                </span>
+                                                <span className="text-[10px] font-mono font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md">
+                                                    Post #{com.post_id}
+                                                </span>
+                                                {com.post?.titulo && (
+                                                    <span className="text-xs font-bold text-slate-800 line-clamp-1 max-w-md">
+                                                        📌 {com.post.titulo}
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            <div className="flex items-center gap-2 self-end sm:self-auto">
+                                                <span className="text-[10px] text-gray-400 font-mono">
+                                                    {com.fecha_comentario ? new Date(com.fecha_comentario).toLocaleString('es-CO') : 'Reciente'}
+                                                </span>
+                                                {com.post?.url_publicacion && (
+                                                    <a
+                                                        href={com.post.url_publicacion}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-slate-900 hover:bg-black text-white text-[10px] font-black uppercase tracking-wider transition-all shadow-xs cursor-pointer group"
+                                                        title="Abrir publicación original en la red social"
+                                                    >
+                                                        <span>Abrir en {platInfo.label}</span>
+                                                        <ExternalLink size={10} className="text-cyan-400 group-hover:translate-x-0.5 transition-transform" />
+                                                    </a>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Contenido principal del comentario y autor */}
+                                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+                                            {/* Columna Izquierda: Identificación del Usuario (4 cols) */}
+                                            <div className="lg:col-span-4 space-y-2">
+                                                <div className="flex items-center gap-2">
+                                                    <div className={`w-9 h-9 rounded-2xl flex items-center justify-center font-black text-sm shrink-0 ${
+                                                        isTeam
+                                                            ? 'bg-emerald-600 text-white shadow-sm'
+                                                            : isCritica
+                                                            ? 'bg-rose-600 text-white shadow-sm'
+                                                            : 'bg-slate-800 text-white'
+                                                    }`}>
+                                                        {isTeam ? '🎖️' : isCritica ? '⚠️' : '👤'}
+                                                    </div>
+                                                    <div className="overflow-hidden">
+                                                        <h4 className="font-black text-xs text-slate-900 truncate">
+                                                            {isTeam ? (com.equipo_nombre || com.nombre_usuario) : com.nombre_usuario}
+                                                        </h4>
+                                                        <p className="text-[11px] font-mono text-indigo-600 truncate font-bold">
+                                                            {com.usuario_red}
+                                                        </p>
+                                                    </div>
+                                                </div>
+
+                                                <div>
+                                                    {isTeam ? (
+                                                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-900 text-[9px] font-black uppercase tracking-wider border border-emerald-300">
+                                                            <CheckCircle size={10} className="text-emerald-700" />
+                                                            {com.equipo_rol || 'Equipo Oficial Verificado'}
+                                                        </span>
+                                                    ) : isCritica ? (
+                                                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-900 text-[9px] font-black uppercase tracking-wider border border-rose-300">
+                                                            <AlertCircle size={10} className="text-rose-700" />
+                                                            Alerta de Vigilancia
+                                                        </span>
+                                                    ) : isPregunta ? (
+                                                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-cyan-100 text-cyan-900 text-[9px] font-black uppercase tracking-wider border border-cyan-300">
+                                                            <HelpCircle size={10} className="text-cyan-700" />
+                                                            Pregunta Ciudadana
+                                                        </span>
+                                                    ) : (
+                                                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[9px] font-bold uppercase tracking-wider border border-slate-200">
+                                                            Ciudadano / Simpatizante
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Columna Derecha: Mensaje y Reacción (8 cols) */}
+                                            <div className="lg:col-span-8 space-y-2.5">
+                                                <div className="flex items-center gap-2 flex-wrap text-[11px]">
+                                                    <span className="font-bold px-2 py-0.5 rounded-lg bg-slate-100 text-slate-800 border border-slate-200">
+                                                        {emojiMap[com.tipo_reaccion] || `👍 ${com.tipo_reaccion}`}
+                                                    </span>
+                                                    <span className={`px-2 py-0.5 rounded-lg font-bold uppercase text-[9px] ${
+                                                        com.sentimiento === 'positivo'
+                                                            ? 'bg-emerald-100 text-emerald-800'
+                                                            : com.sentimiento === 'negativo'
+                                                            ? 'bg-rose-100 text-rose-800 font-black'
+                                                            : 'bg-gray-100 text-gray-700'
+                                                    }`}>
+                                                        Sentimiento: {com.sentimiento || 'Positivo'}
+                                                    </span>
+                                                    {com.likes_comentario > 0 && (
+                                                        <span className="text-gray-500 font-mono text-[10px]">
+                                                            👍 {com.likes_comentario} me gusta
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                <div className={`p-3 rounded-2xl text-xs font-medium leading-relaxed ${
+                                                    isCritica
+                                                        ? 'bg-rose-100/60 text-rose-950 border border-rose-200'
+                                                        : isTeam
+                                                        ? 'bg-emerald-100/50 text-emerald-950 border border-emerald-200'
+                                                        : 'bg-slate-50 text-slate-800 border border-slate-200/80'
+                                                }`}>
+                                                    "{com.texto_comentario}"
+                                                </div>
+
+                                                <div className="flex items-center justify-end gap-2 pt-1">
+                                                    {com.post && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setSelectedPostForComments(com.post);
+                                                                setModalCommentsOpen(true);
+                                                            }}
+                                                            className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-900 rounded-xl text-[10px] font-black uppercase tracking-wider transition-colors border border-indigo-200 cursor-pointer flex items-center gap-1"
+                                                        >
+                                                            <MessageSquare size={12} className="text-indigo-600" />
+                                                            <span>Ver Hilo Completo del Post ({com.post?.comentarios_conteo || 0})</span>
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
             )}
 
             {/* ========================================================= */}
@@ -2834,7 +3481,7 @@ export default function SocialMediaPage() {
                                 <Share2 size={20} className="text-[#00B894]" />
                                 <div>
                                     <h3 className="font-black text-base uppercase">Enlaces Oficiales de Redes Sociales</h3>
-                                    <p className="text-xs text-gray-300">Configura los perfiles oficiales de la campaña y candidato</p>
+                                    <p className="text-xs text-emerald-400 font-semibold">Configurando para: {activeCampaign?.candidato || activeCampaign?.nombre || 'Campaña Activa'}</p>
                                 </div>
                             </div>
                             <button onClick={() => setModalEditLinksOpen(false)} className="text-gray-400 hover:text-white cursor-pointer">

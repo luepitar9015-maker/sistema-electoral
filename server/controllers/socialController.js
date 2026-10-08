@@ -24,30 +24,34 @@ exports.getDashboardMetrics = async (req, res) => {
         const teamAccounts = await SocialTeamAccount.findAll({ where });
         const negativeComments = await SocialNegativeComment.findAll({ where });
         const competitors = await SocialCompetitor.findAll({ where });
+        const allCommentsInDb = await SocialPostComment.findAll({ where });
 
-        // Sumas de métricas
+        // Sumas de métricas y reacciones calculadas a partir de los comentarios auditados
         let totalAlcance = 0;
         let totalImpresiones = 0;
         let totalInteracciones = 0;
         let totalReproducciones = 0;
-        let totalLikes = 0;
-        let totalMeEncanta = 0;
-        let totalMeEnoja = 0;
 
         posts.forEach(p => {
             totalAlcance += p.alcance || 0;
             totalImpresiones += p.impresiones || 0;
             totalInteracciones += p.interacciones || 0;
             totalReproducciones += p.reproducciones || 0;
-            totalLikes += p.likes || 0;
-            totalMeEncanta += p.me_encanta || 0;
-            totalMeEnoja += p.me_enoja || 0;
         });
 
-        const totalReacciones = totalLikes + totalMeEncanta + totalMeEnoja;
-        const pctPositivo = totalReacciones > 0 ? Math.round(((totalLikes + totalMeEncanta) / totalReacciones) * 100) : 75;
-        const pctNegativo = totalReacciones > 0 ? Math.round((totalMeEnoja / totalReacciones) * 100) : 10;
-        const pctNeutral = 100 - pctPositivo - pctNegativo;
+        const totalMeEncanta = allCommentsInDb.filter(c => c.tipo_reaccion === 'me_encanta').length;
+        const totalApoyo = allCommentsInDb.filter(c => c.tipo_reaccion === 'apoyo').length;
+        const totalMeGusta = allCommentsInDb.filter(c => c.tipo_reaccion === 'me_gusta').length;
+        const totalAplausos = allCommentsInDb.filter(c => c.tipo_reaccion === 'aplausos').length;
+        const totalPreguntas = allCommentsInDb.filter(c => c.tipo_reaccion === 'pregunta').length;
+        const totalMeEnoja = allCommentsInDb.filter(c => c.tipo_reaccion === 'critica' || c.tipo_reaccion === 'ataque' || c.sentimiento === 'negativo').length;
+        const totalComentarios = allCommentsInDb.length;
+
+        const totalReaccionesPositivas = totalMeEncanta + totalApoyo + totalMeGusta + totalAplausos;
+        const totalReaccionesAuditadas = totalComentarios;
+        const pctPositivo = totalReaccionesAuditadas > 0 ? Math.round((totalReaccionesPositivas / totalReaccionesAuditadas) * 100) : 75;
+        const pctNegativo = totalReaccionesAuditadas > 0 ? Math.round((totalMeEnoja / totalReaccionesAuditadas) * 100) : 10;
+        const pctNeutral = Math.max(0, 100 - pctPositivo - pctNegativo);
 
         // Distribución por plataforma
         const porPlataforma = {
@@ -73,6 +77,7 @@ exports.getDashboardMetrics = async (req, res) => {
                 totalInteracciones,
                 totalReproducciones,
                 totalPosts: posts.length,
+                totalComentarios,
                 comentariosPendientes,
                 comentariosCriticos,
                 totalCuentasEquipo: teamAccounts.length,
@@ -81,8 +86,14 @@ exports.getDashboardMetrics = async (req, res) => {
                 totalOpositores: competitors.length
             },
             reacciones: {
-                likes: totalLikes,
+                total: totalComentarios,
                 meEncanta: totalMeEncanta,
+                apoyo: totalApoyo,
+                meGusta: totalMeGusta,
+                aplausos: totalAplausos,
+                preguntas: totalPreguntas,
+                criticas: totalMeEnoja,
+                likes: totalMeGusta,
                 meEnoja: totalMeEnoja,
                 pctPositivo,
                 pctNeutral,
@@ -112,6 +123,18 @@ exports.getPosts = async (req, res) => {
             order: [['createdAt', 'DESC']]
         });
 
+        // Cargar todos los comentarios de estos posts para coincidencia 100% matemática
+        const postIds = posts.map(p => p.id);
+        const allComments = postIds.length > 0 ? await SocialPostComment.findAll({
+            where: { post_id: postIds }
+        }) : [];
+
+        const commentsByPost = {};
+        allComments.forEach(c => {
+            if (!commentsByPost[c.post_id]) commentsByPost[c.post_id] = [];
+            commentsByPost[c.post_id].push(c);
+        });
+
         // Cargar interacciones del equipo para cada post
         const allInteractions = await SocialTeamInteraction.findAll();
         const interactionsByPost = {};
@@ -122,6 +145,16 @@ exports.getPosts = async (req, res) => {
 
         let results = posts.map(p => {
             const data = p.toJSON();
+            const pComments = commentsByPost[p.id] || [];
+            const realCommentCount = pComments.length;
+
+            const reacMeEncanta = pComments.filter(c => c.tipo_reaccion === 'me_encanta').length;
+            const reacApoyo = pComments.filter(c => c.tipo_reaccion === 'apoyo').length;
+            const reacMeGusta = pComments.filter(c => c.tipo_reaccion === 'me_gusta').length;
+            const reacAplausos = pComments.filter(c => c.tipo_reaccion === 'aplausos').length;
+            const reacPreguntas = pComments.filter(c => c.tipo_reaccion === 'pregunta').length;
+            const reacCriticas = pComments.filter(c => c.tipo_reaccion === 'critica' || c.tipo_reaccion === 'ataque' || c.sentimiento === 'negativo').length;
+
             const postTeam = interactionsByPost[p.id] || [];
             const teamShares = postTeam.filter(it => it.compartio).length;
             const teamComments = postTeam.filter(it => it.comento).length;
@@ -129,6 +162,20 @@ exports.getPosts = async (req, res) => {
 
             return {
                 ...data,
+                titulo: (data.titulo || '').replace(/^(@[a-zA-Z0-9_]+|Oscar Villamizar|Diego Fran Ariza|Alejandro Gaviria):\s*/i, ''),
+                comentarios_conteo: realCommentCount,
+                likes: reacMeGusta,
+                me_encanta: reacMeEncanta,
+                me_enoja: reacCriticas,
+                reacciones_desglose: {
+                    me_encanta: reacMeEncanta,
+                    apoyo: reacApoyo,
+                    me_gusta: reacMeGusta,
+                    aplausos: reacAplausos,
+                    pregunta: reacPreguntas,
+                    critica: reacCriticas,
+                    total: realCommentCount
+                },
                 team_interactions: postTeam,
                 team_shares: teamShares,
                 team_comments: teamComments,
@@ -1125,7 +1172,10 @@ exports.dispatchLiveSupportAlert = async (req, res) => {
 exports.executeCandidateSweep = async (req, res) => {
     try {
         const { campana_id } = req.body;
-        const activeCampanaId = campana_id || req.user?.campana_id || 7;
+        const activeCampanaId = campana_id || req.user?.campana_id || req.campana_id;
+        if (!activeCampanaId) {
+            return res.status(400).json({ success: false, message: 'Se requiere el ID de la campaña para ejecutar el barrido' });
+        }
         const result = await socialSyncService.executeFullCandidateSweep({ campanaId: parseInt(activeCampanaId, 10) });
         res.json(result);
     } catch (error) {
@@ -1140,11 +1190,14 @@ exports.executeCandidateSweep = async (req, res) => {
 exports.syncProfile = async (req, res) => {
     try {
         const { url, campana_id } = req.body;
-        const activeCampanaId = campana_id || req.user?.campana_id || 1;
+        const activeCampanaId = campana_id || req.user?.campana_id || req.campana_id;
+        if (!activeCampanaId) {
+            return res.status(400).json({ success: false, message: 'Se requiere el ID de la campaña para sincronizar perfil' });
+        }
         if (!url) {
             return res.status(400).json({ success: false, message: 'La URL o link de la red social es requerida' });
         }
-        const result = await socialSyncService.syncProfileFromUrl({ url, campanaId: activeCampanaId });
+        const result = await socialSyncService.syncProfileFromUrl({ url, campanaId: parseInt(activeCampanaId, 10) });
         res.json(result);
     } catch (error) {
         console.error('Error al sincronizar perfil de red social:', error);
@@ -1178,7 +1231,7 @@ exports.getPostComments = async (req, res) => {
     try {
         const { postId } = req.params;
         const post = await SocialMediaPost.findByPk(postId);
-        const campana_id = req.query.campana_id || post?.campana_id || req.user?.campana_id || 7;
+        const campana_id = post?.campana_id || req.query.campana_id || req.user?.campana_id || 1;
         const result = await socialSyncService.getPostCommentsWithAudit(postId, campana_id);
         res.json({ success: true, ...result });
     } catch (error) {
@@ -1205,6 +1258,66 @@ exports.replyToComment = async (req, res) => {
     } catch (error) {
         console.error('Error al responder comentario:', error);
         res.status(500).json({ success: false, message: 'Error al responder comentario', error: error.message });
+    }
+};
+
+/**
+ * CONSULTA GLOBAL DE COMENTARIOS Y REACCIONES (VIGILANCIA DE REDES SOCIALES / SOCIAL LISTENING)
+ */
+exports.getAllComments = async (req, res) => {
+    try {
+        const { campana_id, post_id, sentimiento, es_equipo_campana, plataforma } = req.query;
+        const where = {};
+        if (campana_id) where.campana_id = parseInt(campana_id, 10);
+        if (post_id) where.post_id = parseInt(post_id, 10);
+        if (sentimiento && sentimiento !== 'todos') where.sentimiento = sentimiento;
+        if (plataforma && plataforma !== 'todas') where.plataforma = plataforma;
+        if (es_equipo_campana !== undefined && es_equipo_campana !== 'todos') {
+            where.es_equipo_campana = es_equipo_campana === 'true' || es_equipo_campana === true;
+        }
+
+        const comments = await SocialPostComment.findAll({
+            where,
+            order: [['createdAt', 'DESC']]
+        });
+
+        // Obtener referencias de posts para asociar título y URL de publicación
+        const postIds = [...new Set(comments.map(c => c.post_id))];
+        const posts = await SocialMediaPost.findAll({
+            where: { id: postIds },
+            attributes: ['id', 'titulo', 'url_publicacion', 'plataforma', 'autor_usuario']
+        });
+        const postsMap = {};
+        posts.forEach(p => { postsMap[p.id] = p; });
+
+        const enrichedComments = comments.map(c => {
+            const commentObj = c.toJSON();
+            commentObj.post = postsMap[c.post_id] || null;
+            return commentObj;
+        });
+
+        const total = comments.length;
+        const equipoCount = comments.filter(c => c.es_equipo_campana).length;
+        const ciudadanosCount = comments.filter(c => !c.es_equipo_campana).length;
+        const positivosCount = comments.filter(c => c.sentimiento === 'positivo').length;
+        const negativosCount = comments.filter(c => c.sentimiento === 'negativo').length;
+        const neutrosCount = comments.filter(c => c.sentimiento === 'neutral').length;
+
+        res.json({
+            success: true,
+            comments: enrichedComments,
+            resumen: {
+                total,
+                equipoCount,
+                ciudadanosCount,
+                positivosCount,
+                negativosCount,
+                neutrosCount
+            }
+        });
+    } catch (error) {
+        console.error('Error al obtener vigilancia de comentarios:', error);
+        res.status(500).json({ success: false, message: 'Error al obtener comentarios de vigilancia', error: error.message });
     }
 };
 

@@ -21,7 +21,8 @@ router.post('/posts/:id/track-click', socialController.trackPostClick);
 router.post('/sync-profile', socialController.syncProfile);
 router.post('/candidate-sweep', socialController.executeCandidateSweep);
 
-// Comentarios y Auditoría de Integrantes del Equipo por Publicación
+// Comentarios y Auditoría de Integrantes del Equipo por Publicación y Global
+router.get('/comments', socialController.getAllComments);
 router.get('/posts/:postId/comments', socialController.getPostComments);
 router.post('/comments/:commentId/reply', socialController.replyToComment);
 

@@ -27,7 +27,7 @@ export default function PostCommentsModal({
     const [comments, setComments] = useState([]);
     const [audit, setAudit] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [filterType, setFilterType] = useState('todos'); // 'todos' | 'equipo' | 'ciudadanos'
+    const [filterType, setFilterType] = useState('todos'); // 'todos' | 'equipo' | 'ciudadanos' | 'preguntas' | 'criticas'
     const [searchTerm, setSearchTerm] = useState('');
     const [replyingCommentId, setReplyingCommentId] = useState(null);
     const [replyText, setReplyText] = useState('');
@@ -54,9 +54,10 @@ export default function PostCommentsModal({
 
     useEffect(() => {
         if (isOpen && post?.id) {
+            setFilterType(post.defaultFilter || 'todos');
             fetchComments();
         }
-    }, [isOpen, post?.id]);
+    }, [isOpen, post?.id, post?.defaultFilter]);
 
     const handleSendReply = async (commentId) => {
         if (!replyText.trim()) return;
@@ -76,12 +77,31 @@ export default function PostCommentsModal({
         }
     };
 
+    const reactionCounts = useMemo(() => {
+        return {
+            total: comments.length,
+            me_encanta: comments.filter(c => c.tipo_reaccion === 'me_encanta').length,
+            apoyo: comments.filter(c => c.tipo_reaccion === 'apoyo').length,
+            me_gusta: comments.filter(c => c.tipo_reaccion === 'me_gusta').length,
+            aplausos: comments.filter(c => c.tipo_reaccion === 'aplausos').length,
+            pregunta: comments.filter(c => c.tipo_reaccion === 'pregunta').length,
+            critica: comments.filter(c => c.tipo_reaccion === 'critica' || c.tipo_reaccion === 'ataque' || c.sentimiento === 'negativo').length,
+            equipo: comments.filter(c => c.es_equipo_campana).length,
+            ciudadanos: comments.filter(c => !c.es_equipo_campana).length
+        };
+    }, [comments]);
+
     const filteredComments = useMemo(() => {
         return comments.filter(c => {
-            const matchesFilter =
-                filterType === 'todos' ? true :
-                filterType === 'equipo' ? c.es_equipo_campana :
-                !c.es_equipo_campana;
+            let matchesFilter = true;
+            if (filterType === 'equipo') matchesFilter = c.es_equipo_campana;
+            else if (filterType === 'ciudadanos') matchesFilter = !c.es_equipo_campana;
+            else if (filterType === 'preguntas' || filterType === 'pregunta') matchesFilter = c.tipo_reaccion === 'pregunta';
+            else if (filterType === 'criticas' || filterType === 'critica') matchesFilter = c.tipo_reaccion === 'critica' || c.tipo_reaccion === 'ataque' || c.sentimiento === 'negativo';
+            else if (filterType === 'me_encanta') matchesFilter = c.tipo_reaccion === 'me_encanta';
+            else if (filterType === 'apoyo') matchesFilter = c.tipo_reaccion === 'apoyo';
+            else if (filterType === 'me_gusta') matchesFilter = c.tipo_reaccion === 'me_gusta';
+            else if (filterType === 'aplausos') matchesFilter = c.tipo_reaccion === 'aplausos';
 
             const textMatch =
                 (c.texto_comentario || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -94,6 +114,8 @@ export default function PostCommentsModal({
     }, [comments, filterType, searchTerm]);
 
     if (!isOpen || !post) return null;
+
+    const cleanTitle = (post.titulo || '').replace(/^@[a-zA-Z0-9_]+:\s*/, '');
 
     return (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-200">
@@ -110,37 +132,119 @@ export default function PostCommentsModal({
                                     Reacciones, Comentarios & Auditoría del Equipo
                                 </h3>
                                 <p className="text-xs text-indigo-200">
-                                    Visualización de interacciones con identificación cruzada de integrantes de campaña al lado de cada comentario
+                                    Visualización de interacciones con clasificación de reacciones e identificación precisa de quién reacciona
                                 </p>
                             </div>
                         </div>
 
                         {/* Vista rápida del post */}
-                        <div className="bg-white/10 backdrop-blur-sm p-3 rounded-2xl border border-white/10 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                            <div className="space-y-0.5">
-                                <span className="font-bold text-white line-clamp-1">
-                                    {post.titulo}
-                                </span>
-                                <span className="text-[11px] text-gray-300 line-clamp-1">
+                        <div className="bg-white/10 backdrop-blur-sm p-4 rounded-2xl border border-white/15 text-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+                            <div className="space-y-1 max-w-xl">
+                                <div className="flex items-center gap-2">
+                                    <span className="px-2 py-0.5 rounded-md bg-indigo-500/40 text-cyan-300 font-mono font-bold text-[10px] uppercase">
+                                        ID #{post.id} • {post.plataforma ? post.plataforma.toUpperCase() : 'POST'}
+                                    </span>
+                                    <span className="px-2 py-0.5 rounded-full bg-white/10 font-mono text-[10px] text-gray-300">
+                                        {post.autor_usuario || '@campana'}
+                                    </span>
+                                </div>
+                                <h4 className="font-black text-white text-sm line-clamp-1">
+                                    {cleanTitle}
+                                </h4>
+                                <p className="text-[11px] text-gray-300 line-clamp-2">
                                     {post.contenido}
-                                </span>
+                                </p>
                             </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                                <span className="px-2 py-0.5 rounded-full bg-indigo-500/30 font-mono text-[10px] text-indigo-200">
-                                    {post.autor_usuario || '@campana'}
-                                </span>
-                                {post.url_publicacion && (
-                                    <a
-                                        href={post.url_publicacion}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="p-1 rounded-lg bg-white/20 hover:bg-white/30 text-white transition-colors"
-                                        title="Abrir post en red social"
-                                    >
-                                        <ExternalLink size={13} />
-                                    </a>
-                                )}
-                            </div>
+
+                            {post.url_publicacion && (
+                                <a
+                                    href={post.url_publicacion}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center gap-2 shadow-lg shadow-emerald-500/25 transition-transform hover:scale-105 shrink-0 cursor-pointer"
+                                    title="Abrir publicación original directamente en la red social"
+                                >
+                                    <span>🌐 Abrir en {(post.plataforma || 'Red Social').toUpperCase()}</span>
+                                    <ExternalLink size={14} />
+                                </a>
+                            )}
+                        </div>
+
+                        {/* Barra de Reacciones Clasificadas con filtro directo */}
+                        <div className="flex flex-wrap items-center gap-1.5 pt-1 text-[11px]">
+                            <span className="text-[10px] font-bold text-gray-300 uppercase mr-1">Filtrar por Reacción:</span>
+                            <button
+                                type="button"
+                                onClick={() => setFilterType(filterType === 'me_encanta' ? 'todos' : 'me_encanta')}
+                                className={`px-2 py-0.5 rounded-lg font-bold transition-all cursor-pointer border ${
+                                    filterType === 'me_encanta'
+                                        ? 'bg-rose-500 text-white border-rose-400 shadow-md ring-2 ring-rose-400/50'
+                                        : 'bg-rose-500/20 text-rose-300 hover:bg-rose-500/30 border-rose-500/30'
+                                }`}
+                                title="Ver quiénes reaccionaron con ❤️ Me Encanta"
+                            >
+                                ❤️ Me Encanta ({reactionCounts.me_encanta})
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setFilterType(filterType === 'apoyo' ? 'todos' : 'apoyo')}
+                                className={`px-2 py-0.5 rounded-lg font-bold transition-all cursor-pointer border ${
+                                    filterType === 'apoyo'
+                                        ? 'bg-amber-500 text-white border-amber-400 shadow-md ring-2 ring-amber-400/50'
+                                        : 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border-amber-500/30'
+                                }`}
+                                title="Ver quiénes reaccionaron con 🔥 Apoyo Total"
+                            >
+                                🔥 Apoyo ({reactionCounts.apoyo})
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setFilterType(filterType === 'me_gusta' ? 'todos' : 'me_gusta')}
+                                className={`px-2 py-0.5 rounded-lg font-bold transition-all cursor-pointer border ${
+                                    filterType === 'me_gusta'
+                                        ? 'bg-blue-500 text-white border-blue-400 shadow-md ring-2 ring-blue-400/50'
+                                        : 'bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 border-blue-500/30'
+                                }`}
+                                title="Ver quiénes reaccionaron con 👍 Me Gusta"
+                            >
+                                👍 Me Gusta ({reactionCounts.me_gusta})
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setFilterType(filterType === 'aplausos' ? 'todos' : 'aplausos')}
+                                className={`px-2 py-0.5 rounded-lg font-bold transition-all cursor-pointer border ${
+                                    filterType === 'aplausos'
+                                        ? 'bg-purple-500 text-white border-purple-400 shadow-md ring-2 ring-purple-400/50'
+                                        : 'bg-purple-500/20 text-purple-300 hover:bg-purple-500/30 border-purple-500/30'
+                                }`}
+                                title="Ver quiénes reaccionaron con 👏 Aplausos"
+                            >
+                                👏 Aplausos ({reactionCounts.aplausos})
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setFilterType(filterType === 'preguntas' ? 'todos' : 'preguntas')}
+                                className={`px-2 py-0.5 rounded-lg font-bold transition-all cursor-pointer border ${
+                                    filterType === 'preguntas'
+                                        ? 'bg-cyan-500 text-white border-cyan-400 shadow-md ring-2 ring-cyan-400/50'
+                                        : 'bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30 border-cyan-500/30'
+                                }`}
+                                title="Ver quiénes formularon preguntas ciudadanas"
+                            >
+                                ❓ Preguntas ({reactionCounts.pregunta})
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setFilterType(filterType === 'criticas' ? 'todos' : 'criticas')}
+                                className={`px-2 py-0.5 rounded-lg font-black transition-all cursor-pointer border ${
+                                    filterType === 'criticas'
+                                        ? 'bg-red-500 text-white border-red-400 shadow-md ring-2 ring-red-400/50'
+                                        : 'bg-red-500/30 text-red-200 hover:bg-red-500/40 border-red-500/50'
+                                }`}
+                                title="Ver quiénes hicieron críticas o alertas"
+                            >
+                                ⚠️ Críticas / Alertas ({reactionCounts.critica})
+                            </button>
                         </div>
                     </div>
 
@@ -232,7 +336,7 @@ export default function PostCommentsModal({
 
                 {/* Barra de Filtros y Búsqueda */}
                 <div className="p-3 bg-gray-50/80 border-b border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs">
-                    <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-gray-200 shadow-2xs w-full sm:w-auto">
+                    <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-gray-200 shadow-2xs w-full sm:w-auto flex-wrap">
                         <button
                             type="button"
                             onClick={() => setFilterType('todos')}
@@ -250,7 +354,7 @@ export default function PostCommentsModal({
                             }`}
                         >
                             <ShieldCheck size={12} />
-                            <span>Equipo de Campaña ({audit?.teamCommentsCount || 0})</span>
+                            <span>Equipo Oficial ({reactionCounts.equipo})</span>
                         </button>
                         <button
                             type="button"
@@ -260,7 +364,27 @@ export default function PostCommentsModal({
                             }`}
                         >
                             <Users size={12} />
-                            <span>Ciudadanos ({audit?.externalCommentsCount || 0})</span>
+                            <span>Ciudadanos ({reactionCounts.ciudadanos})</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setFilterType('preguntas')}
+                            className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                                filterType === 'preguntas' ? 'bg-cyan-600 text-white shadow-xs' : 'text-gray-600 hover:text-cyan-700'
+                            }`}
+                        >
+                            <HelpCircle size={12} />
+                            <span>Preguntas ({reactionCounts.pregunta})</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setFilterType('criticas')}
+                            className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                                filterType === 'criticas' ? 'bg-rose-600 text-white shadow-xs' : 'text-gray-600 hover:text-rose-700'
+                            }`}
+                        >
+                            <AlertCircle size={12} />
+                            <span>Alertas / Críticas ({reactionCounts.critica})</span>
                         </button>
                     </div>
 
@@ -447,14 +571,27 @@ export default function PostCommentsModal({
                                                     </div>
                                                 </div>
                                             ) : (
-                                                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 space-y-2">
+                                                <div className={`border rounded-2xl p-3.5 space-y-2 ${
+                                                    comment.sentimiento === 'negativo' || ['critica', 'ataque'].includes(comment.tipo_reaccion)
+                                                        ? 'bg-rose-50/70 border-rose-200'
+                                                        : 'bg-slate-50 border-slate-200'
+                                                }`}>
                                                     <div className="flex items-center justify-between">
-                                                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-200 text-slate-700 text-[9px] font-black uppercase tracking-wider">
-                                                            <Users size={11} />
-                                                            Ciudadano / Simpatizante
-                                                        </span>
-                                                        <span className="text-[10px] font-bold text-gray-400">
-                                                            Externo
+                                                        {comment.sentimiento === 'negativo' || ['critica', 'ataque'].includes(comment.tipo_reaccion) ? (
+                                                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-rose-200 text-rose-800 text-[9px] font-black uppercase tracking-wider">
+                                                                <AlertCircle size={11} />
+                                                                Alerta de Vigilancia
+                                                            </span>
+                                                        ) : (
+                                                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-200 text-slate-700 text-[9px] font-black uppercase tracking-wider">
+                                                                <Users size={11} />
+                                                                Ciudadano / Simpatizante
+                                                            </span>
+                                                        )}
+                                                        <span className={`text-[10px] font-bold ${
+                                                            comment.sentimiento === 'negativo' ? 'text-rose-600' : 'text-gray-400'
+                                                        }`}>
+                                                            {comment.sentimiento === 'negativo' ? 'Requiere Atención' : 'Externo'}
                                                         </span>
                                                     </div>
 
@@ -466,7 +603,9 @@ export default function PostCommentsModal({
                                                             {comment.usuario_red}
                                                         </p>
                                                         <p className="text-[10px] text-gray-400 mt-1">
-                                                            Votante o usuario de la comunidad general. No registrado como integrante oficial.
+                                                            {comment.sentimiento === 'negativo'
+                                                                ? 'Mensaje crítico o señalamiento detectado en monitoreo de redes.'
+                                                                : 'Votante o usuario de la comunidad general. No registrado como integrante oficial.'}
                                                         </p>
                                                     </div>
 
