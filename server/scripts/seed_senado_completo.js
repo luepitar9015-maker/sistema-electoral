@@ -804,7 +804,7 @@ async function seedSenadoCompleto() {
                 comentarios: 890,
                 es_fake_news: true,
                 posible_red_bots: true,
-                tactica_recomendada: 'desmentir_legal',
+                tactica_recomendada: 'desmentir',
                 analisis_estrategico: 'Video tipo fake news reciclado con imágenes de elecciones del 2018 en otra región del país. Táctica de guerra sucia preelectoral. Debe denunciarse ante el CNE y publicar desmentido con peritaje audiovisual.',
                 guion_candidato: '"La desesperación de nuestros adversarios llegó al extremo de difundir montajes burdos con imágenes de hace 8 años. Radicamos denuncia penal ante la Fiscalía y queja ante el CNE por calumnia electoral. No nos van a intimidar."',
                 guion_voceros: '"El video difundido corresponde a un caso ocurrido en el Caribe en el año 2018 que no tiene absolutamente nada que ver con nuestra campaña ni con Santander. Es una falsedad deliberada que viola el estatuto de la oposición."',
