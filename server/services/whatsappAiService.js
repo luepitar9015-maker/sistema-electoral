@@ -1,7 +1,10 @@
 const Voter = require('../models/Voter');
 const CensoElectoral = require('../models/CensoElectoral');
+const CensoDefuncion = require('../models/CensoDefuncion');
+const DivipolePuesto = require('../models/DivipolePuesto');
 const Campaign = require('../models/Campaign');
 const WhatsAppMessage = require('../models/WhatsAppMessage');
+const { Op } = require('sequelize');
 const ExcelJS = require('exceljs');
 const pdf = require('pdf-parse');
 const { createWorker } = require('tesseract.js');
@@ -181,39 +184,96 @@ class WhatsAppAiService {
 
         if (isQueryIntent && singleCedMatch && parsed.voters.length <= 1 && !parsed.leader) {
             const queryCedula = singleCedMatch[0];
+
+            // 1. Auditoría Forense: Verificar si la cédula es una BAJA POR DEFUNCIÓN (RNEC)
+            const defuncionRecord = await CensoDefuncion.findOne({ where: { cedula: queryCedula } });
+            if (defuncionRecord) {
+                const alertaDifunto = `🚨 *ALERTA ELECTORAL OFICIAL (RNEC)* 🇨🇴\n\n` +
+                    `El documento consultado (*CC ${queryCedula}*) se encuentra registrado como *CANCELADO POR DEFUNCIÓN* en el Archivo Nacional de Identificación.\n\n` +
+                    `💀 *Ciudadano(a):* ${defuncionRecord.nombres || ''} ${defuncionRecord.apellidos || ''}\n` +
+                    `📅 *Fecha de Defunción:* ${defuncionRecord.fecha_defuncion || 'Registrada en ANI'}\n` +
+                    `🏛️ *Fuente Oficial:* ${defuncionRecord.fuente || 'Registraduría Nacional del Estado Civil'}\n\n` +
+                    `⚠️ *Condición Legal:* Esta cédula fue dada de baja y *NO está habilitada para ejercer el derecho al voto* ni para figurar en listados de simpatizantes.\n\n` +
+                    `_Sistema de Auditoría y Blindaje Electoral._`;
+
+                await WhatsAppMessage.create({
+                    campana_id: campaign?.id || null,
+                    remitente_telefono: telefonoRemitente || '+573000000000',
+                    remitente_nombre: nombreRemitente || 'Ciudadano Consulta',
+                    mensaje: rawText,
+                    respuesta: alertaDifunto,
+                    tipo_mensaje: 'consulta_puesto',
+                    votantes_procesados: 0,
+                    lider_registrado: false,
+                    detalles_json: JSON.stringify({ queryCedula, es_fallecido: true })
+                });
+
+                return {
+                    reply: alertaDifunto,
+                    tipo: 'consulta_puesto',
+                    success: true,
+                    resultado: { queryCedula, es_fallecido: true }
+                };
+            }
+
+            // 2. Consulta de Puesto en Censo Electoral y Registro de Campaña
             const censoInfo = await CensoElectoral.findOne({ where: { cedula: queryCedula } });
             const voterRecord = await Voter.findOne({ where: { cedula: queryCedula } });
 
             let queryResponse = '';
-            if (censoInfo) {
-                const nombreCiudadano = (censoInfo.nombres ? `${censoInfo.nombres} ${censoInfo.apellidos || ''}` : voterRecord ? `${voterRecord.nombres} ${voterRecord.apellidos}` : 'Ciudadano').trim();
+            let gpsUrl = null;
+
+            if (censoInfo || voterRecord) {
+                const puestoNombre = censoInfo?.puesto_votacion || voterRecord?.lugar_votacion || '';
+                const mesaNumero = censoInfo?.mesa || voterRecord?.mesa || '';
+                const muniNombre = censoInfo?.municipio || voterRecord?.municipio || '';
+                const deptoNombre = censoInfo?.departamento || voterRecord?.departamento || '';
+                let direccion = censoInfo?.direccion || voterRecord?.direccion || '';
+
+                // Búsqueda de Georreferenciación en DIVIPOLE (12.922 Puestos Oficiales)
+                if (puestoNombre) {
+                    try {
+                        const divipolePuesto = await DivipolePuesto.findOne({
+                            where: {
+                                puesto: { [Op.like]: `%${puestoNombre.trim()}%` },
+                                ...(muniNombre ? { municipio: { [Op.like]: `%${muniNombre.trim()}%` } } : {})
+                            }
+                        });
+                        if (divipolePuesto) {
+                            if (!direccion && divipolePuesto.direccion) direccion = divipolePuesto.direccion;
+                            if (divipolePuesto.latitud && divipolePuesto.longitud) {
+                                gpsUrl = `https://www.google.com/maps?q=${divipolePuesto.latitud},${divipolePuesto.longitud}`;
+                            }
+                        }
+                    } catch (e) {}
+                }
+
+                const nombreCiudadano = (censoInfo?.nombres ? `${censoInfo.nombres} ${censoInfo.apellidos || ''}` : voterRecord ? `${voterRecord.nombres} ${voterRecord.apellidos}` : 'Ciudadano(a)').trim();
                 const liderAsignado = voterRecord?.lider_nombre ? `${voterRecord.lider_nombre}` : (campaign?.candidato ? `Equipo de ${campaign.candidato}` : 'Coordinación Electoral');
 
-                queryResponse = `🗳️ *CONSULTA OFICIAL DE PUESTO DE VOTACIÓN* 🇨🇴\n\n` +
+                // Verificación de circunscripción (Trashumancia)
+                let avisoTrashumancia = '';
+                if (campaign?.municipio && muniNombre && campaign.municipio.toLowerCase() !== muniNombre.toLowerCase() && ['alcaldia', 'concejo'].includes(campaign.tipo_cargo)) {
+                    avisoTrashumancia = `\n⚠️ *AVISO TERRITORIAL:* Tu puesto de votación está en *${muniNombre}*. No sumará para la Alcaldía/Concejo de ${campaign.municipio}.\n`;
+                }
+
+                queryResponse = `🗳️ *CONSULTA OFICIAL DE LUGAR DE VOTACIÓN* 🇨🇴\n\n` +
                     `¡Hola, *${nombreCiudadano}*!\n\n` +
-                    `Tu información electoral registrada es:\n` +
-                    `📍 *Puesto de Votación:* ${censoInfo.puesto_votacion || 'Principal'}\n` +
-                    `🏢 *Dirección:* ${censoInfo.direccion || 'Casco Urbano'}\n` +
-                    `🗳️ *Mesa Asignada:* *Mesa ${censoInfo.mesa || '1'}*\n` +
-                    `🗺️ *Municipio:* ${censoInfo.municipio || ''} (${censoInfo.departamento || ''})\n\n` +
-                    `👥 *Tu Enlace / Líder de Campaña:* ${liderAsignado}\n\n` +
-                    `⏰ *Horario de votación:* 8:00 AM a 4:00 PM.\n` +
-                    `⚠️ *Recuerda:* Presenta tu cédula de ciudadanía física o digital original.\n\n` +
-                    `_${campaign?.nombre ? 'Campaña ' + campaign.nombre + ' te desea una excelente jornada.' : '¡Tu voto construye el futuro!'}_`;
-            } else if (voterRecord) {
-                queryResponse = `🗳️ *CONSULTA DE PUESTO DE VOTACIÓN* 🇨🇴\n\n` +
-                    `¡Hola, *${voterRecord.nombres} ${voterRecord.apellidos}*!\n\n` +
-                    `Estás registrado(a) en nuestra campaña electoral:\n` +
-                    `📍 *Puesto:* ${voterRecord.lugar_votacion || 'Por confirmar'}\n` +
-                    `🗳️ *Mesa:* ${voterRecord.mesa || 'Por confirmar'}\n` +
-                    `🗺️ *Municipio:* ${voterRecord.municipio || ''}\n` +
-                    `👥 *Líder Asignado:* ${voterRecord.lider_nombre || 'Equipo Central'}\n\n` +
-                    `⚠️ Tu puesto exacto se confirmará en cuanto se actualice el censo oficial. ¡Tu líder te contactará!`;
+                    `Tu información electoral oficial es:\n` +
+                    `📍 *Puesto de Votación:* ${puestoNombre || 'Asignado en Casco Central'}\n` +
+                    (direccion ? `🏢 *Dirección:* ${direccion}\n` : '') +
+                    `🗳️ *Mesa Asignada:* *Mesa ${mesaNumero || '1'}*\n` +
+                    `🗺️ *Municipio:* ${muniNombre} (${deptoNombre})\n` +
+                    (gpsUrl ? `\n📍 *CÓMO LLEGAR (Google Maps):*\n${gpsUrl}\n` : '') +
+                    avisoTrashumancia +
+                    `\n👥 *Líder / Coordinador de Campaña:* ${liderAsignado}\n` +
+                    `⏰ *Horario de Votación:* 8:00 AM a 4:00 PM.\n` +
+                    `⚠️ Recuerda llevar tu cédula original física o digital.\n\n` +
+                    `_${campaign?.nombre ? 'Campaña ' + campaign.nombre + ' te acompaña en las urnas.' : '¡Tu voto cuenta y transforma!'}_`;
             } else {
                 queryResponse = `🔍 *CONSULTA ELECTORAL*\n\n` +
-                    `No encontramos un registro asignado con la cédula *${queryCedula}* en nuestro censo territorial local.\n\n` +
-                    `👉 Por favor verifica que el número esté bien escrito o consulta directamente en la Registraduría Nacional.\n\n` +
-                    `Si deseas unirte a la campaña o registrarte con un líder, responde con tu nombre completo y barrio.`;
+                    `No encontramos la cédula *${queryCedula}* en el censo municipal activo.\n\n` +
+                    `👉 Puedes verificar en el portal oficial de la Registraduría o si deseas sumarte al equipo de campaña, responde con tu nombre completo y barrio.`;
             }
 
             await WhatsAppMessage.create({

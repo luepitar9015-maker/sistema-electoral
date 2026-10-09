@@ -6,7 +6,8 @@ import { colombiaData } from '../data/colombiaData';
 import {
     Search, UserPlus, Users, UploadCloud, Download, CheckCircle,
     XCircle, AlertCircle, FileSpreadsheet, X, Zap, ExternalLink, Copy, Check,
-    Flag, Globe, Building2, MapPin, Handshake, Quote, Award, Sparkles
+    Flag, Globe, Building2, MapPin, Handshake, Quote, Award, Sparkles,
+    ClipboardCheck, ClipboardPaste, Skull, ShieldAlert, CheckCircle2, ChevronDown, ChevronUp, Trash2
 } from 'lucide-react';
 import { API } from '../config/api';
 
@@ -42,7 +43,17 @@ export default function RegisterVoter() {
     const [trashumanciaInfo, setTrashumanciaInfo] = useState(null);
     const [copiedReg, setCopiedReg] = useState(false);
 
-    // Import state
+    // Carga Masiva states (Pegado Rápido + Archivo Excel)
+    const [importMode, setImportMode] = useState('paste'); // 'paste' | 'file'
+    const [pastedText, setPastedText] = useState('');
+    const [pastedRowsCount, setPastedRowsCount] = useState(0);
+    const [selectedImportLeader, setSelectedImportLeader] = useState('');
+    const [autoAuditarImport, setAutoAuditarImport] = useState(true);
+    const [quickImporting, setQuickImporting] = useState(false);
+    const [quickImportResult, setQuickImportResult] = useState(null);
+    const [showErrorDetails, setShowErrorDetails] = useState(false);
+
+    // Import file state
     const [importFile, setImportFile] = useState(null);
     const [importing, setImporting] = useState(false);
     const [importResult, setImportResult] = useState(null);
@@ -50,8 +61,8 @@ export default function RegisterVoter() {
     const fileInputRef = useRef(null);
 
     useEffect(() => {
-        if (activeTab === 'friend') fetchLeaders();
-        else if (activeTab !== 'import') {
+        if (activeTab === 'friend' || activeTab === 'import') fetchLeaders();
+        else {
             setFormData(prev => ({ ...prev, lider_nombre: '', lider_cedula: '' }));
             setSelectedLeader(null);
         }
@@ -263,6 +274,55 @@ export default function RegisterVoter() {
         }
     };
 
+    const handlePastedTextChange = (text) => {
+        setPastedText(text);
+        if (!text || !text.trim()) {
+            setPastedRowsCount(0);
+            return;
+        }
+        const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+        let count = 0;
+        lines.forEach((l, idx) => {
+            const lower = l.toLowerCase();
+            if (idx === 0 && (lower.includes('ced') || lower.includes('nom') || lower.includes('ape'))) return;
+            if (/\d{4,}/.test(l) || l.includes('\t') || l.includes(';')) count++;
+        });
+        setPastedRowsCount(count || lines.length);
+    };
+
+    const handleQuickImport = async () => {
+        if (!pastedText.trim()) return;
+        setQuickImporting(true);
+        setQuickImportResult(null);
+
+        try {
+            let leaderObj = null;
+            if (selectedImportLeader) {
+                leaderObj = leaders.find(l => String(l.id) === String(selectedImportLeader));
+            }
+
+            const payload = {
+                text: pastedText,
+                campana_id: activeCampaign?.id || null,
+                apoyo_id: selectedImportApoyo ? parseInt(selectedImportApoyo, 10) : null,
+                lider_nombre: leaderObj ? `${leaderObj.nombres} ${leaderObj.apellidos}`.trim() : null,
+                lider_cedula: leaderObj ? leaderObj.cedula : null,
+                auto_auditar: autoAuditarImport
+            };
+
+            const res = await axios.post(`${API}/voters/quick-import`, payload, authHeaders);
+            setQuickImportResult({ type: 'success', ...res.data });
+        } catch (error) {
+            setQuickImportResult({
+                type: 'error',
+                message: error.response?.data?.message || 'Error al procesar el pegado rápido',
+                errors: error.response?.data?.errors || []
+            });
+        } finally {
+            setQuickImporting(false);
+        }
+    };
+
     const handleImport = async () => {
         if (!importFile) return;
         setImporting(true);
@@ -277,6 +337,14 @@ export default function RegisterVoter() {
             if (selectedImportApoyo) {
                 formDataUpload.append('apoyo_id', selectedImportApoyo);
             }
+            if (selectedImportLeader) {
+                const leaderObj = leaders.find(l => String(l.id) === String(selectedImportLeader));
+                if (leaderObj) {
+                    formDataUpload.append('lider_nombre', `${leaderObj.nombres} ${leaderObj.apellidos}`.trim());
+                    formDataUpload.append('lider_cedula', leaderObj.cedula);
+                }
+            }
+            formDataUpload.append('auto_auditar', autoAuditarImport);
 
             const res = await axios.post(`${API}/voters/import`, formDataUpload, {
                 headers: {
@@ -300,6 +368,12 @@ export default function RegisterVoter() {
         setImportFile(null);
         setImportResult(null);
         if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+
+    const clearPasted = () => {
+        setPastedText('');
+        setPastedRowsCount(0);
+        setQuickImportResult(null);
     };
 
     // ─── RENDER ─────────────────────────────────────────────────────────────────
@@ -404,175 +478,466 @@ export default function RegisterVoter() {
                     <UserPlus size={16} /><span>REGISTRAR LÍDER</span>
                 </button>
                 <button onClick={() => setActiveTab('import')} className={tabStyle('import', 'bg-blue-600')}>
-                    <UploadCloud size={16} /><span>CARGA MASIVA EXCEL</span>
+                    <UploadCloud size={16} /><span>CARGA MASIVA & AUDITORÍA</span>
                 </button>
             </div>
 
-            {/* ─── VISTA CARGA MASIVA ───────────────────────────────────── */}
+            {/* ─── VISTA CARGA MASIVA & AUDITORÍA INTELIGENTE ─────────────── */}
             {activeTab === 'import' && (
                 <div className="bg-white rounded-3xl shadow-lg border border-gray-100 overflow-hidden">
                     {/* Header */}
-                    <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-6 text-white">
-                        <h2 className="text-xl font-bold uppercase tracking-widest flex items-center gap-3">
-                            <UploadCloud size={24} />
-                            Carga Masiva de Votantes
-                        </h2>
-                        <p className="text-blue-100 text-xs mt-1">
-                            {activeCampaign
-                                ? `Los votantes importados quedarán vinculados a la campaña: ${activeCampaign.nombre}`
-                                : 'Sube un archivo Excel con los datos de los votantes para registrarlos en lote.'}
-                        </p>
+                    <div className="bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 p-6 text-white relative overflow-hidden">
+                        <div className="absolute right-0 top-0 translate-x-8 -translate-y-4 opacity-10 pointer-events-none">
+                            <UploadCloud size={180} />
+                        </div>
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
+                            <div>
+                                <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                                    <span className="bg-blue-500/20 text-blue-300 border border-blue-400/30 text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                                        <Zap size={11} className="text-amber-400" />
+                                        <span>Procesamiento Masivo Ultrarrápido</span>
+                                    </span>
+                                    <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                                        <MapPin size={11} />
+                                        <span>12.922 Puestos DIVIPOLE</span>
+                                    </span>
+                                    <span className="bg-purple-500/20 text-purple-300 border border-purple-400/30 text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                                        <ShieldAlert size={11} />
+                                        <span>Filtro de Difuntos RNEC</span>
+                                    </span>
+                                </div>
+                                <h2 className="text-xl font-black uppercase tracking-wide flex items-center gap-2.5">
+                                    <UploadCloud size={24} className="text-blue-400" />
+                                    <span>Carga Masiva & Auditoría de Votantes</span>
+                                </h2>
+                                <p className="text-blue-200 text-xs mt-1 max-w-2xl">
+                                    {activeCampaign
+                                        ? `Votantes vinculados a la campaña: ${activeCampaign.nombre}. Registra masivamente cientos de personas en segundos sin guardar archivos.`
+                                        : 'Registra masivamente cientos de simpatizantes en segundos con georreferenciación y auditoría forense inmediata.'}
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Selector de Modalidad */}
+                        <div className="flex gap-2 mt-6 border-b border-white/10 pb-0">
+                            <button
+                                type="button"
+                                onClick={() => { setImportMode('paste'); setImportResult(null); }}
+                                className={`flex items-center gap-2 px-5 py-3 font-bold text-xs uppercase tracking-wider rounded-t-2xl transition-all ${
+                                    importMode === 'paste'
+                                        ? 'bg-white text-slate-900 shadow-md border-t-2 border-blue-500'
+                                        : 'bg-white/10 text-white/80 hover:bg-white/20'
+                                }`}
+                            >
+                                <ClipboardPaste size={15} className={importMode === 'paste' ? 'text-blue-600' : ''} />
+                                <span>Pegado Rápido (Ctrl + V)</span>
+                                <span className="bg-amber-400 text-slate-900 text-[9px] font-black px-1.5 py-0.2 rounded-md uppercase">
+                                    ⭐ Más Rápido
+                                </span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => { setImportMode('file'); setQuickImportResult(null); }}
+                                className={`flex items-center gap-2 px-5 py-3 font-bold text-xs uppercase tracking-wider rounded-t-2xl transition-all ${
+                                    importMode === 'file'
+                                        ? 'bg-white text-slate-900 shadow-md border-t-2 border-blue-500'
+                                        : 'bg-white/10 text-white/80 hover:bg-white/20'
+                                }`}
+                            >
+                                <FileSpreadsheet size={15} className={importMode === 'file' ? 'text-emerald-600' : ''} />
+                                <span>Subir Archivo Excel (.xlsx)</span>
+                            </button>
+                        </div>
                     </div>
 
                     <div className="p-8 space-y-6">
 
-                        {/* Paso 1: Descargar plantilla */}
-                        <div className="flex items-start gap-4 p-5 bg-blue-50/70 rounded-2xl border border-blue-100">
-                            <div className="flex-shrink-0 w-9 h-9 bg-blue-600 rounded-full flex items-center justify-center text-white font-black text-sm">1</div>
-                            <div className="flex-1">
-                                <h3 className="font-bold text-gray-800 text-xs uppercase tracking-wide mb-1">Descarga la Plantilla Oficial</h3>
-                                <p className="text-gray-500 text-xs mb-3">
-                                    Usa nuestra plantilla oficial en Excel (.xlsx) con columnas para nombres, apellidos, cédula, dirección, lugar de votación y líder.
-                                </p>
-                                <button
-                                    onClick={handleDownloadTemplate}
-                                    className="flex items-center gap-2 bg-white border border-blue-300 text-blue-700 hover:bg-blue-600 hover:text-white px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm"
-                                >
-                                    <Download size={14} />
-                                    <span>Descargar Plantilla Excel (.xlsx)</span>
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Paso 2: Apoyo Político (Opcional) */}
-                        {campaignApoyos.length > 0 && (
-                            <div className="flex items-start gap-4 p-5 bg-emerald-50/60 rounded-2xl border border-emerald-100">
-                                <div className="flex-shrink-0 w-9 h-9 bg-emerald-600 rounded-full flex items-center justify-center text-white font-black text-sm">2</div>
-                                <div className="flex-1">
-                                    <h3 className="font-bold text-gray-800 text-xs uppercase tracking-wide mb-1 flex items-center gap-1.5">
-                                        <Handshake size={14} className="text-emerald-600" />
-                                        <span>Asignar a un Apoyo Político / Aliado (Opcional)</span>
+                        {/* PANEL DE CONFIGURACIÓN GLOBAL DEL LOTE */}
+                        <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-5 space-y-4">
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-200 pb-3">
+                                <div>
+                                    <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider flex items-center gap-2">
+                                        <Sparkles size={15} className="text-amber-500" />
+                                        <span>Configuración de Inteligencia y Auditoría Automática</span>
                                     </h3>
-                                    <p className="text-gray-500 text-xs mb-2">
-                                        Si este archivo proviene del trabajo de un candidato aliado (ej. un candidato al concejo), selecciónalo aquí para acreditarle los votos.
+                                    <p className="text-slate-500 text-[11px] mt-0.5">
+                                        Parámetros aplicados al procesar el lote completo de votantes.
                                     </p>
+                                </div>
+                                <label className="inline-flex items-center gap-2 cursor-pointer bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-sm hover:border-blue-400 transition-colors">
+                                    <input
+                                        type="checkbox"
+                                        checked={autoAuditarImport}
+                                        onChange={e => setAutoAuditarImport(e.target.checked)}
+                                        className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 border-gray-300"
+                                    />
+                                    <span className="text-xs font-black text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+                                        <Zap size={13} className="text-amber-500" />
+                                        <span>Auditar con DIVIPOLE & Censo</span>
+                                    </span>
+                                </label>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {/* Selector de Líder Común para el Lote */}
+                                <div>
+                                    <label className="block text-slate-700 font-bold mb-1.5 text-xs uppercase flex items-center gap-1.5">
+                                        <Users size={14} className="text-blue-600" />
+                                        <span>Asignar a un Líder General (Opcional)</span>
+                                    </label>
                                     <select
-                                        value={selectedImportApoyo}
-                                        onChange={e => setSelectedImportApoyo(e.target.value)}
-                                        className="w-full bg-white border border-emerald-300 rounded-xl p-2.5 text-xs font-bold text-emerald-950 focus:outline-none"
+                                        value={selectedImportLeader}
+                                        onChange={e => setSelectedImportLeader(e.target.value)}
+                                        className="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500"
                                     >
-                                        <option value="">-- Sin Apoyo Político Específico (Campaña General) --</option>
-                                        {campaignApoyos.map(a => (
-                                            <option key={a.id} value={a.id}>
-                                                {a.nombre} [{a.cargo_o_rol || a.tipo_apoyo}] - Meta: {a.compromiso_votos} votos
+                                        <option value="">-- Sin Líder Fijo (o tomar de la columna de cada fila) --</option>
+                                        {leaders.map(l => (
+                                            <option key={l.id} value={l.id}>
+                                                {l.nombres} {l.apellidos} - {l.municipio} ({l.departamento}) [CC: {l.cedula}]
                                             </option>
                                         ))}
                                     </select>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Paso 3: Subir archivo */}
-                        <div className="flex items-start gap-4 p-5 bg-gray-50 rounded-2xl border border-gray-200">
-                            <div className="flex-shrink-0 w-9 h-9 bg-slate-800 rounded-full flex items-center justify-center text-white font-black text-sm">
-                                {campaignApoyos.length > 0 ? '3' : '2'}
-                            </div>
-                            <div className="flex-1 space-y-3">
-                                <h3 className="font-bold text-gray-800 text-xs uppercase tracking-wide">Sube el Archivo Diligenciado</h3>
-
-                                <div
-                                    onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-                                    onDragLeave={() => setDragOver(false)}
-                                    onDrop={handleFileDrop}
-                                    onClick={() => fileInputRef.current?.click()}
-                                    className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all ${dragOver ? 'border-blue-500 bg-blue-50' : importFile ? 'border-emerald-400 bg-emerald-50/40' : 'border-gray-300 hover:border-blue-400 bg-white'}`}
-                                >
-                                    <input
-                                        ref={fileInputRef}
-                                        type="file"
-                                        accept=".xlsx,.xls"
-                                        onChange={handleFileSelect}
-                                        className="hidden"
-                                    />
-                                    {importFile ? (
-                                        <div className="flex items-center justify-center gap-3">
-                                            <FileSpreadsheet size={28} className="text-emerald-600" />
-                                            <div className="text-left">
-                                                <p className="font-bold text-xs text-gray-800">{importFile.name}</p>
-                                                <p className="text-[10px] text-gray-400">{(importFile.size / 1024).toFixed(1)} KB</p>
-                                            </div>
-                                            <button
-                                                type="button"
-                                                onClick={(e) => { e.stopPropagation(); clearImport(); }}
-                                                className="ml-4 p-1 text-gray-400 hover:text-rose-500"
-                                            >
-                                                <X size={16} />
-                                            </button>
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-2">
-                                            <UploadCloud size={36} className="mx-auto text-gray-400" />
-                                            <p className="text-xs font-bold text-gray-700">Arrastra tu archivo Excel aquí o haz clic para examinar</p>
-                                            <p className="text-[11px] text-gray-400">Formatos soportados: .xlsx, .xls (máximo 10 MB)</p>
-                                        </div>
-                                    )}
+                                    <p className="text-slate-400 text-[10px] mt-1">
+                                        Si seleccionas un líder, las personas sin líder asignado se le acreditarán a él.
+                                    </p>
                                 </div>
 
-                                {importFile && (
-                                    <div className="flex justify-end gap-3 pt-2">
-                                        <button
-                                            type="button"
-                                            onClick={clearImport}
-                                            className="px-4 py-2 border border-gray-300 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-100 uppercase"
+                                {/* Selector de Apoyo Político (Opcional) */}
+                                {campaignApoyos.length > 0 && (
+                                    <div>
+                                        <label className="block text-emerald-950 font-bold mb-1.5 text-xs uppercase flex items-center gap-1.5">
+                                            <Handshake size={14} className="text-emerald-600" />
+                                            <span>Asignar a Apoyo Político / Aliado (Opcional)</span>
+                                        </label>
+                                        <select
+                                            value={selectedImportApoyo}
+                                            onChange={e => setSelectedImportApoyo(e.target.value)}
+                                            className="w-full bg-white border border-emerald-300 rounded-xl p-2.5 text-xs font-bold text-emerald-950 focus:outline-none focus:border-emerald-600"
                                         >
-                                            Cancelar
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={handleImport}
-                                            disabled={importing}
-                                            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white rounded-xl text-xs font-bold uppercase tracking-wider shadow-md transition-all flex items-center gap-2"
-                                        >
-                                            {importing ? (
-                                                <><span>Procesando...</span></>
-                                            ) : (
-                                                <>
-                                                    <UploadCloud size={14} />
-                                                    <span>Importar Votantes</span>
-                                                </>
-                                            )}
-                                        </button>
+                                            <option value="">-- Sin Apoyo Específico (Campaña General) --</option>
+                                            {campaignApoyos.map(a => (
+                                                <option key={a.id} value={a.id}>
+                                                    {a.nombre} [{a.cargo_o_rol || a.tipo_apoyo}] - Meta: {a.compromiso_votos} votos
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <p className="text-emerald-700 text-[10px] mt-1">
+                                            Acredita el cumplimiento de la meta pactada para este aliado.
+                                        </p>
                                     </div>
                                 )}
                             </div>
+
+                            {autoAuditarImport && (
+                                <div className="p-3 bg-blue-50/70 rounded-xl border border-blue-100 flex items-start gap-2.5 text-xs text-blue-900">
+                                    <CheckCircle2 size={16} className="text-blue-600 flex-shrink-0 mt-0.5" />
+                                    <div className="leading-snug text-[11px]">
+                                        <strong>Auditoría Forense Activa:</strong> Si el listado sólo tiene Cédula y Nombres, el sistema cruzará con los <strong>12.922 puestos DIVIPOLE</strong> y el Censo Oficial para asignar puesto, mesa y coordenadas. Además, <strong>neutralizará automáticamente cédulas de personas fallecidas en RNEC</strong> y alertará duplicados territoriales.
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
-                        {/* Resultado de la importación */}
-                        {importResult && (
-                            <div className={`p-5 rounded-2xl border ${importResult.type === 'success' ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200'}`}>
-                                <h4 className="font-bold text-xs uppercase tracking-wide flex items-center gap-2 mb-2">
-                                    {importResult.type === 'success' ? <CheckCircle size={16} className="text-emerald-600" /> : <XCircle size={16} className="text-rose-600" />}
-                                    <span>{importResult.message}</span>
-                                </h4>
+                        {/* ────────── MODO 1: PEGADO RÁPIDO (CTRL + V) ────────── */}
+                        {importMode === 'paste' && (
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <ClipboardPaste size={18} className="text-blue-600" />
+                                        <h3 className="font-black text-slate-800 text-xs uppercase tracking-wider">
+                                            Área de Pegado Directo (Copia en Excel y Pega Aquí con Ctrl + V)
+                                        </h3>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        {pastedRowsCount > 0 && (
+                                            <span className="bg-emerald-100 text-emerald-800 border border-emerald-300 px-3 py-1 rounded-xl text-xs font-black uppercase tracking-wide flex items-center gap-1.5 animate-pulse">
+                                                <Zap size={13} className="text-emerald-600" />
+                                                <span>⚡ {pastedRowsCount} Votantes Detectados</span>
+                                            </span>
+                                        )}
+                                        {pastedText && (
+                                            <button
+                                                type="button"
+                                                onClick={clearPasted}
+                                                className="text-slate-400 hover:text-rose-500 text-xs font-bold flex items-center gap-1 p-1 transition-colors"
+                                                title="Limpiar texto"
+                                            >
+                                                <Trash2 size={14} />
+                                                <span>Limpiar</span>
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
 
-                                {importResult.type === 'success' && (
-                                    <div className="grid grid-cols-3 gap-3 text-center mt-3">
-                                        <div className="bg-white p-2.5 rounded-xl border border-emerald-100">
-                                            <span className="text-[10px] text-gray-400 font-bold uppercase block">Guardados</span>
-                                            <span className="text-lg font-black text-emerald-600">{importResult.success}</span>
+                                <div className="relative">
+                                    <textarea
+                                        value={pastedText}
+                                        onChange={e => handlePastedTextChange(e.target.value)}
+                                        rows={9}
+                                        placeholder={`Copia filas directamente desde Excel, Google Sheets, un PDF o WhatsApp y pégalas aquí (Ctrl + V)...
+
+Ejemplo de columnas reconocidas automáticamente:
+1098765432	Carlos	Pérez	Calle 10 # 5-20	Colegio San José
+78945612	María	Gómez	Carrera 15 # 40-10	Escuela Central
+52123456	Pedro	Rodríguez
+
+* Puedes incluir encabezados o simplemente pegar los datos. El motor inteligente detecta la cédula y autodiligencia los puestos si tienes activa la auditoría DIVIPOLE.`}
+                                        className="w-full font-mono text-xs p-4 rounded-2xl bg-slate-900 text-slate-100 placeholder:text-slate-500 border border-slate-700 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-inner resize-y leading-relaxed"
+                                    />
+                                </div>
+
+                                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
+                                    <div className="text-[11px] text-slate-500">
+                                        💡 <strong>Tip Pro:</strong> Puedes pegar listas de 10, 50 o 500 votantes de un solo golpe. El sistema los procesa en milisegundos en bloque.
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={handleQuickImport}
+                                        disabled={quickImporting || pastedRowsCount === 0}
+                                        className="w-full sm:w-auto px-8 py-3.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-700 hover:to-indigo-800 disabled:from-slate-300 disabled:to-slate-300 text-white rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2 transform active:scale-95"
+                                    >
+                                        {quickImporting ? (
+                                            <>
+                                                <Zap size={16} className="animate-spin text-amber-300" />
+                                                <span>Procesando y Auditando {pastedRowsCount} Votantes...</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Zap size={16} className="text-amber-300" />
+                                                <span>⚡ Procesar e Importar {pastedRowsCount > 0 ? `(${pastedRowsCount})` : ''} Ahora</span>
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+
+                                {/* RESULTADOS DEL PEGADO RÁPIDO */}
+                                {quickImportResult && (
+                                    <div className={`p-6 rounded-3xl border transition-all ${
+                                        quickImportResult.type === 'success'
+                                            ? 'bg-gradient-to-br from-emerald-50 to-teal-50 border-emerald-200'
+                                            : 'bg-rose-50 border-rose-200'
+                                    }`}>
+                                        <div className="flex items-center justify-between gap-3 mb-4">
+                                            <h4 className="font-black text-sm uppercase tracking-wide flex items-center gap-2">
+                                                {quickImportResult.type === 'success' ? (
+                                                    <CheckCircle2 size={20} className="text-emerald-600 flex-shrink-0" />
+                                                ) : (
+                                                    <XCircle size={20} className="text-rose-600 flex-shrink-0" />
+                                                )}
+                                                <span className={quickImportResult.type === 'success' ? 'text-emerald-950' : 'text-rose-950'}>
+                                                    {quickImportResult.message}
+                                                </span>
+                                            </h4>
+                                            {quickImportResult.type === 'success' && (
+                                                <button
+                                                    type="button"
+                                                    onClick={clearPasted}
+                                                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase px-3 py-1.5 rounded-xl shadow-sm transition-all flex items-center gap-1.5 flex-shrink-0"
+                                                >
+                                                    <ClipboardPaste size={13} />
+                                                    <span>Pegar Siguiente Lote</span>
+                                                </button>
+                                            )}
                                         </div>
-                                        <div className="bg-white p-2.5 rounded-xl border border-yellow-100">
-                                            <span className="text-[10px] text-gray-400 font-bold uppercase block">Duplicados</span>
-                                            <span className="text-lg font-black text-yellow-600">{importResult.duplicates}</span>
-                                        </div>
-                                        <div className="bg-white p-2.5 rounded-xl border border-gray-100">
-                                            <span className="text-[10px] text-gray-400 font-bold uppercase block">Total Filas</span>
-                                            <span className="text-lg font-black text-slate-800">{importResult.total}</span>
-                                        </div>
+
+                                        {quickImportResult.type === 'success' && (
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
+                                                <div className="bg-white p-3.5 rounded-2xl border border-emerald-200 shadow-sm">
+                                                    <span className="text-[10px] text-gray-500 font-bold uppercase block">Guardados con Éxito</span>
+                                                    <span className="text-2xl font-black text-emerald-600">{quickImportResult.success || 0}</span>
+                                                    <span className="text-[10px] text-emerald-700 font-semibold block mt-0.5">Votos computables</span>
+                                                </div>
+                                                <div className="bg-white p-3.5 rounded-2xl border border-blue-200 shadow-sm">
+                                                    <span className="text-[10px] text-gray-500 font-bold uppercase block">Puestos Autodiligenciados</span>
+                                                    <span className="text-2xl font-black text-blue-600">{quickImportResult.puestosAsignados || 0}</span>
+                                                    <span className="text-[10px] text-blue-700 font-semibold block mt-0.5">Vía DIVIPOLE / Censo</span>
+                                                </div>
+                                                <div className="bg-white p-3.5 rounded-2xl border border-rose-200 shadow-sm">
+                                                    <span className="text-[10px] text-rose-500 font-bold uppercase block flex items-center justify-center gap-1">
+                                                        <Skull size={12} className="text-rose-600" />
+                                                        <span>Difuntos Neutralizados</span>
+                                                    </span>
+                                                    <span className="text-2xl font-black text-rose-600">{quickImportResult.defunciones || 0}</span>
+                                                    <span className="text-[10px] text-rose-700 font-semibold block mt-0.5">Bajas por RNEC</span>
+                                                </div>
+                                                <div className="bg-white p-3.5 rounded-2xl border border-amber-200 shadow-sm">
+                                                    <span className="text-[10px] text-gray-500 font-bold uppercase block">Duplicados Prevenidos</span>
+                                                    <span className="text-2xl font-black text-amber-600">{quickImportResult.duplicates || 0}</span>
+                                                    <span className="text-[10px] text-amber-700 font-semibold block mt-0.5">Ya existentes</span>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Acordeón de Errores o Advertencias */}
+                                        {quickImportResult.errors && quickImportResult.errors.length > 0 && (
+                                            <div className="mt-4 pt-3 border-t border-slate-200/80">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowErrorDetails(prev => !prev)}
+                                                    className="w-full flex items-center justify-between text-xs font-bold text-slate-700 hover:text-slate-900 transition-colors"
+                                                >
+                                                    <span className="flex items-center gap-1.5">
+                                                        <AlertCircle size={14} className="text-amber-600" />
+                                                        <span>Ver detalle de {quickImportResult.errors.length} observaciones y advertencias</span>
+                                                    </span>
+                                                    {showErrorDetails ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                                </button>
+
+                                                {showErrorDetails && (
+                                                    <div className="mt-3 max-h-48 overflow-y-auto space-y-1.5 pr-1">
+                                                        {quickImportResult.errors.map((err, idx) => (
+                                                            <div key={idx} className="p-2 bg-white rounded-xl border border-slate-200 text-[11px] flex items-center justify-between gap-2">
+                                                                <span className="font-mono font-bold text-slate-800">
+                                                                    Fila {err.fila} · CC: {err.cedula}
+                                                                </span>
+                                                                <span className="text-slate-600 text-right">
+                                                                    {err.mensaje}
+                                                                </span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>
                         )}
+
+                        {/* ────────── MODO 2: SUBIR ARCHIVO EXCEL ────────── */}
+                        {importMode === 'file' && (
+                            <div className="space-y-6">
+                                {/* Paso 1: Descargar plantilla */}
+                                <div className="flex items-start gap-4 p-5 bg-blue-50/70 rounded-2xl border border-blue-100">
+                                    <div className="flex-shrink-0 w-9 h-9 bg-blue-600 rounded-full flex items-center justify-center text-white font-black text-sm">1</div>
+                                    <div className="flex-1">
+                                        <h3 className="font-bold text-gray-800 text-xs uppercase tracking-wide mb-1">Descarga la Plantilla Oficial</h3>
+                                        <p className="text-gray-500 text-xs mb-3">
+                                            Usa nuestra plantilla oficial en Excel (.xlsx) con columnas para nombres, apellidos, cédula, dirección, lugar de votación y líder.
+                                        </p>
+                                        <button
+                                            type="button"
+                                            onClick={handleDownloadTemplate}
+                                            className="flex items-center gap-2 bg-white border border-blue-300 text-blue-700 hover:bg-blue-600 hover:text-white px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm"
+                                        >
+                                            <Download size={14} />
+                                            <span>Descargar Plantilla Excel (.xlsx)</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Paso 2: Subir archivo */}
+                                <div className="flex items-start gap-4 p-5 bg-gray-50 rounded-2xl border border-gray-200">
+                                    <div className="flex-shrink-0 w-9 h-9 bg-slate-800 rounded-full flex items-center justify-center text-white font-black text-sm">2</div>
+                                    <div className="flex-1 space-y-3">
+                                        <h3 className="font-bold text-gray-800 text-xs uppercase tracking-wide">Sube el Archivo Diligenciado</h3>
+
+                                        <div
+                                            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                                            onDragLeave={() => setDragOver(false)}
+                                            onDrop={handleFileDrop}
+                                            onClick={() => fileInputRef.current?.click()}
+                                            className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all ${dragOver ? 'border-blue-500 bg-blue-50' : importFile ? 'border-emerald-400 bg-emerald-50/40' : 'border-gray-300 hover:border-blue-400 bg-white'}`}
+                                        >
+                                            <input
+                                                ref={fileInputRef}
+                                                type="file"
+                                                accept=".xlsx,.xls"
+                                                onChange={handleFileSelect}
+                                                className="hidden"
+                                            />
+                                            {importFile ? (
+                                                <div className="flex items-center justify-center gap-3">
+                                                    <FileSpreadsheet size={28} className="text-emerald-600" />
+                                                    <div className="text-left">
+                                                        <p className="font-bold text-xs text-gray-800">{importFile.name}</p>
+                                                        <p className="text-[10px] text-gray-400">{(importFile.size / 1024).toFixed(1)} KB</p>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => { e.stopPropagation(); clearImport(); }}
+                                                        className="ml-4 p-1 text-gray-400 hover:text-rose-500"
+                                                    >
+                                                        <X size={16} />
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-2">
+                                                    <UploadCloud size={36} className="mx-auto text-gray-400" />
+                                                    <p className="text-xs font-bold text-gray-700">Arrastra tu archivo Excel aquí o haz clic para examinar</p>
+                                                    <p className="text-[11px] text-gray-400">Formatos soportados: .xlsx, .xls (máximo 10 MB)</p>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {importFile && (
+                                            <div className="flex justify-end gap-3 pt-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={clearImport}
+                                                    className="px-4 py-2 border border-gray-300 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-100 uppercase"
+                                                >
+                                                    Cancelar
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleImport}
+                                                    disabled={importing}
+                                                    className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white rounded-xl text-xs font-bold uppercase tracking-wider shadow-md transition-all flex items-center gap-2"
+                                                >
+                                                    {importing ? (
+                                                        <>
+                                                            <Zap size={14} className="animate-spin text-amber-300" />
+                                                            <span>Procesando y Auditando...</span>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <UploadCloud size={14} />
+                                                            <span>Importar Votantes</span>
+                                                        </>
+                                                    )}
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Resultado de la importación archivo */}
+                                {importResult && (
+                                    <div className={`p-6 rounded-3xl border ${importResult.type === 'success' ? 'bg-gradient-to-br from-emerald-50 to-teal-50 border-emerald-200' : 'bg-rose-50 border-rose-200'}`}>
+                                        <h4 className="font-black text-sm uppercase tracking-wide flex items-center gap-2 mb-3">
+                                            {importResult.type === 'success' ? <CheckCircle2 size={18} className="text-emerald-600" /> : <XCircle size={18} className="text-rose-600" />}
+                                            <span className={importResult.type === 'success' ? 'text-emerald-950' : 'text-rose-950'}>{importResult.message}</span>
+                                        </h4>
+
+                                        {importResult.type === 'success' && (
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center mt-3">
+                                                <div className="bg-white p-3 rounded-2xl border border-emerald-100 shadow-sm">
+                                                    <span className="text-[10px] text-gray-500 font-bold uppercase block">Guardados</span>
+                                                    <span className="text-2xl font-black text-emerald-600">{importResult.success || 0}</span>
+                                                </div>
+                                                <div className="bg-white p-3 rounded-2xl border border-blue-100 shadow-sm">
+                                                    <span className="text-[10px] text-gray-500 font-bold uppercase block">Puestos Asignados</span>
+                                                    <span className="text-2xl font-black text-blue-600">{importResult.puestosAsignados || 0}</span>
+                                                </div>
+                                                <div className="bg-white p-3 rounded-2xl border border-rose-100 shadow-sm">
+                                                    <span className="text-[10px] text-rose-500 font-bold uppercase block flex items-center justify-center gap-1">
+                                                        <Skull size={11} className="text-rose-600" />
+                                                        <span>Difuntos</span>
+                                                    </span>
+                                                    <span className="text-2xl font-black text-rose-600">{importResult.defunciones || 0}</span>
+                                                </div>
+                                                <div className="bg-white p-3 rounded-2xl border border-amber-100 shadow-sm">
+                                                    <span className="text-[10px] text-gray-500 font-bold uppercase block">Duplicados</span>
+                                                    <span className="text-2xl font-black text-amber-600">{importResult.duplicates || 0}</span>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                     </div>
                 </div>
             )}

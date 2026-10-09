@@ -6,6 +6,9 @@ const { Op } = require('sequelize');
 const ExcelJS = require('exceljs');
 const { evaluarTrashumancia } = require('../services/trashumanciaService');
 const { ejecutarAuditoriaVotosReales } = require('../services/electoralAuditService');
+const CensoDefuncion = require('../models/CensoDefuncion');
+const CensoElectoral = require('../models/CensoElectoral');
+const DivipolePuesto = require('../models/DivipolePuesto');
 
 exports.createVoter = async (req, res) => {
     try {
@@ -212,6 +215,244 @@ exports.downloadTemplate = async (req, res) => {
 };
 
 // ─── IMPORTACIÓN MASIVA DESDE EXCEL ────────────────────────────────────────
+
+// ─── PARSEADOR DE TEXTO COPIADO DESDE EXCEL / WHATSAPP / TABLAS ─────────────
+function parsePastedVotersText(rawText) {
+    if (!rawText || !rawText.trim()) return [];
+    const lines = rawText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    if (lines.length === 0) return [];
+
+    const firstLine = lines[0];
+    const hasTabs = firstLine.includes('\t');
+    const delimiter = hasTabs ? '\t' : (firstLine.includes(';') ? ';' : ',');
+
+    const rows = [];
+    const firstParts = firstLine.split(delimiter).map(p => p.trim().toLowerCase());
+    
+    // Detectar si la primera fila son encabezados
+    const isHeader = firstParts.some(p => ['nombre', 'nombres', 'cedula', 'cc', 'documento', 'apellido', 'apellidos'].includes(p));
+    const startIndex = isHeader ? 1 : 0;
+
+    let colMapping = { nombres: 0, apellidos: 1, cedula: 2, direccion: 3, lugar_votacion: 4, lider_nombre: 5 };
+    if (isHeader) {
+        colMapping = {};
+        firstParts.forEach((header, idx) => {
+            if (header.includes('nom') && !header.includes('lid')) colMapping.nombres = idx;
+            else if (header.includes('ape')) colMapping.apellidos = idx;
+            else if (header.includes('ced') || header.includes('cc') || header.includes('doc')) colMapping.cedula = idx;
+            else if (header.includes('dir') || header.includes('barrio')) colMapping.direccion = idx;
+            else if (header.includes('puest') || header.includes('lugar') || header.includes('colegio')) colMapping.lugar_votacion = idx;
+            else if (header.includes('lid') || header.includes('gestor')) colMapping.lider_nombre = idx;
+            else if (header.includes('mesa')) colMapping.mesa = idx;
+        });
+    }
+
+    for (let i = startIndex; i < lines.length; i++) {
+        const parts = lines[i].split(delimiter).map(p => p.trim().replace(/^["']|["']$/g, ''));
+        if (parts.length === 0 || parts.every(p => !p)) continue;
+
+        let nombres = '', apellidos = '', cedula = '', direccion = '', lugar_votacion = '', lider_nombre = '', mesa = '';
+
+        if (colMapping.cedula !== undefined && parts[colMapping.cedula] !== undefined) {
+            cedula = parts[colMapping.cedula] || '';
+            nombres = parts[colMapping.nombres] || '';
+            apellidos = parts[colMapping.apellidos] || '';
+            direccion = parts[colMapping.direccion] || '';
+            lugar_votacion = parts[colMapping.lugar_votacion] || '';
+            lider_nombre = parts[colMapping.lider_nombre] || '';
+            mesa = parts[colMapping.mesa] || '';
+        } else {
+            // Heurística inteligente: localizar la columna que contiene dígitos numéricos de cédula (5 a 11 dígitos)
+            const cedIdx = parts.findIndex(p => /^\d{5,11}$/.test(p.replace(/\D/g, '')));
+            if (cedIdx !== -1) {
+                cedula = parts[cedIdx];
+                const otherParts = parts.filter((_, idx) => idx !== cedIdx);
+                if (otherParts.length >= 2) {
+                    nombres = otherParts[0];
+                    apellidos = otherParts[1];
+                    direccion = otherParts[2] || '';
+                    lugar_votacion = otherParts[3] || '';
+                    lider_nombre = otherParts[4] || '';
+                } else if (otherParts.length === 1) {
+                    const nameParts = otherParts[0].split(' ');
+                    nombres = nameParts.slice(0, Math.ceil(nameParts.length / 2)).join(' ');
+                    apellidos = nameParts.slice(Math.ceil(nameParts.length / 2)).join(' ');
+                }
+            } else {
+                nombres = parts[0] || '';
+                apellidos = parts[1] || '';
+                cedula = parts[2] || '';
+            }
+        }
+
+        const cleanCed = String(cedula).replace(/\D/g, '').trim();
+        if (cleanCed.length >= 4) {
+            rows.push({ nombres, apellidos, cedula: cleanCed, direccion, lugar_votacion, lider_nombre, mesa });
+        }
+    }
+
+    return rows;
+}
+
+// ─── MOTOR DE PROCESAMIENTO MASIVO CON AUDITORÍA DIVIPOLE & CENSO ────────────
+async function processVotersBatch(rows, { userId, campanaId, apoyoId, defaultLiderNombre, defaultLiderCedula, autoAuditar = true }) {
+    const results = {
+        total: rows.length,
+        success: 0,
+        duplicates: 0,
+        defunciones: 0,
+        puestosAsignados: 0,
+        errors: []
+    };
+
+    if (rows.length === 0) return results;
+
+    const cedulasList = rows.map(r => String(r.cedula || '').replace(/\D/g, '').trim()).filter(Boolean);
+
+    // 1. Cruces en lote para máximo rendimiento (1 sola consulta SQL por tabla)
+    const [existingVoters, defunciones, censoRecords] = await Promise.all([
+        Voter.findAll({ where: { cedula: cedulasList }, attributes: ['cedula', 'lider_nombre'] }),
+        CensoDefuncion.findAll({ where: { cedula: cedulasList } }),
+        CensoElectoral.findAll({ where: { cedula: cedulasList } })
+    ]);
+
+    const existingMap = new Map();
+    existingVoters.forEach(v => existingMap.set(String(v.cedula).trim(), v));
+
+    const defuncionMap = new Map();
+    defunciones.forEach(d => defuncionMap.set(String(d.cedula).trim(), d));
+
+    const censoMap = new Map();
+    censoRecords.forEach(c => censoMap.set(String(c.cedula).trim(), c));
+
+    let campana = null;
+    if (campanaId) {
+        campana = await Campaign.findByPk(campanaId);
+    }
+
+    const processedCedulas = new Set();
+    const votersToCreate = [];
+
+    for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const rowNum = i + 1;
+        const cleanCed = String(row.cedula || '').replace(/\D/g, '').trim();
+
+        if (!row.nombres || !row.apellidos || !cleanCed) {
+            results.errors.push({ fila: rowNum, cedula: cleanCed || '-', mensaje: 'Faltan campos obligatorios (nombres, apellidos o cédula)' });
+            continue;
+        }
+
+        // Duplicado en la misma carga
+        if (processedCedulas.has(cleanCed)) {
+            results.duplicates++;
+            results.errors.push({ fila: rowNum, cedula: cleanCed, mensaje: 'Cédula repetida dentro de la misma lista ingresada' });
+            continue;
+        }
+
+        // Duplicado en base de datos previa
+        if (existingMap.has(cleanCed)) {
+            results.duplicates++;
+            const prev = existingMap.get(cleanCed);
+            results.errors.push({
+                fila: rowNum,
+                cedula: cleanCed,
+                mensaje: `Cédula ya registrada en el sistema (por: ${prev.lider_nombre || 'Sin líder'})`
+            });
+            continue;
+        }
+
+        processedCedulas.add(cleanCed);
+
+        // A) Cruce con Defunciones (RNEC)
+        const defuncionData = defuncionMap.get(cleanCed);
+        const esFallecido = !!defuncionData;
+        let fechaDefuncion = null;
+        let esVotoReal = !esFallecido;
+        let motivoInvalidez = null;
+
+        if (esFallecido) {
+            fechaDefuncion = defuncionData.fecha_defuncion || null;
+            motivoInvalidez = `💀 CÉDULA DE DIFUNTO: Registrada como baja por defunción (${defuncionData.fuente || 'RNEC'}). No computable legalmente.`;
+            results.defunciones++;
+        }
+
+        // B) Cruce y Autodiligenciamiento con Censo Oficial
+        let lugarVotacion = row.lugar_votacion || '';
+        let mesa = row.mesa || '';
+        let direccion = row.direccion || '';
+        let municipio = row.municipio || '';
+        let departamento = row.departamento || '';
+        let latitud = null;
+        let longitud = null;
+
+        const censoData = censoMap.get(cleanCed);
+        if (autoAuditar && censoData) {
+            if (!lugarVotacion && censoData.puesto_votacion) {
+                lugarVotacion = censoData.puesto_votacion;
+                results.puestosAsignados++;
+            }
+            if (!mesa && censoData.mesa) mesa = censoData.mesa;
+            if (!direccion && censoData.direccion) direccion = censoData.direccion;
+            if (!municipio && censoData.municipio) municipio = censoData.municipio;
+            if (!departamento && censoData.departamento) departamento = censoData.departamento;
+        }
+
+        // C) Georreferenciación y Normalización con DIVIPOLE (12.922 Puestos Oficiales)
+        if (autoAuditar && lugarVotacion) {
+            try {
+                const divipoleMatch = await DivipolePuesto.findOne({
+                    where: {
+                        [Op.or]: [
+                            { puesto: { [Op.like]: `%${lugarVotacion.trim()}%` } },
+                            { direccion: { [Op.like]: `%${lugarVotacion.trim()}%` } }
+                        ],
+                        ...(municipio ? { municipio: { [Op.like]: `%${municipio.trim()}%` } } : {})
+                    }
+                });
+                if (divipoleMatch) {
+                    latitud = divipoleMatch.latitud;
+                    longitud = divipoleMatch.longitud;
+                    if (!direccion) direccion = divipoleMatch.direccion || '';
+                }
+            } catch (e) {}
+        }
+
+        const isLeaderVal = String(row.isLeader || '').toLowerCase().trim();
+        const isLeader = ['true', 'si', 'sí', '1', 'lider', 'líder'].includes(isLeaderVal);
+
+        votersToCreate.push({
+            nombres: String(row.nombres).trim(),
+            apellidos: String(row.apellidos).trim(),
+            cedula: cleanCed,
+            direccion: direccion || '',
+            lugar_votacion: lugarVotacion || '',
+            mesa: mesa || '',
+            departamento: departamento || (campana ? campana.departamento : ''),
+            municipio: municipio || (campana ? campana.municipio : ''),
+            lider_nombre: row.lider_nombre ? String(row.lider_nombre).trim() : (defaultLiderNombre || ''),
+            lider_cedula: row.lider_cedula ? String(row.lider_cedula).trim() : (defaultLiderCedula || ''),
+            campana_id: campanaId || null,
+            apoyo_id: apoyoId ? parseInt(apoyoId, 10) : null,
+            isLeader,
+            es_fallecido: esFallecido,
+            fecha_defuncion: fechaDefuncion,
+            es_voto_real: esVotoReal,
+            motivo_invalidez: motivoInvalidez,
+            latitud,
+            longitud,
+            usuario_registro_id: userId
+        });
+    }
+
+    if (votersToCreate.length > 0) {
+        await Voter.bulkCreate(votersToCreate);
+        results.success = votersToCreate.length;
+    }
+
+    return results;
+}
+
 exports.importVoters = async (req, res) => {
     if (!req.file) {
         return res.status(400).json({ message: 'No se recibió ningún archivo' });
@@ -311,63 +552,22 @@ exports.importVoters = async (req, res) => {
             });
         }
 
-        // Procesar cada fila
-        for (let i = 0; i < rows.length; i++) {
-            const row = rows[i];
-            const rowNum = i + 2;
+        const { campana_id: campanaId, apoyo_id: apoyoId, lider_nombre, lider_cedula } = req.body;
+        const targetCampana = req.campana_id || (campanaId ? parseInt(campanaId, 10) : null);
+        const autoAuditar = req.body.auto_auditar !== 'false' && req.body.auto_auditar !== false;
 
-            // Validar campos obligatorios mínimos (solo nombres, apellidos y cédula)
-            const missing = [];
-            if (!row.nombres)   missing.push('nombres');
-            if (!row.apellidos) missing.push('apellidos');
-            if (!row.cedula)    missing.push('cedula');
-
-            if (missing.length > 0) {
-                results.errors.push({
-                    fila: rowNum,
-                    cedula: row.cedula || '-',
-                    mensaje: `Faltan campos obligatorios: ${missing.join(', ')}`
-                });
-                continue;
-            }
-
-            // Verificar duplicado
-            const existing = await Voter.findOne({ where: { cedula: row.cedula } });
-            if (existing) {
-                results.duplicates++;
-                results.errors.push({ fila: rowNum, cedula: row.cedula, mensaje: 'Cédula duplicada, ya existe en la base de datos' });
-                continue;
-            }
-
-            // Determinar si es líder
-            const isLeaderVal = norm(row.isLeader || '');
-            const isLeader = ['true', 'si', 'sí', '1', 'lider', 'líder', 's', 'yes'].includes(isLeaderVal);
-
-            const targetCampana = req.campana_id || (campanaId ? parseInt(campanaId, 10) : null);
-
-            await Voter.create({
-                nombres:             row.nombres,
-                apellidos:           row.apellidos,
-                cedula:              row.cedula,
-                direccion:           row.direccion || '',
-                lugar_votacion:      row.lugar_votacion || '',
-                mesa:                row.mesa || '',
-                departamento:        row.departamento,
-                municipio:           row.municipio,
-                lider_nombre:        row.lider_nombre || '',
-                lider_cedula:        row.lider_cedula || '',
-                campana_id:          targetCampana,
-                apoyo_id:            apoyoId ? parseInt(apoyoId, 10) : null,
-                isLeader,
-                usuario_registro_id: req.user.id || req.user.userId
-            });
-
-            results.success++;
-        }
+        const batchResults = await processVotersBatch(rows, {
+            userId: req.user.id || req.user.userId,
+            campanaId: targetCampana,
+            apoyoId,
+            defaultLiderNombre: lider_nombre || null,
+            defaultLiderCedula: lider_cedula || null,
+            autoAuditar
+        });
 
         res.json({
-            message: `Importación completada: ${results.success} registrados, ${results.duplicates} duplicados, ${results.errors.length - results.duplicates} con error.`,
-            ...results
+            message: `Importación completada: ${batchResults.success} registrados, ${batchResults.duplicates} duplicados, ${batchResults.defunciones} difuntos detectados, ${batchResults.puestosAsignados} puestos asignados.`,
+            ...batchResults
         });
     } catch (error) {
         console.error('Error importando Excel:', error);
@@ -703,3 +903,44 @@ exports.getResumenVotosReales = async (req, res) => {
 };
 
 
+
+// ─── PEGADO RÁPIDO DE VOTANTES (DIRECTO DESDE EXCEL / WHATSAPP / TEXTO) ─────
+exports.quickImportVoters = async (req, res) => {
+    try {
+        const { text, rows: inputRows, campana_id, apoyo_id, lider_nombre, lider_cedula, auto_auditar } = req.body;
+        let rows = [];
+
+        if (Array.isArray(inputRows) && inputRows.length > 0) {
+            rows = inputRows;
+        } else if (text && typeof text === 'string') {
+            rows = parsePastedVotersText(text);
+        }
+
+        if (rows.length === 0) {
+            return res.status(400).json({
+                message: 'No se encontraron registros válidos para importar. Copia y pega las filas desde tu Excel o lista de simpatizantes.'
+            });
+        }
+
+        const targetCampana = req.campana_id || (campana_id ? parseInt(campana_id, 10) : null);
+        const autoAuditar = auto_auditar !== false && auto_auditar !== 'false';
+
+        const batchResults = await processVotersBatch(rows, {
+            userId: req.user.id || req.user.userId,
+            campanaId: targetCampana,
+            apoyoId: apoyo_id ? parseInt(apoyo_id, 10) : null,
+            defaultLiderNombre: lider_nombre || null,
+            defaultLiderCedula: lider_cedula || null,
+            autoAuditar
+        });
+
+        return res.json({
+            success: true,
+            message: `⚡ Pegado Rápido completado: ${batchResults.success} registrados exitosamente, ${batchResults.duplicates} duplicados, ${batchResults.defunciones} difuntos neutralizados, ${batchResults.puestosAsignados} puestos y mesas autodiligenciados.`,
+            ...batchResults
+        });
+    } catch (error) {
+        console.error('Error en Pegado Rápido:', error);
+        return res.status(500).json({ message: 'Error procesando pegado rápido de votantes', error: error.message });
+    }
+};

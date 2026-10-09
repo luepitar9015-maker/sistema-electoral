@@ -17,6 +17,7 @@ router.get('/leaders',         voterController.getLeaders);
 // Importación masiva y plantilla
 router.get('/template',        voterController.downloadTemplate);
 router.post('/import',         upload.single('file'), voterController.importVoters);
+router.post('/quick-import',   voterController.quickImportVoters);
 
 // Inteligencia territorial, GIS y Anti-Trashumancia
 router.get('/geo-data',        voterController.getTerritorialGeoData);
