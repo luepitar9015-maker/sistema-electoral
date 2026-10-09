@@ -41,7 +41,6 @@ const ProyectoDocumento = require('./models/ProyectoDocumento');
 ProyectoInversion.hasMany(NecesidadCiudadana, { foreignKey: 'proyecto_id', as: 'necesidades_asociadas' });
 NecesidadCiudadana.belongsTo(ProyectoInversion, { foreignKey: 'proyecto_id', as: 'proyecto' });
 Campaign.hasMany(ProyectoInversion, { foreignKey: 'campana_id', as: 'proyectos_inversion' });
-ProyectoInversion.belongsTo(Campaign, { foreignKey: 'campana_id', as: 'campana' });
 
 // Asociaciones de Reuniones
 Reunion.hasMany(ReunionAsistente, { foreignKey: 'reunion_id', as: 'asistentes', onDelete: 'CASCADE' });
