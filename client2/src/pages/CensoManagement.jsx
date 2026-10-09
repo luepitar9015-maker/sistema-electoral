@@ -43,6 +43,16 @@ export default function CensoManagement() {
     const [auditData, setAuditData] = useState(null);
     const [auditingRealVotes, setAuditingRealVotes] = useState(false);
 
+    // Estados de Directorio Oficial Divipole
+    const [puestosList, setPuestosList] = useState([]);
+    const [puestosTotal, setPuestosTotal] = useState(12922);
+    const [searchPuesto, setSearchPuesto] = useState('');
+    const [filterDepto, setFilterDepto] = useState('');
+    const [filterMuni, setFilterMuni] = useState('');
+    const [pagePuesto, setPagePuesto] = useState(1);
+    const [totalPagesPuesto, setTotalPagesPuesto] = useState(1);
+    const [loadingPuestos, setLoadingPuestos] = useState(false);
+
     // Estados de carga de archivo de censo
     const [file, setFile] = useState(null);
     const [uploading, setUploading] = useState(false);
@@ -81,6 +91,13 @@ export default function CensoManagement() {
             if (resVotos.data && resVotos.data.total_auditados !== undefined) {
                 setResumenVotosReales(resVotos.data);
             }
+
+            try {
+                const resPuestos = await axios.get(`${API}/censo/puestos/stats`, authHeaders);
+                if (resPuestos.data?.totalPuestos) {
+                    setPuestosTotal(resPuestos.data.totalPuestos);
+                }
+            } catch (e) {}
         } catch (error) {
             console.error('Error fetching stats:', error);
         } finally {
@@ -91,6 +108,32 @@ export default function CensoManagement() {
     useEffect(() => {
         fetchAllStats();
     }, []);
+
+    // ─── DIRECTORIO OFICIAL DIVIPOLE ─────────────────────────────────────────
+    const fetchPuestos = async (page = 1, customSearch = null) => {
+        setLoadingPuestos(true);
+        try {
+            const queryVal = customSearch !== null ? customSearch : searchPuesto;
+            const params = new URLSearchParams({
+                page: String(page),
+                limit: '25',
+                ...(queryVal ? { search: queryVal.trim() } : {}),
+                ...(filterDepto ? { departamento: filterDepto.trim() } : {}),
+                ...(filterMuni ? { municipio: filterMuni.trim() } : {})
+            });
+            const res = await axios.get(`${API}/censo/puestos?${params.toString()}`, authHeaders);
+            setPuestosList(res.data.puestos || []);
+            setTotalPagesPuesto(res.data.totalPages || 1);
+            setPagePuesto(page);
+            if (res.data.total !== undefined) {
+                setPuestosTotal(res.data.total);
+            }
+        } catch (e) {
+            console.error('Error fetching puestos:', e);
+        } finally {
+            setLoadingPuestos(false);
+        }
+    };
 
     // ─── CARGA MASIVA DE CENSO ────────────────────────────────────────────────
     const handleDownloadTemplate = async () => {
@@ -342,6 +385,21 @@ export default function CensoManagement() {
                             Depuración Activa
                         </span>
                     )}
+                </button>
+
+                <button
+                    onClick={() => { setActiveTab('divipole'); fetchPuestos(1); }}
+                    className={`flex items-center gap-2 px-6 py-3 font-black text-xs md:text-sm uppercase tracking-wider rounded-t-xl transition-all border-b-2 ${
+                        activeTab === 'divipole'
+                            ? 'border-indigo-600 text-indigo-600 bg-white shadow-sm'
+                            : 'border-transparent text-gray-500 hover:text-gray-800'
+                    }`}
+                >
+                    <Building size={18} className="text-indigo-500" />
+                    <span>Directorio DIVIPOLE</span>
+                    <span className="bg-indigo-100 text-indigo-800 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                        {puestosTotal > 0 ? puestosTotal.toLocaleString() : '12.922'} Puestos
+                    </span>
                 </button>
             </div>
 
@@ -965,6 +1023,201 @@ export default function CensoManagement() {
                         </div>
                     )}
 
+                </div>
+            )}
+
+            {/* CONTENIDO PESTAÑA 3: DIRECTORIO OFICIAL DIVIPOLE (12.922 PUESTOS) */}
+            {activeTab === 'divipole' && (
+                <div className="space-y-6 animate-in fade-in duration-300">
+                    {/* Banner DIVIPOLE */}
+                    <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-6 md:p-8 rounded-2xl text-white shadow-2xl border border-indigo-900/40 relative overflow-hidden">
+                        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                            <div className="space-y-2 max-w-2xl">
+                                <div className="inline-flex items-center gap-2 bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider">
+                                    <Building size={14} /> Directorio Nacional Oficial DIVIPOLE
+                                </div>
+                                <h2 className="text-2xl md:text-3xl font-black tracking-wide">
+                                    Puestos de Votación Georreferenciados (Colombia)
+                                </h2>
+                                <p className="text-indigo-100/80 text-sm leading-relaxed">
+                                    Base oficial de la <b>Registraduría Nacional del Estado Civil</b> con <b>{puestosTotal.toLocaleString()} puestos de votación</b> en los 33 departamentos y 1.121 municipios del país, con dirección oficial, comuna y coordenadas satelitales GPS.
+                                </p>
+                            </div>
+
+                            <div className="flex flex-col sm:flex-row items-center gap-3">
+                                <div className="bg-slate-800/80 border border-slate-700 p-4 rounded-xl text-center">
+                                    <div className="text-xs text-indigo-300 uppercase font-bold">Puestos Cargados</div>
+                                    <div className="text-2xl font-black text-white">{puestosTotal.toLocaleString()}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Barra de Filtro y Búsqueda */}
+                    <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-4">
+                        <div className="flex flex-col md:flex-row gap-3">
+                            <div className="flex-1 relative">
+                                <Search className="absolute left-3.5 top-3.5 text-gray-400" size={18} />
+                                <input
+                                    type="text"
+                                    placeholder="Buscar puesto por nombre, colegio, dirección, barrio o comuna..."
+                                    value={searchPuesto}
+                                    onChange={(e) => setSearchPuesto(e.target.value)}
+                                    onKeyDown={(e) => { if (e.key === 'Enter') fetchPuestos(1); }}
+                                    className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-sm font-medium text-gray-800 focus:outline-none focus:border-indigo-500 transition-colors"
+                                />
+                            </div>
+
+                            <input
+                                type="text"
+                                placeholder="Filtrar Municipio (ej: Medellín, Bucaramanga...)"
+                                value={filterMuni}
+                                onChange={(e) => setFilterMuni(e.target.value)}
+                                onKeyDown={(e) => { if (e.key === 'Enter') fetchPuestos(1); }}
+                                className="w-full md:w-56 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-medium text-gray-800 focus:outline-none focus:border-indigo-500 transition-colors"
+                            />
+
+                            <button
+                                onClick={() => fetchPuestos(1)}
+                                disabled={loadingPuestos}
+                                className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-400 text-white font-bold px-6 py-2.5 rounded-xl text-xs uppercase tracking-wider transition-all shadow-md flex items-center justify-center gap-2"
+                            >
+                                <Search size={16} />
+                                <span>{loadingPuestos ? 'Buscando...' : 'Buscar'}</span>
+                            </button>
+
+                            {(searchPuesto || filterMuni || filterDepto) && (
+                                <button
+                                    onClick={() => {
+                                        setSearchPuesto('');
+                                        setFilterMuni('');
+                                        setFilterDepto('');
+                                        fetchPuestos(1, '');
+                                    }}
+                                    className="px-4 py-2.5 border border-gray-200 text-gray-500 hover:bg-gray-100 rounded-xl text-xs font-bold transition-colors"
+                                >
+                                    Limpiar
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Tabla de Puestos DIVIPOLE */}
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                        <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-slate-50/50">
+                            <span className="text-xs font-black uppercase text-slate-700 tracking-wider flex items-center gap-2">
+                                <Building size={16} className="text-indigo-600" />
+                                <span>Puestos de Votación Oficiales Encontrados ({puestosTotal.toLocaleString()})</span>
+                            </span>
+                            <span className="text-xs text-gray-500 font-medium">
+                                Página {pagePuesto} de {totalPagesPuesto}
+                            </span>
+                        </div>
+
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="bg-gray-50/80 border-b border-gray-100 text-[11px] font-black uppercase text-gray-500 tracking-wider">
+                                        <th className="py-3 px-4">Puesto / Escuela</th>
+                                        <th className="py-3 px-4">Municipio / Depto</th>
+                                        <th className="py-3 px-4">Comuna / Zona</th>
+                                        <th className="py-3 px-4">Dirección Oficial</th>
+                                        <th className="py-3 px-4 text-center">GPS</th>
+                                        <th className="py-3 px-4 text-center">Cargos Habilitados</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100 text-xs text-gray-700">
+                                    {loadingPuestos ? (
+                                        <tr>
+                                            <td colSpan="6" className="py-12 text-center text-gray-400 font-medium">
+                                                Cargando directorio de puestos de votación...
+                                            </td>
+                                        </tr>
+                                    ) : puestosList.length === 0 ? (
+                                        <tr>
+                                            <td colSpan="6" className="py-12 text-center text-gray-400 font-medium">
+                                                No se encontraron puestos con los filtros seleccionados.
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        puestosList.map((puesto) => (
+                                            <tr key={puesto.id} className="hover:bg-indigo-50/30 transition-colors">
+                                                <td className="py-3 px-4 font-bold text-slate-900">
+                                                    {puesto.puesto}
+                                                </td>
+                                                <td className="py-3 px-4">
+                                                    <span className="font-semibold text-slate-800">{puesto.municipio}</span>
+                                                    <span className="block text-[11px] text-gray-400">{puesto.departamento}</span>
+                                                </td>
+                                                <td className="py-3 px-4 text-gray-500">
+                                                    {puesto.comuna || 'Cabecera Municipal'}
+                                                </td>
+                                                <td className="py-3 px-4 text-gray-600 font-mono text-[11px]">
+                                                    {puesto.direccion || 'Sin dirección registrada'}
+                                                </td>
+                                                <td className="py-3 px-4 text-center">
+                                                    {puesto.latitud && puesto.longitud ? (
+                                                        <a
+                                                            href={`https://www.google.com/maps?q=${puesto.latitud},${puesto.longitud}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="inline-flex items-center gap-1 text-[11px] bg-emerald-50 text-emerald-700 hover:bg-emerald-100 px-2 py-1 rounded-md font-bold transition-colors"
+                                                            title="Ver ubicación en Google Maps"
+                                                        >
+                                                            <MapPin size={12} />
+                                                            <span>Ver GPS</span>
+                                                        </a>
+                                                    ) : (
+                                                        <span className="text-[10px] text-gray-400">Sin GPS</span>
+                                                    )}
+                                                </td>
+                                                <td className="py-3 px-4 text-center">
+                                                    <div className="flex items-center justify-center gap-1 flex-wrap">
+                                                        {puesto.alcalde && (
+                                                            <span className="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded text-[9px] font-bold">ALC</span>
+                                                        )}
+                                                        {puesto.concejo && (
+                                                            <span className="bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded text-[9px] font-bold">CON</span>
+                                                        )}
+                                                        {puesto.gobernacion && (
+                                                            <span className="bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded text-[9px] font-bold">GOB</span>
+                                                        )}
+                                                        {puesto.asamblea && (
+                                                            <span className="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded text-[9px] font-bold">ASA</span>
+                                                        )}
+                                                        {puesto.jal && (
+                                                            <span className="bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded text-[9px] font-bold">JAL</span>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Paginación */}
+                        <div className="p-4 border-t border-gray-100 flex justify-between items-center bg-slate-50/50">
+                            <button
+                                onClick={() => fetchPuestos(Math.max(1, pagePuesto - 1))}
+                                disabled={pagePuesto <= 1 || loadingPuestos}
+                                className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-40 transition-colors shadow-sm"
+                            >
+                                ← Anterior
+                            </button>
+                            <span className="text-xs font-semibold text-gray-600">
+                                Página {pagePuesto} de {totalPagesPuesto}
+                            </span>
+                            <button
+                                onClick={() => fetchPuestos(Math.min(totalPagesPuesto, pagePuesto + 1))}
+                                disabled={pagePuesto >= totalPagesPuesto || loadingPuestos}
+                                className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-40 transition-colors shadow-sm"
+                            >
+                                Siguiente →
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>
