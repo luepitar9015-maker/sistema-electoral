@@ -233,7 +233,7 @@ function parsePastedVotersText(rawText) {
     const isHeader = firstParts.some(p => ['nombre', 'nombres', 'cedula', 'cc', 'documento', 'apellido', 'apellidos'].includes(p));
     const startIndex = isHeader ? 1 : 0;
 
-    let colMapping = { nombres: 0, apellidos: 1, cedula: 2, direccion: 3, lugar_votacion: 4, lider_nombre: 5 };
+    let colMapping = null;
     if (isHeader) {
         colMapping = {};
         firstParts.forEach((header, idx) => {
@@ -253,28 +253,43 @@ function parsePastedVotersText(rawText) {
 
         let nombres = '', apellidos = '', cedula = '', direccion = '', lugar_votacion = '', lider_nombre = '', mesa = '';
 
-        if (colMapping.cedula !== undefined && parts[colMapping.cedula] !== undefined) {
+        if (colMapping && colMapping.cedula !== undefined && parts[colMapping.cedula] !== undefined) {
             cedula = parts[colMapping.cedula] || '';
-            nombres = parts[colMapping.nombres] || '';
-            apellidos = parts[colMapping.apellidos] || '';
-            direccion = parts[colMapping.direccion] || '';
-            lugar_votacion = parts[colMapping.lugar_votacion] || '';
-            lider_nombre = parts[colMapping.lider_nombre] || '';
-            mesa = parts[colMapping.mesa] || '';
+            nombres = parts[colMapping.nombres] !== undefined ? parts[colMapping.nombres] : '';
+            apellidos = parts[colMapping.apellidos] !== undefined ? parts[colMapping.apellidos] : '';
+            direccion = parts[colMapping.direccion] !== undefined ? parts[colMapping.direccion] : '';
+            lugar_votacion = parts[colMapping.lugar_votacion] !== undefined ? parts[colMapping.lugar_votacion] : '';
+            lider_nombre = parts[colMapping.lider_nombre] !== undefined ? parts[colMapping.lider_nombre] : '';
+            mesa = parts[colMapping.mesa] !== undefined ? parts[colMapping.mesa] : '';
         } else {
-            // Heurística inteligente: localizar la columna que contiene dígitos numéricos de cédula (5 a 11 dígitos)
-            const cedIdx = parts.findIndex(p => /^\d{5,11}$/.test(p.replace(/\D/g, '')));
+            // Heurística de detección inteligente de columnas por contenido:
+            // Encontrar la columna que corresponde al número de cédula (entre 5 y 11 dígitos numéricos)
+            const cedIdx = parts.findIndex(p => {
+                const digits = p.replace(/\D/g, '');
+                return digits.length >= 5 && digits.length <= 11 && (digits === p.trim() || digits === p.replace(/[.,\s]/g, ''));
+            });
+
             if (cedIdx !== -1) {
                 cedula = parts[cedIdx];
                 const otherParts = parts.filter((_, idx) => idx !== cedIdx);
-                if (otherParts.length >= 2) {
-                    nombres = otherParts[0];
-                    apellidos = otherParts[1];
+
+                if (cedIdx === 0) {
+                    // Formato: [Cédula, Nombres, Apellidos, ...]
+                    nombres = otherParts[0] || '';
+                    apellidos = otherParts[1] || '';
+                    direccion = otherParts[2] || '';
+                    lugar_votacion = otherParts[3] || '';
+                    lider_nombre = otherParts[4] || '';
+                } else if (otherParts.length >= 2) {
+                    // Formato: [Nombres, Apellidos, Cédula, ...]
+                    nombres = otherParts[0] || '';
+                    apellidos = otherParts[1] || '';
                     direccion = otherParts[2] || '';
                     lugar_votacion = otherParts[3] || '';
                     lider_nombre = otherParts[4] || '';
                 } else if (otherParts.length === 1) {
-                    const nameParts = otherParts[0].split(' ');
+                    // Formato: [Nombre Completo, Cédula]
+                    const nameParts = otherParts[0].split(/\s+/);
                     nombres = nameParts.slice(0, Math.ceil(nameParts.length / 2)).join(' ');
                     apellidos = nameParts.slice(Math.ceil(nameParts.length / 2)).join(' ');
                 }
@@ -287,7 +302,21 @@ function parsePastedVotersText(rawText) {
 
         const cleanCed = String(cedula).replace(/\D/g, '').trim();
         if (cleanCed.length >= 4) {
-            rows.push({ nombres, apellidos, cedula: cleanCed, direccion, lugar_votacion, lider_nombre, mesa });
+            // Si apellidos quedó vacío y nombres tiene varias palabras, auto-dividir
+            if (!apellidos && nombres.includes(' ')) {
+                const partsArr = nombres.split(/\s+/);
+                nombres = partsArr.slice(0, Math.ceil(partsArr.length / 2)).join(' ');
+                apellidos = partsArr.slice(Math.ceil(partsArr.length / 2)).join(' ');
+            }
+            rows.push({
+                nombres: nombres || 'Simpatizante',
+                apellidos: apellidos || 'Registrado',
+                cedula: cleanCed,
+                direccion,
+                lugar_votacion,
+                lider_nombre,
+                mesa
+            });
         }
     }
 
