@@ -33,4 +33,8 @@ router.post('/defunciones/import', upload.single('file'), censoController.import
 router.get('/defunciones/stats', censoController.getDefuncionesStats);
 router.delete('/defunciones/clear', censoController.clearDefunciones);
 
+// ─── PUESTOS DE VOTACIÓN OFICIALES DIVIPOLE (COLOMBIA) ──────────────────────
+router.get('/puestos', censoController.getPuestosDivipole);
+router.get('/puestos/stats', censoController.getPuestosDivipoleStats);
+
 module.exports = router;

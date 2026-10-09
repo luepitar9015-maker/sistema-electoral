@@ -596,3 +596,56 @@ exports.clearDefunciones = async (req, res) => {
     }
 };
 
+// ─── CONSULTAR PUESTOS DE VOTACIÓN OFICIALES DIVIPOLE ─────────────────────────
+exports.getPuestosDivipole = async (req, res) => {
+    try {
+        const DivipolePuesto = require('../models/DivipolePuesto');
+        const { municipio, departamento, search, limit = 50, page = 1 } = req.query;
+        const where = {};
+        const isPostgres = sequelize.getDialect() === 'postgres';
+        const likeOp = isPostgres ? Op.iLike : Op.like;
+
+        if (municipio) {
+            where.municipio = { [likeOp]: `%${municipio.trim()}%` };
+        }
+        if (departamento) {
+            where.departamento = { [likeOp]: `%${departamento.trim()}%` };
+        }
+        if (search) {
+            where[Op.or] = [
+                { puesto: { [likeOp]: `%${search.trim()}%` } },
+                { direccion: { [likeOp]: `%${search.trim()}%` } },
+                { comuna: { [likeOp]: `%${search.trim()}%` } }
+            ];
+        }
+
+        const offset = (parseInt(page, 10) - 1) * parseInt(limit, 10);
+        const { count, rows } = await DivipolePuesto.findAndCountAll({
+            where,
+            limit: parseInt(limit, 10),
+            offset,
+            order: [['departamento', 'ASC'], ['municipio', 'ASC'], ['puesto', 'ASC']]
+        });
+
+        return res.json({
+            total: count,
+            page: parseInt(page, 10),
+            totalPages: Math.ceil(count / parseInt(limit, 10)),
+            puestos: rows
+        });
+    } catch (error) {
+        console.error('Error al consultar puestos Divipole:', error);
+        return res.status(500).json({ message: 'Error al consultar puestos Divipole', error: error.message });
+    }
+};
+
+exports.getPuestosDivipoleStats = async (req, res) => {
+    try {
+        const DivipolePuesto = require('../models/DivipolePuesto');
+        const total = await DivipolePuesto.count();
+        return res.json({ totalPuestos: total });
+    } catch (error) {
+        return res.json({ totalPuestos: 0 });
+    }
+};
+
