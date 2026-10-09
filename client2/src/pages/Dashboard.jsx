@@ -324,10 +324,14 @@ export default function Dashboard() {
                     <div className="bg-slate-900/60 p-3 rounded-2xl border border-slate-700/40">
                         <div className="text-[11px] font-medium text-slate-400">Piso Electoral Real</div>
                         <div className="text-2xl font-black text-emerald-400 mt-0.5">
-                            {resumenAudit ? resumenAudit.votos_reales.toLocaleString() : Math.round(totalVoters * 0.82).toLocaleString()}
+                            {resumenAudit 
+                                ? (resumenAudit.votos_reales_computables ?? resumenAudit.votos_reales ?? 0).toLocaleString() 
+                                : Math.round(totalVoters * 0.82).toLocaleString()}
                         </div>
                         <div className="text-[10px] text-slate-500 mt-0.5">
-                            {resumenAudit ? `${resumenAudit.porcentaje_real}% de efectividad` : 'Votos computables seguros'}
+                            {resumenAudit 
+                                ? `${resumenAudit.porcentaje_efectividad_real ?? resumenAudit.porcentaje_real ?? 100}% de efectividad` 
+                                : 'Votos computables seguros'}
                         </div>
                     </div>
 
@@ -337,7 +341,9 @@ export default function Dashboard() {
                             <span>Bajas por Defunción</span>
                         </div>
                         <div className="text-2xl font-black text-rose-400 mt-0.5">
-                            {resumenAudit ? resumenAudit.difuntos.toLocaleString() : '0'}
+                            {resumenAudit 
+                                ? (resumenAudit.difuntos_detectados ?? resumenAudit.difuntos ?? 0).toLocaleString() 
+                                : '0'}
                         </div>
                         <div className="text-[10px] text-rose-400/80 mt-0.5">
                             Cédulas fallecidas aisladas
@@ -347,7 +353,9 @@ export default function Dashboard() {
                     <div className="bg-slate-900/60 p-3 rounded-2xl border border-slate-700/40">
                         <div className="text-[11px] font-medium text-slate-400">Duplicados Depurados</div>
                         <div className="text-2xl font-black text-amber-400 mt-0.5">
-                            {resumenAudit ? resumenAudit.duplicados.toLocaleString() : '0'}
+                            {resumenAudit 
+                                ? (resumenAudit.duplicados_detectados ?? resumenAudit.duplicados ?? 0).toLocaleString() 
+                                : '0'}
                         </div>
                         <div className="text-[10px] text-slate-500 mt-0.5">
                             Cédulas en múltiple líder
@@ -357,7 +365,9 @@ export default function Dashboard() {
                     <div className="bg-slate-900/60 p-3 rounded-2xl border border-slate-700/40">
                         <div className="text-[11px] font-medium text-slate-400">Voto Duro Identificado</div>
                         <div className="text-2xl font-black text-cyan-400 mt-0.5">
-                            {resumenAudit ? resumenAudit.votos_duros.toLocaleString() : Math.round(totalVoters * 0.55).toLocaleString()}
+                            {resumenAudit 
+                                ? (resumenAudit.voto_duro_seguro ?? resumenAudit.votos_duros ?? 0).toLocaleString() 
+                                : Math.round(totalVoters * 0.55).toLocaleString()}
                         </div>
                         <div className="text-[10px] text-slate-500 mt-0.5">
                             Compromiso 5/5 verificado
@@ -478,8 +488,8 @@ export default function Dashboard() {
                         </span>
                     </div>
 
-                    <div className="h-64">
-                        <ResponsiveContainer width="100%" height="100%">
+                    <div className="h-64 min-w-0 w-full">
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                             <AreaChart data={dataTendencia}>
                                 <defs>
                                     <linearGradient id="colorVoters" x1="0" y1="0" x2="0" y2="1">
@@ -518,8 +528,8 @@ export default function Dashboard() {
                         </div>
                     </div>
 
-                    <div className="h-64">
-                        <ResponsiveContainer width="100%" height="100%">
+                    <div className="h-64 min-w-0 w-full">
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                             <BarChart data={dataTerritorio} layout="vertical">
                                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#334155" />
                                 <XAxis type="number" stroke="#94a3b8" fontSize={11} />
