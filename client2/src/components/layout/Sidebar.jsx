@@ -26,6 +26,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
         { icon: Headphones,     label: 'CALL CENTER GOTV',     path: '/callcenter',  badge: 'EN VIVO' },
         { icon: Compass,        label: 'MAPA TERRITORIAL',     path: '/territorio',  badge: 'GIS' },
         { icon: Building2,      label: 'BANCO NECESIDADES',    path: '/necesidades', badge: 'IA / 4 AÑOS' },
+        { icon: Landmark,       label: 'BANCO PROYECTOS & MGA', path: '/proyectos-mga', badge: 'MINISTERIOS' },
         { icon: Calculator,     label: 'SIMULADOR CURULES',    path: '/simulador' },
         { icon: CalendarDays,   label: 'REUNIONES Y AGENDA',   path: '/meetings',    badge: 'EVENTOS' },
         { icon: Share2,         label: 'REDES SOCIALES',       path: '/social',      badge: 'EN VIVO' },
@@ -46,7 +47,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
         gerente: ['*'],
         coordinador_zonal: [
             '/dashboard', '/gobernanza', '/territorio', '/voters', '/register', 
-            '/necesidades', '/meetings', '/dia-d', '/reports'
+            '/necesidades', '/proyectos-mga', '/meetings', '/dia-d', '/reports'
         ],
         comunicaciones_prensa: [
             '/dashboard', '/social', '/whatsapp', '/necesidades', '/meetings'
@@ -55,7 +56,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
             '/dia-d', '/censo'
         ],
         lider: [
-            '/dashboard', '/register', '/voters', '/necesidades', '/meetings', '/reports'
+            '/dashboard', '/register', '/voters', '/necesidades', '/proyectos-mga', '/meetings', '/reports'
         ],
         apoyo_bd: [
             '/dashboard', '/register', '/voters', '/censo', '/necesidades'

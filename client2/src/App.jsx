@@ -19,6 +19,7 @@ import DHondtSimulator from './features/simulador/DHondtSimulator';
 import LogisticaFlotaDashboard from './features/logistica/LogisticaFlotaDashboard';
 import CallCenterOperator from './features/callcenter/CallCenterOperator';
 import NecesidadesPage from './pages/NecesidadesPage';
+import BancoProyectos from './pages/BancoProyectos';
 import ParticipaCiudadano from './pages/ParticipaCiudadano';
 import GovernancePage from './pages/GovernancePage';
 
@@ -49,6 +50,7 @@ function AppRoutes() {
                 <Route path="callcenter" element={<CallCenterOperator />} />
                 <Route path="territorio" element={<TerritorialHeatMap />} />
                 <Route path="necesidades" element={<NecesidadesPage />} />
+                <Route path="proyectos-mga" element={<BancoProyectos />} />
                 <Route path="simulador" element={<DHondtSimulator />} />
                 <Route path="meetings" element={<MeetingsPage />} />
                 <Route path="social" element={<SocialMediaPage />} />

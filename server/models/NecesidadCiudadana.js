@@ -116,6 +116,10 @@ const NecesidadCiudadana = sequelize.define('NecesidadCiudadana', {
             model: User,
             key: 'id'
         }
+    },
+    proyecto_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true
     }
 }, {
     tableName: 'NecesidadesCiudadanas',

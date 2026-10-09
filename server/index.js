@@ -34,6 +34,14 @@ const LogisticaDespacho = require('./models/LogisticaDespacho');
 const CallCenterLog = require('./models/CallCenterLog');
 const NecesidadCiudadana = require('./models/NecesidadCiudadana');
 const CompromisoGestion = require('./models/CompromisoGestion');
+const ProyectoInversion = require('./models/ProyectoInversion');
+const ProyectoDocumento = require('./models/ProyectoDocumento');
+
+// Asociaciones de Proyectos de Inversión y Necesidades
+ProyectoInversion.hasMany(NecesidadCiudadana, { foreignKey: 'proyecto_id', as: 'necesidades_asociadas' });
+NecesidadCiudadana.belongsTo(ProyectoInversion, { foreignKey: 'proyecto_id', as: 'proyecto' });
+Campaign.hasMany(ProyectoInversion, { foreignKey: 'campana_id', as: 'proyectos_inversion' });
+ProyectoInversion.belongsTo(Campaign, { foreignKey: 'campana_id', as: 'campana' });
 
 // Asociaciones de Reuniones
 Reunion.hasMany(ReunionAsistente, { foreignKey: 'reunion_id', as: 'asistentes', onDelete: 'CASCADE' });
@@ -89,6 +97,7 @@ const logisticaRoutes = require('./routes/logisticaRoutes');
 const callCenterRoutes = require('./routes/callCenterRoutes');
 const necesidadesRoutes = require('./routes/necesidadesRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const projectBankRoutes = require('./routes/projectBankRoutes');
 
 app.use(cors());
 app.use(express.json({ limit: '25mb' }));
@@ -132,6 +141,7 @@ app.use('/api/dia-d', diaDRoutes);
 app.use('/api/logistica', logisticaRoutes);
 app.use('/api/callcenter', callCenterRoutes);
 app.use('/api/necesidades', necesidadesRoutes);
+app.use('/api/proyectos', projectBankRoutes);
 app.use('/api/notifications', notificationRoutes);
 
 // Ruta pública de Revisor y Trazabilidad por el Link del Candidato

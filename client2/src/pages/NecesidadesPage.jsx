@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCampaign } from '../context/CampaignContext';
 import { colombiaData } from '../data/colombiaData';
@@ -7,7 +8,7 @@ import {
     Sparkles, Plus, Search, Filter, MapPin, Users, DollarSign,
     AlertTriangle, CheckCircle2, Clock, FileText, Copy, Check,
     X, ChevronRight, BarChart3, Building2, Flame, RefreshCw, Send,
-    Share2, ExternalLink
+    Share2, ExternalLink, Landmark
 } from 'lucide-react';
 import { API } from '../config/api';
 
@@ -39,6 +40,7 @@ const ESTADOS = {
 };
 
 export default function NecesidadesPage() {
+    const navigate = useNavigate();
     const { user } = useAuth();
     const { activeCampaign } = useCampaign();
     const token = localStorage.getItem('token');
@@ -250,8 +252,16 @@ export default function NecesidadesPage() {
 
                     <div className="flex flex-wrap items-center gap-3">
                         <button
+                            onClick={() => navigate('/proyectos-mga')}
+                            className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 font-black shadow-lg shadow-amber-500/25 transition-all transform hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
+                            title="Convertir necesidades en proyectos MGA para bajar dineros de ministerios"
+                        >
+                            <Landmark size={18} />
+                            <span>Bajar Recursos (Ministerios / MGA)</span>
+                        </button>
+                        <button
                             onClick={() => setModalCompartirAbierto(true)}
-                            className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition-all shadow-lg shadow-indigo-600/30 transform hover:-translate-y-0.5"
+                            className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition-all shadow-lg shadow-indigo-600/30 transform hover:-translate-y-0.5 cursor-pointer"
                             title="Compartir link público para que los ciudadanos radiquen sus necesidades"
                         >
                             <Share2 size={18} />
@@ -259,14 +269,14 @@ export default function NecesidadesPage() {
                         </button>
                         <button
                             onClick={handleGenerarResumenIA}
-                            className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black shadow-lg shadow-emerald-500/25 transition-all transform hover:-translate-y-0.5 active:translate-y-0"
+                            className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black shadow-lg shadow-emerald-500/25 transition-all transform hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
                         >
                             <Sparkles size={18} className="animate-spin-slow" />
                             <span>Resumen Ejecutivo con IA</span>
                         </button>
                         <button
                             onClick={() => setModalCrearAbierto(true)}
-                            className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white font-bold transition-all"
+                            className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white font-bold transition-all cursor-pointer"
                         >
                             <Plus size={18} />
                             <span>Reportar Necesidad</span>
