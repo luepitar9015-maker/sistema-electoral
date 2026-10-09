@@ -1,4 +1,5 @@
 const CensoElectoral = require('../models/CensoElectoral');
+const CensoDefuncion = require('../models/CensoDefuncion');
 const Voter = require('../models/Voter');
 const ExcelJS = require('exceljs');
 const { Op } = require('sequelize');
@@ -380,3 +381,218 @@ exports.clearCenso = async (req, res) => {
         return res.status(500).json({ message: 'Error al vaciar censo', error: error.message });
     }
 };
+
+// ─── MAPEO DE COLUMNAS PARA DEFUNCIONES ─────────────────────────────────────
+const DEFUNCIONES_COLUMN_MAP = {
+    cedula: ['cedula', 'cc', 'documento', 'num documento', 'numero documento', 'nro cedula', 'no cedula', 'identificacion', 'nuip', 'doc'],
+    nombres: ['nombres', 'nombre', 'primer nombre', 'nombres completos', 'nombre completo'],
+    apellidos: ['apellidos', 'apellido', 'primer apellido', 'apellidos completos'],
+    fecha_defuncion: ['fecha_defuncion', 'fecha defuncion', 'fecha', 'fecha_muerte', 'fecha fallecimiento', 'defuncion', 'fecha cancelacion', 'fallecimiento'],
+    municipio_defuncion: ['municipio', 'municipio_defuncion', 'ciudad', 'municipio defuncion'],
+    departamento_defuncion: ['departamento', 'departamento_defuncion', 'depto', 'dpto', 'departamento defuncion'],
+    fuente_registro: ['fuente', 'fuente_registro', 'origen', 'registro', 'entidad'],
+    observaciones: ['observaciones', 'observacion', 'motivo', 'notas']
+};
+
+// ─── CARGA MASIVA DE CÉDULAS DE DIFUNTOS / BAJAS POR MUERTE (EXCEL / CSV) ──
+exports.importDefunciones = async (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ message: 'No se recibió ningún archivo de defunciones' });
+    }
+
+    try {
+        const rows = [];
+        const filename = (req.file.originalname || '').toLowerCase();
+
+        if (filename.endsWith('.csv') || req.file.mimetype === 'text/csv' || req.file.mimetype === 'text/plain') {
+            const content = req.file.buffer.toString('utf-8');
+            const lines = content.split(/\r?\n/).filter(line => line.trim().length > 0);
+            if (lines.length < 2) {
+                return res.status(400).json({ message: 'El archivo CSV está vacío o no contiene filas de datos' });
+            }
+
+            const firstLine = lines[0];
+            const delimiter = (firstLine.match(/;/g) || []).length > (firstLine.match(/,/g) || []).length ? ';' : ',';
+            const rawHeaders = firstLine.split(delimiter).map(h => norm(h.replace(/^["']|["']$/g, '')));
+
+            const colMap = {};
+            rawHeaders.forEach((header, idx) => {
+                for (const [field, variants] of Object.entries(DEFUNCIONES_COLUMN_MAP)) {
+                    if (variants.includes(header)) {
+                        colMap[idx] = field;
+                        break;
+                    }
+                }
+            });
+
+            for (let i = 1; i < lines.length; i++) {
+                const parts = lines[i].split(delimiter).map(v => v.replace(/^["']|["']$/g, '').trim());
+                const obj = {};
+                parts.forEach((val, idx) => {
+                    const field = colMap[idx];
+                    if (field) obj[field] = val;
+                });
+
+                const ced = String(obj.cedula || '').replace(/\D/g, '').trim();
+                if (ced.length >= 4) {
+                    obj.cedula = ced;
+                    if (!obj.fuente_registro) obj.fuente_registro = 'RNEC - Bajas por Muerte';
+                    rows.push(obj);
+                }
+            }
+        } else {
+            const workbook = new ExcelJS.Workbook();
+            await workbook.xlsx.load(req.file.buffer);
+            const sheet = workbook.worksheets[0];
+            if (!sheet) {
+                return res.status(400).json({ message: 'El archivo Excel no contiene hojas de cálculo' });
+            }
+
+            const rawHeaders = [];
+            sheet.getRow(1).eachCell({ includeEmpty: true }, (cell, colIdx) => {
+                rawHeaders[colIdx - 1] = norm(cell.value);
+            });
+
+            const colFieldMap = {};
+            rawHeaders.forEach((rawHeader, colIdx) => {
+                for (const [field, variants] of Object.entries(DEFUNCIONES_COLUMN_MAP)) {
+                    if (variants.includes(rawHeader)) {
+                        colFieldMap[colIdx] = field;
+                        break;
+                    }
+                }
+            });
+
+            sheet.eachRow((row, rowNumber) => {
+                if (rowNumber <= 1) return;
+                const obj = {};
+                row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+                    const fieldName = colFieldMap[colNumber - 1];
+                    if (fieldName) {
+                        let val = cell.value;
+                        if (val !== null && val !== undefined) {
+                            if (typeof val === 'number') val = String(Math.round(val));
+                            else if (typeof val === 'object' && val.text) val = val.text;
+                            else if (val instanceof Date) val = val.toISOString().split('T')[0];
+                            else val = String(val).trim();
+                        } else {
+                            val = '';
+                        }
+                        obj[fieldName] = val;
+                    }
+                });
+
+                const cedVal = String(obj.cedula || '').replace(/\D/g, '').trim();
+                if (cedVal.length >= 4) {
+                    obj.cedula = cedVal;
+                    if (!obj.fuente_registro) obj.fuente_registro = 'RNEC - Bajas por Muerte';
+                    rows.push(obj);
+                }
+            });
+        }
+
+        if (rows.length === 0) {
+            return res.status(400).json({
+                message: 'No se encontraron cédulas de defunción válidas en el archivo.'
+            });
+        }
+
+        // Eliminar duplicados en el archivo
+        const uniqueMap = new Map();
+        for (const item of rows) {
+            uniqueMap.set(item.cedula, item);
+        }
+        const uniqueRows = Array.from(uniqueMap.values());
+
+        // Guardar en lotes de 500
+        const BATCH_SIZE = 500;
+        for (let i = 0; i < uniqueRows.length; i += BATCH_SIZE) {
+            const batch = uniqueRows.slice(i, i + BATCH_SIZE);
+            await CensoDefuncion.bulkCreate(batch, {
+                updateOnDuplicate: ['nombres', 'apellidos', 'fecha_defuncion', 'municipio_defuncion', 'departamento_defuncion', 'fuente_registro', 'observaciones']
+            });
+        }
+
+        const totalDefunciones = await CensoDefuncion.count();
+
+        return res.json({
+            success: true,
+            totalProcessed: uniqueRows.length,
+            totalDefunciones,
+            message: `¡Base de defunciones actualizada! Se registraron ${uniqueRows.length} cédulas dadas de baja por fallecimiento. Total en lista negra: ${totalDefunciones}.`
+        });
+    } catch (error) {
+        console.error('Error importando defunciones:', error);
+        return res.status(500).json({ message: 'Error al procesar archivo de defunciones', error: error.message });
+    }
+};
+
+// ─── ESTADÍSTICAS DE DEFUNCIONES ───────────────────────────────────────────
+exports.getDefuncionesStats = async (req, res) => {
+    try {
+        const totalDefunciones = await CensoDefuncion.count();
+        return res.json({ totalDefunciones });
+    } catch (error) {
+        console.error('Error en getDefuncionesStats:', error);
+        return res.status(500).json({ message: 'Error al consultar defunciones', error: error.message });
+    }
+};
+
+// ─── DESCARGAR PLANTILLA PARA REGISTRO DE DIFUNTOS ─────────────────────────
+exports.downloadDefuncionesTemplate = async (req, res) => {
+    try {
+        const workbook = new ExcelJS.Workbook();
+        workbook.creator = 'Sistema Electoral';
+        const sheet = workbook.addWorksheet('Bajas por Muerte');
+
+        sheet.columns = [
+            { header: 'cedula',                 key: 'cedula',                 width: 16 },
+            { header: 'nombres',                key: 'nombres',                width: 22 },
+            { header: 'apellidos',              key: 'apellidos',              width: 22 },
+            { header: 'fecha_defuncion',        key: 'fecha_defuncion',        width: 18 },
+            { header: 'municipio_defuncion',    key: 'municipio_defuncion',    width: 22 },
+            { header: 'departamento_defuncion', key: 'departamento_defuncion', width: 22 },
+            { header: 'fuente_registro',        key: 'fuente_registro',        width: 26 },
+            { header: 'observaciones',          key: 'observaciones',          width: 30 }
+        ];
+
+        const headerRow = sheet.getRow(1);
+        headerRow.eachCell(cell => {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF991B1B' } }; // Rojo oscuro de alerta
+            cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+            cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        });
+        headerRow.height = 24;
+
+        sheet.addRow({
+            cedula: '13456789',
+            nombres: 'PEDRO',
+            apellidos: 'PÉREZ',
+            fecha_defuncion: '2023-05-14',
+            municipio_defuncion: 'Bucaramanga',
+            departamento_defuncion: 'Santander',
+            fuente_registro: 'RNEC - Bajas por Defunción',
+            observaciones: 'Cancelación de cédula por fallecimiento'
+        });
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename=plantilla_bajas_defuncion_rnec.xlsx');
+        await workbook.xlsx.write(res);
+        res.end();
+    } catch (error) {
+        console.error('Error generando plantilla defunciones:', error);
+        res.status(500).json({ message: 'Error al generar plantilla', error: error.message });
+    }
+};
+
+// ─── VACIAR LISTA DE DEFUNCIONES ───────────────────────────────────────────
+exports.clearDefunciones = async (req, res) => {
+    try {
+        await CensoDefuncion.destroy({ where: {}, truncate: false });
+        return res.json({ success: true, message: 'Base de defunciones vaciada exitosamente' });
+    } catch (error) {
+        console.error('Error al vaciar defunciones:', error);
+        return res.status(500).json({ message: 'Error al vaciar base de defunciones', error: error.message });
+    }
+};
+

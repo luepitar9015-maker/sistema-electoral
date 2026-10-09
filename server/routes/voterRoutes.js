@@ -21,6 +21,8 @@ router.post('/import',         upload.single('file'), voterController.importVote
 // Inteligencia territorial, GIS y Anti-Trashumancia
 router.get('/geo-data',        voterController.getTerritorialGeoData);
 router.post('/auditar-trashumancia', voterController.auditarTrashumanciaMasiva);
+router.post('/auditar-votos-reales', voterController.auditarVotosReales);
+router.get('/resumen-votos-reales',  voterController.getResumenVotosReales);
 
 // Scoring y seguimiento
 router.put('/:id/scoring',     voterController.updateVoterScoring);

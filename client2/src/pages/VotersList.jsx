@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useCampaign } from '../context/CampaignContext';
 import { colombiaData } from '../data/colombiaData';
-import { Search, Save, CheckCircle, Loader, Zap, ExternalLink, RefreshCw, Flag, Star, ShieldAlert } from 'lucide-react';
+import { Search, Save, CheckCircle, Loader, Zap, ExternalLink, RefreshCw, Flag, Star, ShieldAlert, Skull, ShieldCheck } from 'lucide-react';
 import VoterScoringModal from '../components/VoterScoringModal';
 import { API } from '../config/api';
 
@@ -22,6 +22,7 @@ export default function VotersList() {
     const [loading, setLoading] = useState(true);
     const [autoAssigning, setAutoAssigning] = useState(false);
     const [auditingTrashumancia, setAuditingTrashumancia] = useState(false);
+    const [auditingRealVotes, setAuditingRealVotes] = useState(false);
     const [search, setSearch] = useState('');
     const [filterDept, setFilterDept] = useState('');
     const [filterCamp, setFilterCamp] = useState(activeCampaign?.id || '');
@@ -60,7 +61,18 @@ export default function VotersList() {
         const dept = !filterDept || v.departamento === filterDept;
         const campOk = !filterCamp || v.campana_id === parseInt(filterCamp, 10);
         const apoyoOk = !filterApoyo || v.apoyo_id === parseInt(filterApoyo, 10);
-        const trashumanciaOk = !filterTrashumancia || v.estado_trashumancia === filterTrashumancia;
+        
+        let trashumanciaOk = true;
+        if (filterTrashumancia === 'voto_real') {
+            trashumanciaOk = !!v.es_voto_real;
+        } else if (filterTrashumancia === 'fallecido') {
+            trashumanciaOk = !!v.es_fallecido || v.estado_trashumancia === 'fallecido';
+        } else if (filterTrashumancia === 'duplicado') {
+            trashumanciaOk = !!v.es_duplicado;
+        } else if (filterTrashumancia) {
+            trashumanciaOk = v.estado_trashumancia === filterTrashumancia;
+        }
+
         return ok && dept && campOk && apoyoOk && trashumanciaOk;
     });
 
@@ -124,6 +136,28 @@ export default function VotersList() {
         }
     };
 
+    const handleAuditarVotosReales = async () => {
+        setAuditingRealVotes(true);
+        try {
+            const campQuery = filterCamp ? `?campana_id=${filterCamp}` : '';
+            const res = await axios.post(`${API}/voters/auditar-votos-reales${campQuery}`, {}, { headers });
+            const s = res.data.data.stats;
+            alert(`🛡️ AUDITORÍA DE DIFUNTOS Y VOTOS REALES COMPLETADA:\n\n` +
+                `• Total Padrón Bruto: ${s.total_auditados}\n` +
+                `• 💀 Cédulas de Difuntos Detectadas: ${s.difuntos_detectados}\n` +
+                `• ❌ No Habilitados en Censo: ${s.no_en_censo}\n` +
+                `• 🚚 Trashumancia (Fuera de Territorio): ${s.trashumancia_municipio + s.trashumancia_departamento}\n` +
+                `• 👥 Duplicados entre Líderes: ${s.duplicados_detectados}\n\n` +
+                `🎯 VOTOS REALES COMPUTABLES: ${s.votos_reales_computables} (${s.porcentaje_efectividad_real}% efectividad)\n` +
+                `🛡️ Voto Duro Seguro (Ponderado): ${s.proyeccion_ponderada_fidelidad}`);
+            fetch();
+        } catch (e) {
+            alert(e.response?.data?.message || 'Error al ejecutar auditoría de votos reales');
+        } finally {
+            setAuditingRealVotes(false);
+        }
+    };
+
     const handleOpenRegistraduria = (cedula) => {
         const cleanCed = String(cedula || '').replace(/\D/g, '').trim();
         if (cleanCed) {
@@ -143,7 +177,17 @@ export default function VotersList() {
                     <h1 className="text-xl font-black text-gray-800 uppercase tracking-wide">Votantes</h1>
                     <p className="text-gray-400 text-xs">{filtered.length.toLocaleString()} registros · mostrando hasta 100 por página</p>
                 </div>
-                <div className="flex items-center gap-2 text-xs">
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <button
+                        onClick={handleAuditarVotosReales}
+                        disabled={auditingRealVotes}
+                        className="flex items-center gap-1.5 bg-rose-600 hover:bg-rose-500 disabled:bg-gray-400 text-white font-black px-3.5 py-2 rounded-lg uppercase tracking-wider text-xs shadow-sm transition-all"
+                        title="Audita bajas por defunción RNEC, elimina votos fantasmas y calcula votos reales"
+                    >
+                        <Skull size={14} className={auditingRealVotes ? 'animate-bounce text-yellow-300' : 'text-yellow-300'} />
+                        <span>{auditingRealVotes ? 'Auditando...' : '💀 Auditar Difuntos & Votos Reales'}</span>
+                    </button>
+
                     <button
                         onClick={handleAutoAssign}
                         disabled={autoAssigning}
@@ -164,13 +208,21 @@ export default function VotersList() {
                         <span>{auditingTrashumancia ? 'Auditando...' : '🛡️ Auditar Trashumancia'}</span>
                     </button>
 
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5 text-center shadow-sm">
+                        <span className="text-emerald-700 block font-bold uppercase text-[10px]">Votos Reales</span>
+                        <span className="text-base font-black text-emerald-600">{voters.filter(v => v.es_voto_real).length}</span>
+                    </div>
+
+                    {voters.filter(v => v.es_fallecido).length > 0 && (
+                        <div className="bg-rose-50 border border-rose-200 rounded-lg px-3 py-1.5 text-center shadow-sm">
+                            <span className="text-rose-700 block font-bold uppercase text-[10px]">💀 Difuntos</span>
+                            <span className="text-base font-black text-rose-600">{voters.filter(v => v.es_fallecido).length}</span>
+                        </div>
+                    )}
+
                     <div className="bg-white border rounded-lg px-3 py-1.5 text-center shadow-sm">
                         <span className="text-gray-400 block font-bold uppercase text-[10px]">Con Puesto</span>
                         <span className="text-base font-black text-[#00B894]">{voters.filter(v => v.lugar_votacion).length}</span>
-                    </div>
-                    <div className="bg-white border rounded-lg px-3 py-1.5 text-center shadow-sm">
-                        <span className="text-gray-400 block font-bold uppercase text-[10px]">Sin Puesto</span>
-                        <span className="text-base font-black text-orange-500">{voters.filter(v => !v.lugar_votacion).length}</span>
                     </div>
                 </div>
             </div>
@@ -216,13 +268,16 @@ export default function VotersList() {
                         ))}
                 </select>
 
-                {/* Filtro de Trashumancia / Censo */}
+                {/* Filtro de Trashumancia / Censo / Difuntos */}
                 <select
                     value={filterTrashumancia}
                     onChange={e => { setFilterTrashumancia(e.target.value); setPage(1); }}
                     className="px-2.5 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none font-bold text-rose-700 bg-white min-w-48"
                 >
-                    <option value="">🛡️ Todos los Estados de Trashumancia</option>
+                    <option value="">🛡️ Auditoría Electoral / Todos</option>
+                    <option value="voto_real">🟢 Votos Reales Computables</option>
+                    <option value="fallecido">💀 DIFUNTOS (Bajas por Muerte)</option>
+                    <option value="duplicado">👥 Duplicados entre Líderes</option>
                     <option value="valido">🟢 Voto Válido en Territorio</option>
                     <option value="alerta_municipio">🟡 Alerta: Vota en otro Municipio</option>
                     <option value="alerta_departamento">🔴 Alerta: Vota en otro Departamento</option>
@@ -364,10 +419,14 @@ export default function VotersList() {
                                                 />
                                             </td>
                                             {/* Trashumancia / Censo Real */}
-                                            <td className="border-r border-gray-100 px-1 text-center" title={row.detalle_trashumancia || 'Sin análisis de censo'}>
+                                            <td className="border-r border-gray-100 px-1 text-center" title={row.motivo_invalidez || row.detalle_trashumancia || 'Sin análisis de censo'}>
                                                 <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider cursor-help ${
-                                                    row.estado_trashumancia === 'valido'
-                                                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                                    row.es_fallecido || row.estado_trashumancia === 'fallecido'
+                                                        ? 'bg-rose-600 text-white font-black shadow-sm'
+                                                        : row.es_duplicado
+                                                            ? 'bg-purple-100 text-purple-800 border border-purple-300'
+                                                            : row.es_voto_real
+                                                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
                                                         : row.estado_trashumancia === 'alerta_municipio'
                                                             ? 'bg-amber-100 text-amber-800 border border-amber-300'
                                                             : row.estado_trashumancia === 'alerta_departamento'
@@ -376,7 +435,9 @@ export default function VotersList() {
                                                                     ? 'bg-orange-100 text-orange-800 border border-orange-300'
                                                                     : 'bg-gray-100 text-gray-500'
                                                 }`}>
-                                                    {row.estado_trashumancia === 'valido' ? '🟢 Válido' :
+                                                    {row.es_fallecido || row.estado_trashumancia === 'fallecido' ? '💀 Difunto' :
+                                                     row.es_duplicado ? '👥 Duplicado' :
+                                                     row.es_voto_real ? '🟢 Voto Real' :
                                                      row.estado_trashumancia === 'alerta_municipio' ? '🟡 Otro Mpio' :
                                                      row.estado_trashumancia === 'alerta_departamento' ? '🔴 Dif. Dpto' :
                                                      row.estado_trashumancia === 'sospecha_concentracion' ? '🟠 Concentrado' :

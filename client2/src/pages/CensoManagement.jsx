@@ -3,7 +3,9 @@ import axios from 'axios';
 import {
     Database, UploadCloud, Download, Search, CheckCircle,
     XCircle, AlertCircle, RefreshCw, ExternalLink, Copy, Check,
-    FileSpreadsheet, Zap, Trash2, MapPin, Building, Hash
+    FileSpreadsheet, Zap, Trash2, MapPin, Building, Hash,
+    Skull, ShieldCheck, ShieldAlert, Users, AlertTriangle,
+    Layers, TrendingUp, Award, FileText
 } from 'lucide-react';
 import { API } from '../config/api';
 
@@ -11,7 +13,10 @@ export default function CensoManagement() {
     const token = localStorage.getItem('token');
     const authHeaders = { headers: { Authorization: `Bearer ${token}` } };
 
-    // Estados de estadísticas
+    // Pestaña activa: 'censo' | 'difuntos'
+    const [activeTab, setActiveTab] = useState('censo');
+
+    // Estados de estadísticas de censo general
     const [stats, setStats] = useState({
         totalCenso: 0,
         totalVoters: 0,
@@ -21,12 +26,36 @@ export default function CensoManagement() {
     });
     const [loadingStats, setLoadingStats] = useState(true);
 
-    // Estados de carga de archivo
+    // Estados de defunciones y votos reales
+    const [defuncionesCount, setDefuncionesCount] = useState(0);
+    const [resumenVotosReales, setResumenVotosReales] = useState({
+        total_auditados: 0,
+        votos_brutos: 0,
+        difuntos_detectados: 0,
+        duplicados_detectados: 0,
+        no_en_censo: 0,
+        trashumancia_municipio: 0,
+        trashumancia_departamento: 0,
+        votos_reales_computables: 0,
+        voto_duro_seguro: 0,
+        porcentaje_efectividad_real: 0
+    });
+    const [auditData, setAuditData] = useState(null);
+    const [auditingRealVotes, setAuditingRealVotes] = useState(false);
+
+    // Estados de carga de archivo de censo
     const [file, setFile] = useState(null);
     const [uploading, setUploading] = useState(false);
     const [uploadResult, setUploadResult] = useState(null);
     const [dragOver, setDragOver] = useState(false);
     const fileInputRef = useRef(null);
+
+    // Estados de carga de archivo de defunciones
+    const [fileDefuncion, setFileDefuncion] = useState(null);
+    const [uploadingDefuncion, setUploadingDefuncion] = useState(false);
+    const [uploadDefuncionResult, setUploadDefuncionResult] = useState(null);
+    const [dragOverDefuncion, setDragOverDefuncion] = useState(false);
+    const fileDefuncionInputRef = useRef(null);
 
     // Estados de autodiligenciamiento
     const [autoAssigning, setAutoAssigning] = useState(false);
@@ -38,24 +67,32 @@ export default function CensoManagement() {
     const [searchResult, setSearchResult] = useState(null);
     const [copied, setCopied] = useState(false);
 
-    // Cargar estadísticas al inicio
-    const fetchStats = async () => {
+    // Cargar estadísticas
+    const fetchAllStats = async () => {
         setLoadingStats(true);
         try {
-            const res = await axios.get(`${API}/censo/stats`, authHeaders);
-            setStats(res.data);
+            const [resCenso, resDefunciones, resVotos] = await Promise.all([
+                axios.get(`${API}/censo/stats`, authHeaders).catch(() => ({ data: {} })),
+                axios.get(`${API}/censo/defunciones/stats`, authHeaders).catch(() => ({ data: { totalDefunciones: 0 } })),
+                axios.get(`${API}/voters/resumen-votos-reales`, authHeaders).catch(() => ({ data: {} }))
+            ]);
+            setStats(resCenso.data);
+            setDefuncionesCount(resDefunciones.data.totalDefunciones || 0);
+            if (resVotos.data && resVotos.data.total_auditados !== undefined) {
+                setResumenVotosReales(resVotos.data);
+            }
         } catch (error) {
-            console.error('Error fetching censo stats:', error);
+            console.error('Error fetching stats:', error);
         } finally {
             setLoadingStats(false);
         }
     };
 
     useEffect(() => {
-        fetchStats();
+        fetchAllStats();
     }, []);
 
-    // ─── CARGA MASIVA ────────────────────────────────────────────────────────
+    // ─── CARGA MASIVA DE CENSO ────────────────────────────────────────────────
     const handleDownloadTemplate = async () => {
         try {
             const res = await axios.get(`${API}/censo/template`, {
@@ -112,7 +149,7 @@ export default function CensoManagement() {
             setUploadResult({ type: 'success', message: res.data.message, total: res.data.totalProcessed });
             setFile(null);
             if (fileInputRef.current) fileInputRef.current.value = '';
-            fetchStats();
+            fetchAllStats();
         } catch (error) {
             setUploadResult({
                 type: 'error',
@@ -120,6 +157,71 @@ export default function CensoManagement() {
             });
         } finally {
             setUploading(false);
+        }
+    };
+
+    // ─── CARGA MASIVA DE DEFUNCIONES / DIFUNTOS (RNEC) ────────────────────────
+    const handleDownloadDefuncionesTemplate = async () => {
+        try {
+            const res = await axios.get(`${API}/censo/defunciones/template`, {
+                ...authHeaders,
+                responseType: 'blob'
+            });
+            const url = window.URL.createObjectURL(new Blob([res.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', 'plantilla_bajas_defuncion_rnec.xlsx');
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+        } catch (error) {
+            alert('Error al descargar plantilla de defunciones: ' + (error.response?.data?.message || error.message));
+        }
+    };
+
+    const handleUploadDefunciones = async () => {
+        if (!fileDefuncion) return;
+        setUploadingDefuncion(true);
+        setUploadDefuncionResult(null);
+
+        try {
+            const formData = new FormData();
+            formData.append('file', fileDefuncion);
+
+            const res = await axios.post(`${API}/censo/defunciones/import`, formData, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'multipart/form-data'
+                }
+            });
+
+            setUploadDefuncionResult({ type: 'success', message: res.data.message });
+            setFileDefuncion(null);
+            if (fileDefuncionInputRef.current) fileDefuncionInputRef.current.value = '';
+            fetchAllStats();
+        } catch (error) {
+            setUploadDefuncionResult({
+                type: 'error',
+                message: error.response?.data?.message || 'Error al procesar archivo de defunciones'
+            });
+        } finally {
+            setUploadingDefuncion(false);
+        }
+    };
+
+    // ─── AUDITORÍA INTEGRAL DE VOTOS REALES Y DIFUNTOS ───────────────────────
+    const handleRunAuditoriaVotosReales = async () => {
+        setAuditingRealVotes(true);
+        try {
+            const res = await axios.post(`${API}/voters/auditar-votos-reales`, {}, authHeaders);
+            setAuditData(res.data.data);
+            setResumenVotosReales(res.data.data.stats);
+            fetchAllStats();
+        } catch (error) {
+            alert('Error al ejecutar auditoría de votos reales: ' + (error.response?.data?.message || error.message));
+        } finally {
+            setAuditingRealVotes(false);
         }
     };
 
@@ -207,8 +309,47 @@ export default function CensoManagement() {
                 </div>
             </div>
 
-            {/* Métricas KPI */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Pestañas de Navegación */}
+            <div className="flex border-b border-gray-200 gap-2">
+                <button
+                    onClick={() => setActiveTab('censo')}
+                    className={`flex items-center gap-2 px-6 py-3 font-black text-xs md:text-sm uppercase tracking-wider rounded-t-xl transition-all border-b-2 ${
+                        activeTab === 'censo'
+                            ? 'border-[#00B894] text-[#00B894] bg-white shadow-sm'
+                            : 'border-transparent text-gray-500 hover:text-gray-800'
+                    }`}
+                >
+                    <Database size={18} />
+                    <span>Censo Electoral & Puestos</span>
+                </button>
+
+                <button
+                    onClick={() => setActiveTab('difuntos')}
+                    className={`flex items-center gap-2 px-6 py-3 font-black text-xs md:text-sm uppercase tracking-wider rounded-t-xl transition-all border-b-2 ${
+                        activeTab === 'difuntos'
+                            ? 'border-rose-600 text-rose-600 bg-white shadow-sm'
+                            : 'border-transparent text-gray-500 hover:text-gray-800'
+                    }`}
+                >
+                    <Skull size={18} className="text-rose-500" />
+                    <span>Auditoría de Difuntos & Votos Reales</span>
+                    {resumenVotosReales.difuntos_detectados > 0 ? (
+                        <span className="bg-rose-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold animate-pulse">
+                            {resumenVotosReales.difuntos_detectados} Difuntos
+                        </span>
+                    ) : (
+                        <span className="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                            Depuración Activa
+                        </span>
+                    )}
+                </button>
+            </div>
+
+            {/* CONTENIDO PESTAÑA 1: CENSO ELECTORAL */}
+            {activeTab === 'censo' && (
+                <div className="space-y-6">
+                    {/* Métricas KPI */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm flex items-center justify-between">
                     <div>
                         <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Registros en Censo</p>
@@ -465,9 +606,367 @@ export default function CensoManagement() {
                         </p>
                     </div>
                 </div>
-
             </div>
+            </div>
+            )}
 
+            {/* CONTENIDO PESTAÑA 2: AUDITORÍA DE DIFUNTOS Y VOTOS REALES */}
+            {activeTab === 'difuntos' && (
+                <div className="space-y-6 animate-in fade-in duration-300">
+                    {/* Banner de Auditoría Forense */}
+                    <div className="bg-gradient-to-r from-slate-900 via-rose-950 to-slate-900 p-6 md:p-8 rounded-2xl text-white shadow-2xl border border-rose-900/40 relative overflow-hidden">
+                        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                            <div className="space-y-2 max-w-2xl">
+                                <div className="inline-flex items-center gap-2 bg-rose-500/20 text-rose-300 border border-rose-500/30 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider">
+                                    <Skull size={14} /> Auditoría Anti-Fraude & Depuración Electoral
+                                </div>
+                                <h2 className="text-2xl md:text-3xl font-black tracking-wide">
+                                    Detección de Difuntos y Cálculo de Votos Reales
+                                </h2>
+                                <p className="text-rose-100/80 text-sm leading-relaxed">
+                                    Depura automáticamente la base de datos de simpatizantes reportada por comités y líderes. Detecta cédulas canceladas por fallecimiento (bajas RNEC), suprime duplicidades y descarta trashumancia para obtener su <b>verdadero piso electoral computable</b>.
+                                </p>
+                            </div>
+
+                            <button
+                                onClick={handleRunAuditoriaVotosReales}
+                                disabled={auditingRealVotes}
+                                className="flex-shrink-0 flex items-center justify-center gap-3 bg-rose-600 hover:bg-rose-500 disabled:bg-gray-700 text-white font-black text-sm uppercase tracking-wider px-8 py-5 rounded-2xl shadow-2xl transition-all transform hover:-translate-y-1 hover:shadow-rose-600/30"
+                            >
+                                <Zap size={20} className={auditingRealVotes ? 'animate-spin text-yellow-300' : 'text-yellow-300'} />
+                                <span>{auditingRealVotes ? 'Auditando Cédulas...' : '⚡ Ejecutar Auditoría de Votos Reales'}</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Malla de Indicadores del Embudo de Purga */}
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                        {/* 1. Padrón Bruto */}
+                        <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
+                            <span className="text-[10px] font-black uppercase text-gray-400 block tracking-wider">1. Padrón Bruto</span>
+                            <div className="text-xl md:text-2xl font-black text-slate-800 mt-1">
+                                {resumenVotosReales.votos_brutos?.toLocaleString() || 0}
+                            </div>
+                            <span className="text-[10px] text-gray-500">Reportados por líderes</span>
+                        </div>
+
+                        {/* 2. Difuntos Detectados */}
+                        <div className="bg-rose-50/70 p-4 rounded-xl border border-rose-200 shadow-sm relative overflow-hidden">
+                            <span className="text-[10px] font-black uppercase text-rose-700 block tracking-wider flex items-center gap-1">
+                                <Skull size={12} /> 2. Difuntos
+                            </span>
+                            <div className="text-xl md:text-2xl font-black text-rose-600 mt-1">
+                                -{resumenVotosReales.difuntos_detectados?.toLocaleString() || 0}
+                            </div>
+                            <span className="text-[10px] text-rose-700 font-bold">Cédulas canceladas RNEC</span>
+                        </div>
+
+                        {/* 3. No en Censo */}
+                        <div className="bg-amber-50/70 p-4 rounded-xl border border-amber-200 shadow-sm">
+                            <span className="text-[10px] font-black uppercase text-amber-700 block tracking-wider">3. No en Censo</span>
+                            <div className="text-xl md:text-2xl font-black text-amber-600 mt-1">
+                                -{resumenVotosReales.no_en_censo?.toLocaleString() || 0}
+                            </div>
+                            <span className="text-[10px] text-amber-700">Sin inscripción vigente</span>
+                        </div>
+
+                        {/* 4. Trashumantes */}
+                        <div className="bg-orange-50/70 p-4 rounded-xl border border-orange-200 shadow-sm">
+                            <span className="text-[10px] font-black uppercase text-orange-700 block tracking-wider">4. Trashumancia</span>
+                            <div className="text-xl md:text-2xl font-black text-orange-600 mt-1">
+                                -{((resumenVotosReales.trashumancia_municipio || 0) + (resumenVotosReales.trashumancia_departamento || 0)).toLocaleString()}
+                            </div>
+                            <span className="text-[10px] text-orange-700">Votan en otro territorio</span>
+                        </div>
+
+                        {/* 5. Duplicados */}
+                        <div className="bg-purple-50/70 p-4 rounded-xl border border-purple-200 shadow-sm">
+                            <span className="text-[10px] font-black uppercase text-purple-700 block tracking-wider">5. Duplicados</span>
+                            <div className="text-xl md:text-2xl font-black text-purple-600 mt-1">
+                                -{resumenVotosReales.duplicados_detectados?.toLocaleString() || 0}
+                            </div>
+                            <span className="text-[10px] text-purple-700">Cruces entre líderes</span>
+                        </div>
+
+                        {/* 6. VOTOS REALES COMPUTABLES */}
+                        <div className="bg-emerald-600 p-4 rounded-xl text-white shadow-md relative overflow-hidden">
+                            <span className="text-[10px] font-black uppercase text-emerald-100 block tracking-wider flex items-center gap-1">
+                                <ShieldCheck size={12} /> 🎯 Votos Reales
+                            </span>
+                            <div className="text-xl md:text-2xl font-black mt-1">
+                                {resumenVotosReales.votos_reales_computables?.toLocaleString() || 0}
+                            </div>
+                            <span className="text-[10px] text-emerald-100 font-bold block">
+                                {resumenVotosReales.porcentaje_efectividad_real || 0}% efectividad neta
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Dos Bloques: Cargar Archivo de Difuntos & Embudo Visual */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+                        {/* Bloque Izquierdo: Cargar Base de Difuntos (RNEC) */}
+                        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-5">
+                            <div className="flex items-center justify-between border-b pb-4">
+                                <div>
+                                    <h3 className="font-black text-slate-800 uppercase tracking-wide text-sm flex items-center gap-2">
+                                        <Skull size={18} className="text-rose-600" /> Cargar Bajas por Defunción (RNEC / Notarías)
+                                    </h3>
+                                    <p className="text-gray-400 text-xs mt-0.5">
+                                        Base de datos negra de personas fallecidas para depurar listas electorales.
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={handleDownloadDefuncionesTemplate}
+                                    className="flex items-center gap-1.5 text-xs font-bold text-rose-700 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-lg border border-rose-200 transition-colors"
+                                >
+                                    <Download size={14} /> Plantilla Bajas
+                                </button>
+                            </div>
+
+                            {/* Dropzone Defunciones */}
+                            <div
+                                onDragOver={(e) => { e.preventDefault(); setDragOverDefuncion(true); }}
+                                onDragLeave={() => setDragOverDefuncion(false)}
+                                onDrop={(e) => {
+                                    e.preventDefault();
+                                    setDragOverDefuncion(false);
+                                    if (e.dataTransfer.files[0]) setFileDefuncion(e.dataTransfer.files[0]);
+                                }}
+                                onClick={() => fileDefuncionInputRef.current?.click()}
+                                className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all ${
+                                    dragOverDefuncion ? 'border-rose-500 bg-rose-50/50' : 'border-gray-200 hover:border-gray-300 bg-gray-50/50'
+                                }`}
+                            >
+                                <input
+                                    ref={fileDefuncionInputRef}
+                                    type="file"
+                                    accept=".xlsx, .xls, .csv"
+                                    onChange={(e) => { if (e.target.files[0]) setFileDefuncion(e.target.files[0]); }}
+                                    className="hidden"
+                                />
+                                <div className="w-12 h-12 mx-auto bg-white rounded-xl shadow-sm border border-gray-100 flex items-center justify-center text-rose-500 mb-3">
+                                    <Skull size={24} className={uploadingDefuncion ? 'animate-bounce' : ''} />
+                                </div>
+                                {fileDefuncion ? (
+                                    <div>
+                                        <p className="font-bold text-slate-800 text-sm">{fileDefuncion.name}</p>
+                                        <p className="text-gray-400 text-xs mt-1">{(fileDefuncion.size / (1024 * 1024)).toFixed(2)} MB</p>
+                                    </div>
+                                ) : (
+                                    <div>
+                                        <p className="font-bold text-gray-700 text-sm">Arrastra aquí el archivo de difuntos o haz clic</p>
+                                        <p className="text-gray-400 text-xs mt-1">Columna de cédula requerida. Soporta nombres, apellidos y fecha de defunción.</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Botón de Carga */}
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={handleUploadDefunciones}
+                                    disabled={!fileDefuncion || uploadingDefuncion}
+                                    className="flex-1 bg-rose-600 hover:bg-rose-700 disabled:bg-gray-300 text-white font-bold py-3 px-4 rounded-xl text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-2 shadow-sm"
+                                >
+                                    <UploadCloud size={16} />
+                                    <span>{uploadingDefuncion ? 'Cargando difuntos...' : 'Cargar Cédulas a Base de Bajas'}</span>
+                                </button>
+                                {fileDefuncion && (
+                                    <button
+                                        onClick={() => { setFileDefuncion(null); setUploadDefuncionResult(null); }}
+                                        className="px-3 py-3 border border-gray-200 text-gray-500 hover:bg-gray-100 rounded-xl transition-colors"
+                                    >
+                                        <XCircle size={18} />
+                                    </button>
+                                )}
+                            </div>
+
+                            {uploadDefuncionResult && (
+                                <div className={`p-4 rounded-xl border flex items-center gap-3 text-xs ${uploadDefuncionResult.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-rose-50 border-rose-200 text-rose-800'}`}>
+                                    {uploadDefuncionResult.type === 'success' ? <CheckCircle size={18} className="text-emerald-600" /> : <XCircle size={18} className="text-rose-600" />}
+                                    <span>{uploadDefuncionResult.message}</span>
+                                </div>
+                            )}
+
+                            {/* Estado de Bajas */}
+                            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between text-xs">
+                                <span className="text-slate-600 font-bold flex items-center gap-2">
+                                    <Database size={14} className="text-slate-500" /> Cédulas de difuntos registradas en lista negra:
+                                </span>
+                                <span className="font-black text-rose-600 bg-rose-100 px-2.5 py-0.5 rounded-full">
+                                    {defuncionesCount.toLocaleString()} cédulas
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Bloque Derecho: Visualizador del Embudo Electoral */}
+                        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-5">
+                            <div className="border-b pb-4">
+                                <h3 className="font-black text-slate-800 uppercase tracking-wide text-sm flex items-center gap-2">
+                                    <Layers size={18} className="text-emerald-600" /> Embudo de Depuración de Votos
+                                </h3>
+                                <p className="text-gray-400 text-xs mt-0.5">
+                                    Fórmula matemática de depuración aplicada sobre la lista de votantes.
+                                </p>
+                            </div>
+
+                            <div className="space-y-4 pt-2">
+                                {/* Barra 1: Padrón Bruto */}
+                                <div>
+                                    <div className="flex justify-between text-xs font-bold text-slate-700 mb-1">
+                                        <span>Padrón Bruto Registrado</span>
+                                        <span>100% ({resumenVotosReales.votos_brutos?.toLocaleString() || 0})</span>
+                                    </div>
+                                    <div className="w-full bg-gray-100 h-3 rounded-full overflow-hidden">
+                                        <div className="bg-slate-700 h-full rounded-full" style={{ width: '100%' }} />
+                                    </div>
+                                </div>
+
+                                {/* Barra 2: Difuntos & Bajas */}
+                                <div>
+                                    <div className="flex justify-between text-xs font-bold text-rose-700 mb-1">
+                                        <span className="flex items-center gap-1"><Skull size={12} /> Bajas por Difuntos</span>
+                                        <span>
+                                            -{resumenVotosReales.votos_brutos > 0 ? ((resumenVotosReales.difuntos_detectados / resumenVotosReales.votos_brutos) * 100).toFixed(1) : 0}% ({resumenVotosReales.difuntos_detectados})
+                                        </span>
+                                    </div>
+                                    <div className="w-full bg-gray-100 h-2.5 rounded-full overflow-hidden">
+                                        <div
+                                            className="bg-rose-500 h-full rounded-full"
+                                            style={{
+                                                width: `${resumenVotosReales.votos_brutos > 0 ? Math.min(100, (resumenVotosReales.difuntos_detectados / resumenVotosReales.votos_brutos) * 100) : 0}%`
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Barra 3: Trashumancia & No Censo */}
+                                <div>
+                                    <div className="flex justify-between text-xs font-bold text-amber-700 mb-1">
+                                        <span>No en Censo o Fuera de Territorio</span>
+                                        <span>
+                                            -{resumenVotosReales.votos_brutos > 0 ? (((resumenVotosReales.no_en_censo + resumenVotosReales.trashumancia_municipio + resumenVotosReales.trashumancia_departamento) / resumenVotosReales.votos_brutos) * 100).toFixed(1) : 0}%
+                                        </span>
+                                    </div>
+                                    <div className="w-full bg-gray-100 h-2.5 rounded-full overflow-hidden">
+                                        <div
+                                            className="bg-amber-500 h-full rounded-full"
+                                            style={{
+                                                width: `${resumenVotosReales.votos_brutos > 0 ? Math.min(100, ((resumenVotosReales.no_en_censo + resumenVotosReales.trashumancia_municipio + resumenVotosReales.trashumancia_departamento) / resumenVotosReales.votos_brutos) * 100) : 0}%`
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Barra 4: VOTO REAL FINAL */}
+                                <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl space-y-2 mt-4">
+                                    <div className="flex justify-between text-xs font-black text-emerald-900">
+                                        <span className="flex items-center gap-1.5"><ShieldCheck size={16} className="text-emerald-600" /> PISO ELECTORAL REAL COMPUTABLE</span>
+                                        <span className="text-base text-emerald-700">{resumenVotosReales.votos_reales_computables?.toLocaleString() || 0} Votos</span>
+                                    </div>
+                                    <div className="w-full bg-emerald-200 h-4 rounded-full overflow-hidden">
+                                        <div
+                                            className="bg-emerald-600 h-full rounded-full transition-all duration-700"
+                                            style={{ width: `${Math.min(100, resumenVotosReales.porcentaje_efectividad_real || 0)}%` }}
+                                        />
+                                    </div>
+                                    <p className="text-[11px] text-emerald-800 leading-relaxed pt-1">
+                                        Este es el número exacto de votantes habilitados legalmente para votar por su campaña en los puestos de votación de su circunscripción.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    {/* Ranking de Líderes por Calidad de Votos */}
+                    {auditData?.rankingLideres && auditData.rankingLideres.length > 0 && (
+                        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-4">
+                            <div className="flex items-center justify-between border-b pb-4">
+                                <div>
+                                    <h3 className="font-black text-slate-800 uppercase tracking-wide text-sm flex items-center gap-2">
+                                        <Award size={18} className="text-yellow-500" /> Auditoría de Listas por Líder Territorial
+                                    </h3>
+                                    <p className="text-gray-400 text-xs mt-0.5">
+                                        Efectividad real de cada líder: identifica quién trajo votos reales y quién aportó difuntos o trashumantes.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-xs text-left">
+                                    <thead className="bg-slate-50 text-slate-600 font-black uppercase text-[10px] tracking-wider border-b">
+                                        <tr>
+                                            <th className="py-3 px-4">Líder Responsable</th>
+                                            <th className="py-3 px-3 text-center">Total Aportados</th>
+                                            <th className="py-3 px-3 text-center text-emerald-700 font-bold">Votos Reales</th>
+                                            <th className="py-3 px-3 text-center text-rose-600 font-bold">Difuntos 💀</th>
+                                            <th className="py-3 px-3 text-center text-orange-600 font-bold">Trashumantes</th>
+                                            <th className="py-3 px-3 text-center text-amber-600 font-bold">No Censo</th>
+                                            <th className="py-3 px-4 text-right">Efectividad</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100 font-semibold text-slate-700">
+                                        {auditData.rankingLideres.map((lider, idx) => (
+                                            <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
+                                                <td className="py-3 px-4 font-bold text-slate-900 flex items-center gap-2">
+                                                    <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-600 text-[10px] flex items-center justify-center font-black">
+                                                        {idx + 1}
+                                                    </span>
+                                                    {lider.lider_nombre}
+                                                </td>
+                                                <td className="py-3 px-3 text-center font-bold">{lider.total_aportados}</td>
+                                                <td className="py-3 px-3 text-center font-black text-emerald-600 bg-emerald-50/40">
+                                                    {lider.votos_reales}
+                                                </td>
+                                                <td className="py-3 px-3 text-center">
+                                                    {lider.difuntos > 0 ? (
+                                                        <span className="bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full font-black text-[10px]">
+                                                            💀 {lider.difuntos}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-gray-400">0</span>
+                                                    )}
+                                                </td>
+                                                <td className="py-3 px-3 text-center">
+                                                    {lider.trashumantes > 0 ? (
+                                                        <span className="bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-bold text-[10px]">
+                                                            {lider.trashumantes}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-gray-400">0</span>
+                                                    )}
+                                                </td>
+                                                <td className="py-3 px-3 text-center">
+                                                    {lider.no_censo > 0 ? (
+                                                        <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold text-[10px]">
+                                                            {lider.no_censo}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-gray-400">0</span>
+                                                    )}
+                                                </td>
+                                                <td className="py-3 px-4 text-right">
+                                                    <span className={`px-2.5 py-1 rounded-lg font-black text-xs ${
+                                                        lider.tasa_limpieza >= 80
+                                                            ? 'bg-emerald-100 text-emerald-800'
+                                                            : lider.tasa_limpieza >= 50
+                                                            ? 'bg-amber-100 text-amber-800'
+                                                            : 'bg-rose-100 text-rose-800'
+                                                    }`}>
+                                                        {lider.tasa_limpieza}%
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+
+                </div>
+            )}
         </div>
     );
 }

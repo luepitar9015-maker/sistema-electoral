@@ -138,6 +138,31 @@ const Voter = sequelize.define('Voter', {
     mesa_censo_real: {
         type: DataTypes.STRING,
         allowNull: true
+    },
+    // Depuración de Censo, Difuntos y Votos Reales
+    es_fallecido: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false
+    },
+    fecha_defuncion: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    es_voto_real: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: true
+    },
+    motivo_invalidez: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    },
+    es_duplicado: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false
+    },
+    lideres_duplicados: {
+        type: DataTypes.TEXT,
+        allowNull: true
     }
 }, {
     timestamps: true,

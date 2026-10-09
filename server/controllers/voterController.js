@@ -5,6 +5,7 @@ const VoterInteraction = require('../models/VoterInteraction');
 const { Op } = require('sequelize');
 const ExcelJS = require('exceljs');
 const { evaluarTrashumancia } = require('../services/trashumanciaService');
+const { ejecutarAuditoriaVotosReales } = require('../services/electoralAuditService');
 
 exports.createVoter = async (req, res) => {
     try {
@@ -642,4 +643,63 @@ exports.auditarTrashumanciaMasiva = async (req, res) => {
         return res.status(500).json({ message: 'Error al ejecutar auditoría', error: error.message });
     }
 };
+
+// ─── AUDITORÍA INTEGRAL DE VOTOS REALES Y DIFUNTOS ─────────────────────────
+exports.auditarVotosReales = async (req, res) => {
+    try {
+        const campanaId = req.campaignId || req.campana_id || (req.query.campana_id ? parseInt(req.query.campana_id, 10) : null);
+        const resultado = await ejecutarAuditoriaVotosReales(campanaId);
+        return res.json({
+            success: true,
+            message: 'Auditoría integral completada: Se identificaron difuntos, duplicados, inconsistencias de censo y se calcularon los votos reales.',
+            data: resultado
+        });
+    } catch (error) {
+        console.error('Error en auditarVotosReales:', error);
+        return res.status(500).json({ message: 'Error al ejecutar auditoría de votos reales', error: error.message });
+    }
+};
+
+// ─── RESUMEN DE VOTOS REALES Y EFECTIVIDAD ─────────────────────────────────
+exports.getResumenVotosReales = async (req, res) => {
+    try {
+        const campanaId = req.campaignId || req.campana_id || (req.query.campana_id ? parseInt(req.query.campana_id, 10) : null);
+        const whereClause = {};
+        if (campanaId) whereClause.campana_id = campanaId;
+
+        const totalAuditados = await Voter.count({ where: whereClause });
+        const difuntosCount = await Voter.count({ where: { ...whereClause, es_fallecido: true } });
+        const duplicadosCount = await Voter.count({ where: { ...whereClause, es_duplicado: true, es_voto_real: false } });
+        const noEnCensoCount = await Voter.count({ where: { ...whereClause, estado_trashumancia: 'no_en_censo' } });
+        const trashumanciaMpio = await Voter.count({ where: { ...whereClause, estado_trashumancia: 'alerta_municipio' } });
+        const trashumanciaDepto = await Voter.count({ where: { ...whereClause, estado_trashumancia: 'alerta_departamento' } });
+        const votosReales = await Voter.count({ where: { ...whereClause, es_voto_real: true } });
+
+        // Scoring de votos reales seguros (fidelidad >= 4)
+        const votoDuro = await Voter.count({ 
+            where: { 
+                ...whereClause, 
+                es_voto_real: true, 
+                fidelidad_score: { [Op.gte]: 4 } 
+            } 
+        });
+
+        return res.json({
+            total_auditados: totalAuditados,
+            votos_brutos: totalAuditados,
+            difuntos_detectados: difuntosCount,
+            duplicados_detectados: duplicadosCount,
+            no_en_censo: noEnCensoCount,
+            trashumancia_municipio: trashumanciaMpio,
+            trashumancia_departamento: trashumanciaDepto,
+            votos_reales_computables: votosReales,
+            voto_duro_seguro: votoDuro,
+            porcentaje_efectividad_real: totalAuditados > 0 ? Math.round((votosReales / totalAuditados) * 100) : 0
+        });
+    } catch (error) {
+        console.error('Error en getResumenVotosReales:', error);
+        return res.status(500).json({ message: 'Error al obtener resumen de votos reales', error: error.message });
+    }
+};
+
 

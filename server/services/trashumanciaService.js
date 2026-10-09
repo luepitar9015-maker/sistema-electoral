@@ -37,10 +37,29 @@ async function evaluarTrashumancia({
         };
     }
 
+    // 0. Comprobar si la cédula figura como fallecida / cancelada por defunción
+    const CensoDefuncion = require('../models/CensoDefuncion');
+    const defuncionRecord = await CensoDefuncion.findOne({ where: { cedula: cleanCedula } });
+
     // 1. Buscar en el Censo Electoral oficial registrado
     const censoRecord = await CensoElectoral.findOne({
         where: { cedula: cleanCedula }
     });
+
+    if (defuncionRecord || (censoRecord && ['fallecido', 'cancelada', 'baja'].includes(String(censoRecord.estado_cedula || '').toLowerCase()))) {
+        return {
+            estado_trashumancia: 'fallecido',
+            detalle_trashumancia: `💀 CÉDULA DE DIFUNTO: Registrada como baja por defunción (${defuncionRecord?.fuente_registro || 'RNEC / Censo Inactivo'}). No computable legalmente.`,
+            es_computable: false,
+            es_fallecido: true,
+            es_voto_real: false,
+            nivel_riesgo: 'critico',
+            municipio_censo_real: censoRecord?.municipio || defuncionRecord?.municipio_defuncion || null,
+            departamento_censo_real: censoRecord?.departamento || defuncionRecord?.departamento_defuncion || null,
+            puesto_censo_real: null,
+            mesa_censo_real: null
+        };
+    }
 
     // 2. Obtener datos de la campaña si está asociada
     let campana = null;

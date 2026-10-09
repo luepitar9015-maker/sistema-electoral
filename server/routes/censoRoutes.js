@@ -27,4 +27,10 @@ router.get('/stats', censoController.getStats);
 // Limpieza de censo
 router.delete('/clear', censoController.clearCenso);
 
+// ─── CONTROL DE DIFUNTOS Y BAJAS POR MUERTE (RNEC) ─────────────────────────
+router.get('/defunciones/template', censoController.downloadDefuncionesTemplate);
+router.post('/defunciones/import', upload.single('file'), censoController.importDefunciones);
+router.get('/defunciones/stats', censoController.getDefuncionesStats);
+router.delete('/defunciones/clear', censoController.clearDefunciones);
+
 module.exports = router;
