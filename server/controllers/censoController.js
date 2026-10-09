@@ -3,6 +3,7 @@ const CensoDefuncion = require('../models/CensoDefuncion');
 const Voter = require('../models/Voter');
 const ExcelJS = require('exceljs');
 const { Op } = require('sequelize');
+const sequelize = require('../database/db');
 const { evaluarTrashumancia } = require('../services/trashumanciaService');
 
 // Normalizar texto: minúsculas, sin tildes, sin espacios extra
