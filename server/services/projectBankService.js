@@ -493,14 +493,17 @@ class ProjectBankService {
         const proyecto = await ProyectoInversion.findByPk(proyectoId);
         if (!proyecto) throw new Error('Proyecto no encontrado');
 
-        const config = SECTORES_CONFIG[proyecto.sector] || SECTORES_CONFIG.transporte_vias;
+        const config = SECTORES_CONFIG[proyecto.sector] ||
+            Object.values(SECTORES_CONFIG).find(s => s.nombre.toLowerCase().includes(String(proyecto.sector).toLowerCase().substring(0, 5))) ||
+            SECTORES_CONFIG.transporte_vias;
 
-        // Si tenemos API Key de Gemini, generamos formulación avanzada estructurada
+        // Si tenemos API Key válida de Gemini (AIzaSy...), intentamos con IA en máx 6 segundos
         const apiKey = process.env.GEMINI_API_KEY;
         let aiResult = null;
 
-        if (apiKey) {
+        if (apiKey && apiKey.startsWith('AIzaSy')) {
             try {
+                const model = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
                 const prompt = `
 Actúa como el estructurador senior de proyectos de inversión pública en Colombia (experto certificado en Metodología General Ajustada - MGA del Departamento Nacional de Planeación DNP).
 
@@ -547,9 +550,10 @@ Responde EXCLUSIVAMENTE en formato JSON con la siguiente estructura exacta:
 }
 `;
 
-                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`, {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
+                    signal: AbortSignal.timeout(6000),
                     body: JSON.stringify({
                         contents: [{ parts: [{ text: prompt }] }],
                         generationConfig: {
@@ -567,69 +571,190 @@ Responde EXCLUSIVAMENTE en formato JSON con la siguiente estructura exacta:
                     }
                 }
             } catch (err) {
-                console.warn('Fallo en IA Gemini para MGA, recurriendo al motor de formulación experto:', err.message);
+                console.warn('Fallo o timeout en IA Gemini para MGA, recurriendo al motor de formulación experto:', err.message);
             }
         }
 
-        // Si no hay API Key o falló la respuesta, usamos el motor experto de respaldo
+        // Si no hay API Key o falló la respuesta, usamos el motor experto de respaldo altamente especializado
         if (!aiResult) {
-            aiResult = {
-                arbol_problemas: {
-                    problema_central: `Deficiente infraestructura de ${config.nombre.toLowerCase()} y limitada capacidad de respuesta territorial en ${proyecto.municipio} (${proyecto.departamento}).`,
-                    causas_directas: [
-                        `Inexistencia o deterioro progresivo de obras de infraestructura adecuada en el sector.`,
-                        `Limitada disponibilidad presupuestal de fuentes corrientes para financiar inversiones de gran escala.`
-                    ],
-                    causas_indirectas: [
-                        `Condiciones climáticas severas que aceleran el desgaste de las intervenciones provisionales.`,
-                        `Histórico rezago en la cofinanciación con partidas del orden nacional.`
-                    ],
-                    efectos_directos: [
-                        `Afectación a la movilidad, salubridad y calidad de vida de más de ${proyecto.poblacion_beneficiada} habitantes.`,
-                        `Incremento en los costos de transporte de cosechas y pérdida de competitividad de las familias.`
-                    ],
-                    efectos_indirectos: [
-                        `Migración de población joven hacia centros urbanos y reducción de la productividad rural.`,
-                        `Aumento de la vulnerabilidad socioeconómica y reclamos constantes a la administración pública.`
+            const isAgua = config.nombre.toLowerCase().includes('agua') || config.nombre.toLowerCase().includes('saneamiento');
+            const isVias = config.nombre.toLowerCase().includes('transporte') || config.nombre.toLowerCase().includes('vía');
+
+            if (isAgua) {
+                aiResult = {
+                    arbol_problemas: {
+                        problema_central: `Suministro de agua con alto índice de riesgo de la calidad para consumo humano (IRCA > 60%) e insuficiente capacidad del sistema de acueducto en ${proyecto.municipio} (${proyecto.departamento}).`,
+                        causas_directas: [
+                            'Ausencia de sistemas tecnificados de floculación, sedimentación y desinfección en la planta de tratamiento.',
+                            'Líneas de aducción y conducción con pérdidas hidráulicas superiores al 45% por obsolescencia.'
+                        ],
+                        causas_indirectas: [
+                            'Histórico déficit presupuestal para inversión en agua potable rural.',
+                            'Variabilidad climática y turbiedad severa en la bocatoma durante invierno.'
+                        ],
+                        efectos_directos: [
+                            `Elevada incidencia de enfermedades diarreicas agudas (EDA) en niños y adultos mayores de la comunidad (${proyecto.poblacion_beneficiada} habitantes).`,
+                            'Restricciones en la continuidad del servicio de agua potable a menos de 6 horas diarias.'
+                        ],
+                        efectos_indirectos: [
+                            'Deterioro de la calidad de vida y afectación económica familiar por gastos médicos.',
+                            'Conflictos comunitarios y baja confianza en la prestación del servicio público.'
+                        ]
+                    },
+                    arbol_objetivos: {
+                        objetivo_general: `Optimizar y ampliar la planta de tratamiento y redes de distribución para garantizar agua apta para consumo humano con continuidad 24/7 en ${proyecto.municipio} (${proyecto.departamento}).`,
+                        medios_directos: [
+                            'Construcción y puesta en marcha de módulos de filtración rápida y desinfección según norma RAS Resolución 0330.',
+                            'Sustitución de tuberías principales e instalación de macromedición y válvulas reguladoras.'
+                        ],
+                        medios_indirectos: [
+                            'Implementación del plan de protección de microcuenca abastecedora.',
+                            'Capacitación técnica y administrativa a la Junta Administradora del Acueducto Veredal.'
+                        ],
+                        fines_directos: [
+                            'Reducción del IRCA a niveles sin riesgo (< 5%) apto para consumo humano.',
+                            'Cobertura continua de agua potable las 24 horas del día para las familias beneficiarias.'
+                        ],
+                        fines_indirectos: [
+                            'Disminución radical de morbilidad infantil y mejora sustancial en los índices de salud pública.',
+                            'Desarrollo sostenible del territorio y cumplimiento de las metas del ODS 6.'
+                        ]
+                    },
+                    cadena_valor_mga: {
+                        codigo_producto_dnp: config.codigo_producto_dnp || '4001001',
+                        nombre_producto_dnp: config.nombre_producto_dnp || 'Sistemas de acueducto construidos o mejorados',
+                        indicador_producto: config.indicador_dnp || 'Número de personas con acceso a agua potable con continuidad',
+                        meta_cuantitativa: `1 Sistema PTAP optimizado beneficiando a ${proyecto.poblacion_beneficiada} habitantes`,
+                        actividades_principales: [
+                            { nombre: 'Fase 1: Obras de captación, desarenador y línea de aducción', costo_porcentaje: '25%' },
+                            { nombre: 'Fase 2: Construcción de módulos PTAP compactos, dosificación y lecho filtrante', costo_porcentaje: '60%' },
+                            { nombre: 'Fase 3: Interventoría técnica, puesta en marcha y ensayos de calidad de agua', costo_porcentaje: '15%' }
+                        ]
+                    },
+                    justificacion_tecnica: `El proyecto responde a la obligación constitucional del Estado de garantizar el acceso a agua potable en condiciones de salubridad y dignidad para los habitantes de ${proyecto.municipio}. La intervención cumple con los criterios técnicos del Reglamento Técnico del Sector de Agua Potable y Saneamiento Básico (RAS Resolución 0330 de 2017) y la política Agua al Campo del Ministerio de Vivienda, Ciudad y Territorio, resolviendo de manera definitiva los altos niveles de riesgo sanitario detectados en la zona.`,
+                    puntos_clave_para_no_devolucion: [
+                        'Verificar que la Concesión de Aguas emitida por la CAR esté vigente y ampare el caudal de diseño (Qmd).',
+                        'Asegurar que los predios de la bocatoma y PTAP cuenten con escritura pública o servidumbre formalizada ante notaría.',
+                        'Incluir el acta de concertación de tarifas con la comunidad para asegurar la sostenibilidad del sistema.'
                     ]
-                },
-                arbol_objetivos: {
-                    objetivo_general: `Construir y optimizar la infraestructura de ${config.nombre.toLowerCase()} para garantizar conectividad, bienestar y desarrollo social en ${proyecto.municipio} (${proyecto.departamento}).`,
-                    medios_directos: [
-                        `Ejecutar obras de infraestructura bajo especificaciones técnicas de alta resistencia y durabilidad.`,
-                        `Articular fuentes de cofinanciación entre la Nación (${proyecto.ministerio_objetivo}) y la Entidad Territorial.`
-                    ],
-                    medios_indirectos: [
-                        `Implementar planes de manejo ambiental y drenajes para mitigar el impacto pluvial.`,
-                        `Fortalecer la veeduría y el control social a través de las Juntas de Acción Comunal.`
-                    ],
-                    fines_directos: [
-                        `Reducir los tiempos de traslado, costos de operación y mejorar la salubridad comunitaria.`,
-                        `Aumentar el acceso permanente de la población a servicios esenciales de salud, educación y comercio.`
-                    ],
-                    fines_indirectos: [
-                        `Fomentar el arraigo territorial, la reactivación económica del campo y la equidad social.`,
-                        `Consolidar la confianza de la ciudadanía en las instituciones del Estado mediante obras concretas.`
+                };
+            } else if (isVias) {
+                aiResult = {
+                    arbol_problemas: {
+                        problema_central: `Inadecuada e intransitable infraestructura vial terciaria que restringe la conectividad y movilidad de ${proyecto.poblacion_beneficiada} habitantes en ${proyecto.municipio} (${proyecto.departamento}).`,
+                        causas_directas: [
+                            'Ausencia de superficie de rodadura estable y desprendimiento de afirmado por lluvias.',
+                            'Falta de obras de drenaje transversal (alcantarillas y cunetas revestidas en concreto).'
+                        ],
+                        causas_indirectas: [
+                            'Recursos municipales insuficientes para pavimentación con recursos propios.',
+                            'Pendientes pronunciadas del terreno que aceleran la escorrentía y socavación.'
+                        ],
+                        efectos_directos: [
+                            'Incomunicación rural recurrente y pérdidas económicas en cosechas agrícolas por sobrecostos de fletes.',
+                            'Dificultad para el traslado de emergencias médicas y asistencia escolar.'
+                        ],
+                        efectos_indirectos: [
+                            'Aislamiento de la población rural y deserción productiva de jóvenes hacia cabeceras urbanas.',
+                            'Baja competitividad territorial y deterioro del tejido socioeconómico.'
+                        ]
+                    },
+                    arbol_objetivos: {
+                        objetivo_general: `Construir y pavimentar tramos de placa huella y obras de drenaje para asegurar transitabilidad permanente en corredores veredales de ${proyecto.municipio} (${proyecto.departamento}).`,
+                        medios_directos: [
+                            'Construcción de cintas de concreto reforzado de 3000 PSI con piedra pegada y cunetas según cartilla Invías.',
+                            'Instalación de alcantarillas de 36 pulgadas, cabezales y filtros franceses para manejo de escorrentía.'
+                        ],
+                        medios_indirectos: [
+                            'Fortalecimiento de convenios solidarios con la Junta de Acción Comunal para mano de obra local.',
+                            'Mantenimiento preventivo periódico mediante cuadrillas de camineros comunitarios.'
+                        ],
+                        fines_directos: [
+                            'Transitabilidad vehicular segura los 365 días del año reduciendo tiempos de viaje en más de un 60%.',
+                            'Disminución inmediata de fletes de transporte de productos agrícolas hacia los centros de abasto.'
+                        ],
+                        fines_indirectos: [
+                            'Reactivación económica del campo, dinamización de la economía campesina y paz territorial.',
+                            'Mejora de los índices de satisfacción ciudadana y presencia efectiva del Estado.'
+                        ]
+                    },
+                    cadena_valor_mga: {
+                        codigo_producto_dnp: config.codigo_producto_dnp || '2101004',
+                        nombre_producto_dnp: config.nombre_producto_dnp || 'Vías terciarias mejoradas o rehabilitadas',
+                        indicador_producto: config.indicador_dnp || 'Kilómetros de red vial terciaria intervenida',
+                        meta_cuantitativa: `Construcción de tramos estratégicos de placa huella para ${proyecto.poblacion_beneficiada} habitantes`,
+                        actividades_principales: [
+                            { nombre: 'Fase 1: Replanteo topográfico, excavación y subbase granular', costo_porcentaje: '20%' },
+                            { nombre: 'Fase 2: Fundida de placas de concreto, piedra pegada, cunetas y disipadores', costo_porcentaje: '68%' },
+                            { nombre: 'Fase 3: Interventoría técnica integral, ensayos de compresión y liquidación', costo_porcentaje: '12%' }
+                        ]
+                    },
+                    justificacion_tecnica: `El proyecto se fundamenta en la necesidad inaplazable de garantizar la conectividad vial rural en ${proyecto.municipio}. Conforme a los lineamientos del Instituto Nacional de Vías (Invías) en el marco del programa Caminos Comunitarios de la Paz Total, la placa huella es la solución técnica más eficiente y duradera para vías de topografía montañosa, ofreciendo una vida útil superior a 20 años con mínimo mantenimiento.`,
+                    puntos_clave_para_no_devolucion: [
+                        'Certificar que el tramo vial esté incorporado en el inventario vial municipal o departamental.',
+                        'Presentar el concepto técnico favorable del Consejo Municipal de Gestión del Riesgo (CMGRD).',
+                        'Asegurar que los APU no superen los topes máximos autorizados en la tabla de costos de Invías.'
                     ]
-                },
-                cadena_valor_mga: {
-                    codigo_producto_dnp: config.codigo_producto_dnp,
-                    nombre_producto_dnp: config.nombre_producto_dnp,
-                    indicador_producto: config.indicador_dnp,
-                    meta_cuantitativa: `Intervención integral certificada para ${proyecto.poblacion_beneficiada} personas`,
-                    actividades_principales: [
-                        { nombre: 'Actividad 1: Topografía, estudios definitivos y descapote inicial', costo_porcentaje: '10%' },
-                        { nombre: 'Actividad 2: Construcción de obras principales y estructuras de contención', costo_porcentaje: '75%' },
-                        { nombre: 'Actividad 3: Interventoría técnica integral y plan de manejo de tráfico y ambiental', costo_porcentaje: '15%' }
+                };
+            } else {
+                aiResult = {
+                    arbol_problemas: {
+                        problema_central: `Deficiente infraestructura de ${config.nombre.toLowerCase()} y limitada capacidad de respuesta territorial en ${proyecto.municipio} (${proyecto.departamento}).`,
+                        causas_directas: [
+                            `Inexistencia o deterioro progresivo de obras de infraestructura adecuada en el sector.`,
+                            `Limitada disponibilidad presupuestal de fuentes corrientes para financiar inversiones de gran escala.`
+                        ],
+                        causas_indirectas: [
+                            `Condiciones climáticas severas que aceleran el desgaste de las intervenciones provisionales.`,
+                            `Histórico rezago en la cofinanciación con partidas del orden nacional.`
+                        ],
+                        efectos_directos: [
+                            `Afectación a la movilidad, salubridad y calidad de vida de más de ${proyecto.poblacion_beneficiada} habitantes.`,
+                            `Incremento en los costos de operación y pérdida de competitividad de las familias.`
+                        ],
+                        efectos_indirectos: [
+                            `Migración de población joven hacia centros urbanos y reducción de la productividad.`,
+                            `Aumento de la vulnerabilidad socioeconómica y reclamos constantes a la administración pública.`
+                        ]
+                    },
+                    arbol_objetivos: {
+                        objetivo_general: `Construir y optimizar la infraestructura de ${config.nombre.toLowerCase()} para garantizar conectividad, bienestar y desarrollo social en ${proyecto.municipio} (${proyecto.departamento}).`,
+                        medios_directos: [
+                            `Ejecutar obras de infraestructura bajo especificaciones técnicas de alta resistencia y durabilidad.`,
+                            `Articular fuentes de cofinanciación entre la Nación (${proyecto.ministerio_objetivo}) y la Entidad Territorial.`
+                        ],
+                        medios_indirectos: [
+                            `Implementar planes de manejo ambiental y drenajes para mitigar el impacto pluvial.`,
+                            `Fortalecer la veeduría y el control social a través de las Juntas de Acción Comunal.`
+                        ],
+                        fines_directos: [
+                            `Reducir costos de operación y mejorar la calidad de vida comunitaria.`,
+                            `Aumentar el acceso permanente de la población a servicios esenciales.`
+                        ],
+                        fines_indirectos: [
+                            `Fomentar el arraigo territorial, la reactivación económica y la equidad social.`,
+                            `Consolidar la confianza de la ciudadanía en las instituciones del Estado mediante obras concretas.`
+                        ]
+                    },
+                    cadena_valor_mga: {
+                        codigo_producto_dnp: config.codigo_producto_dnp,
+                        nombre_producto_dnp: config.nombre_producto_dnp,
+                        indicador_producto: config.indicador_dnp,
+                        meta_cuantitativa: `Intervención integral certificada para ${proyecto.poblacion_beneficiada} personas`,
+                        actividades_principales: [
+                            { nombre: 'Actividad 1: Topografía, estudios definitivos y descapote inicial', costo_porcentaje: '10%' },
+                            { nombre: 'Actividad 2: Construcción de obras principales y estructuras', costo_porcentaje: '75%' },
+                            { nombre: 'Actividad 3: Interventoría técnica integral y plan de manejo ambiental', costo_porcentaje: '15%' }
+                        ]
+                    },
+                    justificacion_tecnica: `El presente proyecto responde a una imperiosa necesidad socioeconómica en el municipio de ${proyecto.municipio}. De acuerdo con los lineamientos del Departamento Nacional de Planeación (DNP) y los objetivos de desarrollo territorial, la intervención es técnicamente viable, ambientalmente sostenible y socioeconómicamente rentable.`,
+                    puntos_clave_para_no_devolucion: [
+                        'Verificar que el certificado de tradición tenga fecha de expedición inferior a 30 días calendario.',
+                        'Asegurar que los precios unitarios del presupuesto cuenten con cotizaciones del mercado local.',
+                        'Adjuntar el concepto del Consejo Municipal de Gestión del Riesgo con firmas de los integrantes.'
                     ]
-                },
-                justificacion_tecnica: `El presente proyecto responde a una imperiosa necesidad socioeconómica en el municipio de ${proyecto.municipio}. De acuerdo con los lineamientos del Departamento Nacional de Planeación (DNP) y los objetivos de desarrollo territorial, la intervención es técnicamente viable, ambientalmente sostenible y socioeconómicamente rentable, generando una relación beneficio-costo positiva para las familias beneficiarias.`,
-                puntos_clave_para_no_devolucion: [
-                    'Verificar que el certificado de tradición tenga fecha de expedición inferior a 30 días calendario.',
-                    'Asegurar que los precios unitarios del presupuesto cuenten con mínimo 2 cotizaciones del mercado local.',
-                    'Adjuntar el concepto del Consejo Municipal de Gestión del Riesgo con firmas de todos los integrantes.'
-                ]
-            };
+                };
+            }
         }
 
         // Guardar la formulación en el proyecto

@@ -15,7 +15,8 @@ exports.getProyectos = async (req, res) => {
         if (estado && estado !== 'TODOS') whereClause.estado = estado;
         if (ministerio && ministerio !== 'TODOS') whereClause.ministerio_objetivo = ministerio;
 
-        const targetCampId = campana_id || req.campana_id || null;
+        const targetCampId = campana_id ? parseInt(campana_id, 10) : (req.campana_id && req.user?.role !== 'superadmin' && req.user?.role !== 'admin' ? req.campana_id : null);
+        console.log('[DEBUG_PROYECTOS]', { userRole: req.user?.role, userCampId: req.user?.campana_id, reqCampId: req.campana_id, targetCampId });
         if (targetCampId) {
             whereClause[Op.or] = [
                 { campana_id: targetCampId },
@@ -25,24 +26,28 @@ exports.getProyectos = async (req, res) => {
 
         if (search && search.trim()) {
             const cleanSearch = `%${search.trim().toLowerCase()}%`;
-            whereClause[Op.or] = [
-                { titulo: { [Op.like]: cleanSearch } },
-                { municipio: { [Op.like]: cleanSearch } },
-                { departamento: { [Op.like]: cleanSearch } },
-                { zona_localidad: { [Op.like]: cleanSearch } },
-                { codigo_bpin: { [Op.like]: cleanSearch } }
-            ];
+            const searchOr = {
+                [Op.or]: [
+                    { titulo: { [Op.like]: cleanSearch } },
+                    { municipio: { [Op.like]: cleanSearch } },
+                    { departamento: { [Op.like]: cleanSearch } },
+                    { zona_localidad: { [Op.like]: cleanSearch } },
+                    { codigo_bpin: { [Op.like]: cleanSearch } }
+                ]
+            };
+            whereClause[Op.and] = [searchOr];
         }
 
         const proyectos = await ProyectoInversion.findAll({
             where: whereClause,
             include: [
-                { model: Campaign, as: 'campana', attributes: ['id', 'nombre', 'candidato', 'color'] },
-                { model: ProyectoDocumento, as: 'documentos', attributes: ['id', 'tipo_documento', 'nombre_archivo', 'estado_revision'] }
+                { model: Campaign, as: 'campana', attributes: ['id', 'nombre', 'candidato', 'color'], required: false },
+                { model: ProyectoDocumento, as: 'documentos', attributes: ['id', 'tipo_documento', 'nombre_archivo', 'estado_revision'], required: false }
             ],
             order: [['updatedAt', 'DESC']]
         });
 
+        console.log('PROYECTOS_FOUND_COUNT:', proyectos.length);
         res.json(proyectos);
     } catch (error) {
         console.error('Error al listar proyectos:', error);
@@ -55,8 +60,8 @@ exports.getProyectoById = async (req, res) => {
     try {
         const proyecto = await ProyectoInversion.findByPk(req.params.id, {
             include: [
-                { model: Campaign, as: 'campana' },
-                { model: ProyectoDocumento, as: 'documentos' }
+                { model: Campaign, as: 'campana', required: false },
+                { model: ProyectoDocumento, as: 'documentos', required: false }
             ]
         });
 
@@ -326,13 +331,18 @@ exports.getStats = async (req, res) => {
     try {
         const campanaId = req.campana_id || (req.query.campana_id ? parseInt(req.query.campana_id, 10) : null);
         const whereClause = {};
-        if (campanaId) whereClause.campana_id = campanaId;
+        if (campanaId) {
+            whereClause[Op.or] = [
+                { campana_id: campanaId },
+                { campana_id: null }
+            ];
+        }
 
         const proyectos = await ProyectoInversion.findAll({ where: whereClause });
 
         const totalProyectos = proyectos.length;
-        const montoTotalGestionado = proyectos.reduce((sum, p) => sum + parseFloat(p.costo_estimado_total || 0), 0);
-        const montoNacionSolicitado = proyectos.reduce((sum, p) => sum + parseFloat(p.monto_solicitado_nacion || 0), 0);
+        const montoTotalGestionado = proyectos.reduce((sum, p) => sum + parseFloat(p.costo_total_estimado || p.costo_estimado_total || 0), 0);
+        const montoNacionSolicitado = proyectos.reduce((sum, p) => sum + parseFloat(p.aporte_nacion_solicitado || p.monto_solicitado_nacion || 0), 0);
         const listosRadicar = proyectos.filter(p => p.estado === 'listo_radicar' || p.score_antidevolucion >= 80).length;
         const promedioScore = totalProyectos > 0 ? Math.round(proyectos.reduce((sum, p) => sum + (p.score_antidevolucion || 0), 0) / totalProyectos) : 0;
 
