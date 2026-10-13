@@ -1,6 +1,7 @@
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 const sequelize = require('../database/db');
+const Campaign = require('../models/Campaign');
 
 (async () => {
     console.log('=== VERIFICANDO DEPENDENCIAS DE CAMPAÑAS 2, 5, 6, 7 ===');
@@ -8,7 +9,9 @@ const sequelize = require('../database/db');
         const [posts] = await sequelize.query(`SELECT count(*) as c FROM "SocialMediaPosts" WHERE campana_id = ${cid}`);
         const [voters] = await sequelize.query(`SELECT count(*) as c FROM "Voters" WHERE campana_id = ${cid}`);
         const [users] = await sequelize.query(`SELECT count(*) as c FROM "Users" WHERE campana_id = ${cid}`);
-    const Campaign = require('../models/Campaign');
+        console.log(`Campaña #${cid}: ${posts[0].c} posts, ${voters[0].c} votantes, ${users[0].c} usuarios`);
+    }
+
     const c6 = await Campaign.findByPk(6);
     console.log('\nCampaign #6:', { id: c6?.id, nombre: c6?.nombre, candidato: c6?.candidato, partido: c6?.partido_politico, links: { fb: c6?.link_facebook, ig: c6?.link_instagram, yt: c6?.link_youtube } });
     const c7 = await Campaign.findByPk(7);
