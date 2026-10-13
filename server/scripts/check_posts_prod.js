@@ -4,9 +4,10 @@ const Campaign = require('../models/Campaign');
 const SocialMediaPost = require('../models/SocialMediaPost');
 
 (async () => {
-    const campaigns = await Campaign.findAll({ order: [['id', 'ASC']] });
-    console.log('=== CAMPAÑAS EN PRODUCCION ===');
-    campaigns.forEach(c => console.log(`ID: ${c.id} | Candidato: ${c.candidato} | Nombre: ${c.nombre} | Partido: ${c.partido_politico} | Created: ${c.createdAt}`));
+    const User = require('../models/User');
+    const users = await User.findAll({ attributes: ['id', 'username', 'email', 'role', 'campana_id'] });
+    console.log('\n=== USUARIOS EN PRODUCCION ===');
+    users.forEach(u => console.log(`ID: ${u.id} | User: ${u.username} | Role: ${u.role} | Campaña: ${u.campana_id}`));
 
     const posts = await SocialMediaPost.findAll({ attributes: ['id', 'campana_id', 'autor_nombre', 'titulo'] });
     console.log('\nTotal posts:', posts.length);
