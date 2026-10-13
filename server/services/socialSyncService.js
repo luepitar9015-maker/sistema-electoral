@@ -22,30 +22,48 @@ function normalizeHandle(handle) {
 function parseProfileUrl(url) {
     if (!url) return { platform: 'instagram', handle: '@campana', cleanUrl: '' };
 
-    const cleanUrl = url.trim().replace(/\?.*$/, '').replace(/\/$/, '');
+    const rawUrl = url.trim();
+    let cleanUrl = rawUrl.replace(/\/$/, '');
     let platform = 'instagram';
     let handle = '';
 
-    if (/youtube\.com/i.test(cleanUrl)) {
+    if (/youtube\.com|youtu\.be/i.test(rawUrl)) {
         platform = 'youtube';
-        const match = cleanUrl.match(/youtube\.com\/(?:@|channel\/|user\/)?([^/?#]+)/i);
-        handle = match ? match[1] : '';
+        const videoMatch = rawUrl.match(/(?:[?&]v=|\/shorts\/|youtu\.be\/)([a-zA-Z0-9_-]{11})/i);
+        if (videoMatch) {
+            handle = `video_${videoMatch[1]}`;
+            cleanUrl = `https://www.youtube.com/watch?v=${videoMatch[1]}`;
+        } else {
+            const match = cleanUrl.replace(/\?.*$/, '').match(/youtube\.com\/(?:@|channel\/|user\/)?([^/?#]+)/i);
+            handle = match ? match[1] : '';
+            cleanUrl = cleanUrl.replace(/\?.*$/, '');
+        }
     } else if (/facebook\.com/i.test(cleanUrl)) {
         platform = 'facebook';
+        cleanUrl = cleanUrl.replace(/\?.*$/, '');
         const match = cleanUrl.match(/facebook\.com\/([^/?#]+)/i);
         handle = match ? match[1] : '';
     } else if (/instagram\.com/i.test(cleanUrl)) {
         platform = 'instagram';
+        cleanUrl = cleanUrl.replace(/\?.*$/, '');
         const match = cleanUrl.match(/instagram\.com\/([^/?#]+)/i);
         handle = match ? match[1] : '';
     } else if (/twitter\.com|x\.com/i.test(cleanUrl)) {
         platform = 'twitter';
+        cleanUrl = cleanUrl.replace(/\?.*$/, '');
         const match = cleanUrl.match(/(?:twitter|x)\.com\/([^/?#]+)/i);
         handle = match ? match[1] : '';
     } else if (/tiktok\.com/i.test(cleanUrl)) {
         platform = 'tiktok';
-        const match = cleanUrl.match(/tiktok\.com\/@?([^/?#]+)/i);
-        handle = match ? match[1] : '';
+        const videoMatch = rawUrl.match(/\/video\/(\d+)/i);
+        if (videoMatch) {
+            handle = `video_${videoMatch[1]}`;
+            cleanUrl = rawUrl.replace(/\?.*$/, '');
+        } else {
+            cleanUrl = cleanUrl.replace(/\?.*$/, '');
+            const match = cleanUrl.match(/tiktok\.com\/@?([^/?#]+)/i);
+            handle = match ? match[1] : '';
+        }
     }
 
     return {
@@ -175,6 +193,7 @@ async function registerMonitoredAccount({ campanaId, url, platform, tipoCuenta =
         if (resolvedData.external_account_id) account.external_account_id = resolvedData.external_account_id;
         if (resolvedData.nombre_mostrado) account.nombre_mostrado = resolvedData.nombre_mostrado;
         if (resolvedData.avatar_url) account.avatar_url = resolvedData.avatar_url;
+        if (resolvedData.url_perfil) account.url_perfil = resolvedData.url_perfil;
         account.sync_status = syncStatus;
         account.sync_status_detail = syncStatusDetail;
         await account.save();
@@ -208,7 +227,7 @@ async function syncAccountPostsAndComments({ accountId, campanaId, limit = 20, s
 
     const targetUrl = account.url_perfil || account.url || '';
     const isPublicVideoUrl = !!(
-        (account.plataforma === 'youtube' && targetUrl.match(/(?:v=|\/shorts\/|youtu\.be\/)[a-zA-Z0-9_-]{11}/i)) ||
+        (account.plataforma === 'youtube' && targetUrl.match(/(?:[?&]v=|\/shorts\/|youtu\.be\/)[a-zA-Z0-9_-]{11}/i)) ||
         (account.plataforma === 'tiktok' && (targetUrl.includes('/video/') || targetUrl.includes('tiktok.com')))
     );
 

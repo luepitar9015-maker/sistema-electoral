@@ -1,4 +1,15 @@
 const sequelize = require('../database/db');
+require('../models/SocialAccount');
+require('../models/SocialConnection');
+require('../models/ContentAlert');
+require('../models/ModerationReview');
+require('../models/SocialSyncJob');
+require('../models/SocialSyncError');
+require('../models/SocialAuditLog');
+require('../models/SocialMediaPost');
+require('../models/SocialPostComment');
+require('../models/SocialTeamAccount');
+require('../models/SocialTeamInteraction');
 
 async function migrateSocialRealMonitoring() {
     console.log('--- Iniciando Migración Segura de Monitoreo Real de Redes Sociales ---');
