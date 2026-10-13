@@ -1,6 +1,11 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('../database/db');
 
+/**
+ * Modelo SocialTeamInteraction
+ * Registra la participación de miembros del equipo con distinción estricta de verificabilidad
+ * Prohibido: scores de lealtad, espionaje o perfilamiento político
+ */
 const SocialTeamInteraction = sequelize.define('SocialTeamInteraction', {
     id: {
         type: DataTypes.INTEGER,
@@ -39,12 +44,17 @@ const SocialTeamInteraction = sequelize.define('SocialTeamInteraction', {
         type: DataTypes.STRING,
         allowNull: false
     },
-    // Reacción: 'like', 'me_encanta', 'apoyo', 'ninguna'
+    // 'verificada': Confirmada directamente por la API oficial con ID de comentario o respuesta
+    // 'declarada': Notificada por el miembro con enlace público de evidencia
+    // 'no_verificable': No es posible corroborar técnicamente debido a restricciones de privacidad de la plataforma
+    tipo_verificacion: {
+        type: DataTypes.ENUM('verificada', 'declarada', 'no_verificable'),
+        defaultValue: 'declarada'
+    },
     tipo_reaccion: {
         type: DataTypes.STRING,
         defaultValue: 'like'
     },
-    // Comentarios
     comento: {
         type: DataTypes.BOOLEAN,
         defaultValue: false
@@ -53,7 +63,6 @@ const SocialTeamInteraction = sequelize.define('SocialTeamInteraction', {
         type: DataTypes.TEXT,
         allowNull: true
     },
-    // Compartido / Repost
     compartio: {
         type: DataTypes.BOOLEAN,
         defaultValue: false
@@ -62,13 +71,35 @@ const SocialTeamInteraction = sequelize.define('SocialTeamInteraction', {
         type: DataTypes.STRING,
         allowNull: true
     },
+    evidencia_url: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    external_interaction_id: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    api_verified_at: {
+        type: DataTypes.DATE,
+        allowNull: true
+    },
+    notas_verificacion: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    },
     fecha_interaccion: {
         type: DataTypes.STRING,
         allowNull: false
     }
 }, {
     tableName: 'SocialTeamInteractions',
-    timestamps: true
+    timestamps: true,
+    indexes: [
+        { fields: ['campana_id'] },
+        { fields: ['post_id'] },
+        { fields: ['tipo_verificacion'] },
+        { fields: ['usuario_handle'] }
+    ]
 });
 
 module.exports = SocialTeamInteraction;

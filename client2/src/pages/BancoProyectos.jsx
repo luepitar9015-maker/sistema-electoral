@@ -8,8 +8,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCampaign } from '../context/CampaignContext';
-
-const API = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+import { API } from '../config/api';
 
 const SECTORES_INFO = {
     transporte_vias: { label: 'Vías y Transporte', icon: '🛣️', color: 'from-amber-500 to-orange-600', badge: 'bg-amber-500/20 text-amber-300 border-amber-500/30' },
@@ -806,7 +805,7 @@ export default function BancoProyectos() {
 
                                                 <div className="flex items-center gap-1.5 flex-shrink-0">
                                                     <a
-                                                        href={`${API.replace('/api', '')}${doc.url_archivo}`}
+                                                        href={`${doc.url_archivo}?token=${token}`}
                                                         target="_blank"
                                                         rel="noreferrer"
                                                         className="p-1.5 text-slate-300 hover:text-white bg-slate-700 hover:bg-slate-600 rounded-lg cursor-pointer"

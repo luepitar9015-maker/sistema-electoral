@@ -11,6 +11,18 @@ const SocialMediaPost = sequelize.define('SocialMediaPost', {
         type: DataTypes.INTEGER,
         allowNull: false
     },
+    account_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true // Vínculo con SocialAccount
+    },
+    external_id: {
+        type: DataTypes.STRING,
+        allowNull: true // Identificador oficial devuelto por la API de la plataforma
+    },
+    source_type: {
+        type: DataTypes.ENUM('managed', 'public_third_party'),
+        defaultValue: 'public_third_party'
+    },
     plataforma: {
         type: DataTypes.ENUM('facebook', 'instagram', 'tiktok', 'twitter', 'youtube'),
         allowNull: false
@@ -154,10 +166,25 @@ const SocialMediaPost = sequelize.define('SocialMediaPost', {
     is_simulation: {
         type: DataTypes.BOOLEAN,
         defaultValue: false
+    },
+    raw_data: {
+        type: DataTypes.TEXT, // Almacena payload original de la API oficial para auditoría
+        allowNull: true
+    },
+    sync_status: {
+        type: DataTypes.STRING, // 'synced', 'restricted', 'error'
+        defaultValue: 'synced'
     }
 }, {
     tableName: 'SocialMediaPosts',
-    timestamps: true
+    timestamps: true,
+    indexes: [
+        { fields: ['campana_id'] },
+        { fields: ['plataforma'] },
+        { fields: ['external_id'] },
+        { fields: ['account_id'] },
+        { fields: ['source_type'] }
+    ]
 });
 
 

@@ -10,9 +10,18 @@ const { calculateProgrammaticMetrics } = require('../services/contentIntelligenc
 const socialSyncService = require('../services/socialSyncService');
 const politicalStrategyAiService = require('../services/politicalStrategyAiService');
 const SocialPostComment = require('../models/SocialPostComment');
+const SocialAccount = require('../models/SocialAccount');
+const SocialConnection = require('../models/SocialConnection');
+const ContentAlert = require('../models/ContentAlert');
+const ModerationReview = require('../models/ModerationReview');
+const SocialSyncJob = require('../models/SocialSyncJob');
+const SocialSyncError = require('../models/SocialSyncError');
+const SocialAuditLog = require('../models/SocialAuditLog');
+const { getConnector, getAllConnectors } = require('../services/socialConnectors');
 
 /**
  * Métricas generales y KPIs de redes sociales
+ * Basado 100% en publicaciones y comentarios reales sincronizados
  */
 exports.getDashboardMetrics = async (req, res) => {
     try {
@@ -25,8 +34,14 @@ exports.getDashboardMetrics = async (req, res) => {
         const negativeComments = await SocialNegativeComment.findAll({ where });
         const competitors = await SocialCompetitor.findAll({ where });
         const allCommentsInDb = await SocialPostComment.findAll({ where });
+        const accounts = await SocialAccount.findAll({ where });
+        const alerts = await ContentAlert.findAll({ where });
+        const lastSyncJob = await SocialSyncJob.findOne({
+            where,
+            order: [['createdAt', 'DESC']]
+        });
 
-        // Sumas de métricas y reacciones calculadas a partir de los comentarios auditados
+        // Sumas de métricas y reacciones calculadas a partir de publicaciones reales
         let totalAlcance = 0;
         let totalImpresiones = 0;
         let totalInteracciones = 0;
@@ -43,15 +58,23 @@ exports.getDashboardMetrics = async (req, res) => {
         const totalApoyo = allCommentsInDb.filter(c => c.tipo_reaccion === 'apoyo').length;
         const totalMeGusta = allCommentsInDb.filter(c => c.tipo_reaccion === 'me_gusta').length;
         const totalAplausos = allCommentsInDb.filter(c => c.tipo_reaccion === 'aplausos').length;
-        const totalPreguntas = allCommentsInDb.filter(c => c.tipo_reaccion === 'pregunta').length;
-        const totalMeEnoja = allCommentsInDb.filter(c => c.tipo_reaccion === 'critica' || c.tipo_reaccion === 'ataque' || c.sentimiento === 'negativo').length;
+        const totalPreguntas = allCommentsInDb.filter(c => c.categoria_contenido === 'pregunta' || c.tipo_reaccion === 'pregunta').length;
+        const totalCriticasLegitimas = allCommentsInDb.filter(c => c.categoria_contenido === 'critica' || c.es_critica_legitima).length;
+        const totalInsultos = allCommentsInDb.filter(c => c.categoria_contenido === 'insulto').length;
+        const totalAmenazas = allCommentsInDb.filter(c => c.categoria_contenido === 'amenaza' || c.es_amenaza).length;
+        const totalSpam = allCommentsInDb.filter(c => c.categoria_contenido === 'spam').length;
+        const totalRequiereRevision = allCommentsInDb.filter(c => c.categoria_contenido === 'requiere_revision' || c.requiere_revision_humana).length;
         const totalComentarios = allCommentsInDb.length;
 
         const totalReaccionesPositivas = totalMeEncanta + totalApoyo + totalMeGusta + totalAplausos;
+        const totalReaccionesNegativas = totalCriticasLegitimas + totalInsultos + totalAmenazas;
         const totalReaccionesAuditadas = totalComentarios;
-        const pctPositivo = totalReaccionesAuditadas > 0 ? Math.round((totalReaccionesPositivas / totalReaccionesAuditadas) * 100) : 75;
-        const pctNegativo = totalReaccionesAuditadas > 0 ? Math.round((totalMeEnoja / totalReaccionesAuditadas) * 100) : 10;
-        const pctNeutral = Math.max(0, 100 - pctPositivo - pctNegativo);
+
+        // Si no hay datos reales, los porcentajes son 0 de forma estricta (no inventar 75%)
+        const hasRealData = posts.length > 0 || totalComentarios > 0;
+        const pctPositivo = totalReaccionesAuditadas > 0 ? Math.round((totalReaccionesPositivas / totalReaccionesAuditadas) * 100) : 0;
+        const pctNegativo = totalReaccionesAuditadas > 0 ? Math.round((totalReaccionesNegativas / totalReaccionesAuditadas) * 100) : 0;
+        const pctNeutral = totalReaccionesAuditadas > 0 ? Math.max(0, 100 - pctPositivo - pctNegativo) : 0;
 
         // Distribución por plataforma
         const porPlataforma = {
@@ -62,15 +85,22 @@ exports.getDashboardMetrics = async (req, res) => {
             youtube: posts.filter(p => p.plataforma === 'youtube').length
         };
 
-        // Comentarios negativos pendientes
-        const comentariosPendientes = negativeComments.filter(c => c.estado_gestion === 'pendiente').length;
-        const comentariosCriticos = negativeComments.filter(c => c.nivel_riesgo === 'critico' || c.nivel_riesgo === 'alto').length;
+        // Alertas de contenido y moderación
+        const alertasPendientes = alerts.filter(a => a.estado === 'pendiente').length;
+        const alertasCriticas = alerts.filter(a => a.nivel_severidad === 'critico' && a.estado === 'pendiente').length;
+        const comentariosPendientes = negativeComments.filter(c => c.estado_gestion === 'pendiente').length + alertasPendientes;
+        const comentariosCriticos = negativeComments.filter(c => c.nivel_riesgo === 'critico' || c.nivel_riesgo === 'alto').length + alertasCriticas;
 
-        // Miembros del equipo activos vs inactivos
+        // Cuentas monitoreadas
+        const cuentasActivas = accounts.filter(a => a.sync_status === 'active').length;
+        const cuentasRestringidas = accounts.filter(a => a.sync_status === 'restricted' || a.sync_status === 'error').length;
+
+        // Miembros del equipo con participación verificable
         const equipoMuyActivo = teamAccounts.filter(t => t.nivel_participacion === 'Muy Activo').length;
         const equipoInactivo = teamAccounts.filter(t => t.nivel_participacion === 'Inactivo' || t.nivel_participacion === 'Baja Participación').length;
 
         res.json({
+            has_real_data: hasRealData,
             kpis: {
                 totalAlcance,
                 totalImpresiones,
@@ -80,10 +110,15 @@ exports.getDashboardMetrics = async (req, res) => {
                 totalComentarios,
                 comentariosPendientes,
                 comentariosCriticos,
+                totalCuentasMonitoreadas: accounts.length,
+                cuentasActivas,
+                cuentasRestringidas,
                 totalCuentasEquipo: teamAccounts.length,
                 equipoMuyActivo,
                 equipoInactivo,
-                totalOpositores: competitors.length
+                totalOpositores: competitors.length,
+                alertasPendientes,
+                alertasCriticas
             },
             reacciones: {
                 total: totalComentarios,
@@ -92,14 +127,25 @@ exports.getDashboardMetrics = async (req, res) => {
                 meGusta: totalMeGusta,
                 aplausos: totalAplausos,
                 preguntas: totalPreguntas,
-                criticas: totalMeEnoja,
+                criticasLegitimas: totalCriticasLegitimas,
+                insultos: totalInsultos,
+                amenazas: totalAmenazas,
+                spam: totalSpam,
+                requiereRevision: totalRequiereRevision,
                 likes: totalMeGusta,
-                meEnoja: totalMeEnoja,
+                meEnoja: totalReaccionesNegativas,
                 pctPositivo,
                 pctNeutral,
                 pctNegativo
             },
-            porPlataforma
+            porPlataforma,
+            ultimoSync: lastSyncJob ? {
+                estado: lastSyncJob.estado,
+                iniciado_en: lastSyncJob.iniciado_en,
+                finalizado_en: lastSyncJob.finalizado_en,
+                plataforma: lastSyncJob.plataforma,
+                mensaje_error: lastSyncJob.mensaje_error
+            } : null
         });
     } catch (error) {
         console.error('Error al obtener métricas de redes:', error);
@@ -1168,6 +1214,7 @@ exports.dispatchLiveSupportAlert = async (req, res) => {
 
 /**
  * BARRIDO INTEGRAL DE REDES SOCIALES DEL CANDIDATO DE LA CAMPAÑA
+ * Sincroniza todas las cuentas oficiales registradas para la campaña
  */
 exports.executeCandidateSweep = async (req, res) => {
     try {
@@ -1176,8 +1223,64 @@ exports.executeCandidateSweep = async (req, res) => {
         if (!activeCampanaId) {
             return res.status(400).json({ success: false, message: 'Se requiere el ID de la campaña para ejecutar el barrido' });
         }
-        const result = await socialSyncService.executeFullCandidateSweep({ campanaId: parseInt(activeCampanaId, 10) });
-        res.json(result);
+
+        const accounts = await SocialAccount.findAll({
+            where: { campana_id: activeCampanaId, is_active: true }
+        });
+
+        if (accounts.length === 0) {
+            return res.json({
+                success: true,
+                message: 'No hay cuentas registradas en esta campaña. Agregue perfiles oficiales o públicos de YouTube, Meta, X o TikTok para sincronizar.',
+                accountsSynced: 0,
+                postsCreated: 0,
+                commentsCreated: 0
+            });
+        }
+
+        let totalPosts = 0;
+        let totalComments = 0;
+        let totalVerifiedTeam = 0;
+        const syncResults = [];
+
+        for (const acc of accounts) {
+            try {
+                const r = await socialSyncService.syncAccountPostsAndComments({
+                    accountId: acc.id,
+                    campanaId: activeCampanaId,
+                    limit: 15,
+                    syncOrigin: 'manual_usuario'
+                });
+                totalPosts += (r.postsCreated || 0) + (r.postsUpdated || 0);
+                totalComments += r.commentsFetched || 0;
+                totalVerifiedTeam += r.verifiedTeamInteractions || 0;
+                syncResults.push({
+                    platform: acc.plataforma,
+                    handle: acc.handle,
+                    status: 'success',
+                    posts: (r.postsCreated || 0) + (r.postsUpdated || 0),
+                    comments: r.commentsFetched || 0,
+                    technicalNotice: r.technicalNotice
+                });
+            } catch (syncErr) {
+                syncResults.push({
+                    platform: acc.plataforma,
+                    handle: acc.handle,
+                    status: 'error',
+                    error: syncErr.message
+                });
+            }
+        }
+
+        res.json({
+            success: true,
+            campana_id: activeCampanaId,
+            accountsSynced: accounts.length,
+            postsCreated: totalPosts,
+            commentsCreated: totalComments,
+            verifiedTeamInteractions: totalVerifiedTeam,
+            results: syncResults
+        });
     } catch (error) {
         console.error('Error al ejecutar barrido de redes del candidato:', error);
         res.status(500).json({ success: false, message: 'Error al ejecutar barrido de redes', error: error.message });
@@ -1185,11 +1288,11 @@ exports.executeCandidateSweep = async (req, res) => {
 };
 
 /**
- * SINCRONIZACIÓN DE PERFIL SOCIAL CON EXTRACCIÓN DE POSTS Y COMENTARIOS
+ * SINCRONIZACIÓN DE PERFIL SOCIAL CON EXTRACCIÓN DE POSTS Y COMENTARIOS REALES
  */
 exports.syncProfile = async (req, res) => {
     try {
-        const { url, campana_id } = req.body;
+        const { url, campana_id, tipo_cuenta } = req.body;
         const activeCampanaId = campana_id || req.user?.campana_id || req.campana_id;
         if (!activeCampanaId) {
             return res.status(400).json({ success: false, message: 'Se requiere el ID de la campaña para sincronizar perfil' });
@@ -1197,11 +1300,17 @@ exports.syncProfile = async (req, res) => {
         if (!url) {
             return res.status(400).json({ success: false, message: 'La URL o link de la red social es requerida' });
         }
-        const result = await socialSyncService.syncProfileFromUrl({ url, campanaId: parseInt(activeCampanaId, 10) });
+
+        const result = await socialSyncService.syncProfileFromUrl({
+            url,
+            campanaId: parseInt(activeCampanaId, 10),
+            tipoCuenta: tipo_cuenta || 'public_third_party'
+        });
+
         res.json(result);
     } catch (error) {
         console.error('Error al sincronizar perfil de red social:', error);
-        res.status(500).json({ success: false, message: 'Error al sincronizar perfil', error: error.message });
+        res.status(500).json({ success: false, message: error.message || 'Error al sincronizar perfil', error: error.message });
     }
 };
 
@@ -1251,10 +1360,30 @@ exports.replyToComment = async (req, res) => {
         if (!comment) {
             return res.status(404).json({ success: false, message: 'Comentario no encontrado' });
         }
+
+        const post = await SocialMediaPost.findByPk(comment.post_id);
+        let apiPublished = false;
+        let apiNotice = null;
+
+        try {
+            const connector = getConnector(comment.plataforma);
+            const credentials = await connector.getCredentials(comment.campana_id, comment.account_id);
+            if (credentials.available && typeof connector.replyToComment === 'function') {
+                await connector.replyToComment({ post, comment, replyText: respuesta_texto, credentials });
+                apiPublished = true;
+            } else {
+                apiNotice = credentials.reason || 'Conector no configurado con permisos de moderación externa';
+            }
+        } catch (apiErr) {
+            console.warn('Aviso API reply:', apiErr.message);
+            apiNotice = apiErr.message;
+        }
+
         comment.respondido = true;
         comment.respuesta_texto = respuesta_texto;
         await comment.save();
-        res.json({ success: true, comment });
+
+        res.json({ success: true, comment, apiPublished, apiNotice });
     } catch (error) {
         console.error('Error al responder comentario:', error);
         res.status(500).json({ success: false, message: 'Error al responder comentario', error: error.message });
@@ -1262,18 +1391,29 @@ exports.replyToComment = async (req, res) => {
 };
 
 /**
- * CONSULTA GLOBAL DE COMENTARIOS Y REACCIONES (VIGILANCIA DE REDES SOCIALES / SOCIAL LISTENING)
+ * CONSULTA GLOBAL DE COMENTARIOS Y REACCIONES CON FILTROS NLP
  */
 exports.getAllComments = async (req, res) => {
     try {
-        const { campana_id, post_id, sentimiento, es_equipo_campana, plataforma } = req.query;
+        const { campana_id, post_id, sentimiento, categoria_contenido, estado_revision, es_equipo_campana, plataforma, search } = req.query;
         const where = {};
         if (campana_id) where.campana_id = parseInt(campana_id, 10);
         if (post_id) where.post_id = parseInt(post_id, 10);
         if (sentimiento && sentimiento !== 'todos') where.sentimiento = sentimiento;
+        if (categoria_contenido && categoria_contenido !== 'todos') where.categoria_contenido = categoria_contenido;
+        if (estado_revision && estado_revision !== 'todos') where.estado_revision = estado_revision;
         if (plataforma && plataforma !== 'todas') where.plataforma = plataforma;
         if (es_equipo_campana !== undefined && es_equipo_campana !== 'todos') {
             where.es_equipo_campana = es_equipo_campana === 'true' || es_equipo_campana === true;
+        }
+
+        if (search) {
+            const { Op } = require('sequelize');
+            where[Op.or] = [
+                { texto_comentario: { [Op.like]: `%${search}%` } },
+                { usuario_red: { [Op.like]: `%${search}%` } },
+                { nombre_usuario: { [Op.like]: `%${search}%` } }
+            ];
         }
 
         const comments = await SocialPostComment.findAll({
@@ -1296,12 +1436,16 @@ exports.getAllComments = async (req, res) => {
             return commentObj;
         });
 
+        // Conteo por categoría para badges de filtro
         const total = comments.length;
         const equipoCount = comments.filter(c => c.es_equipo_campana).length;
         const ciudadanosCount = comments.filter(c => !c.es_equipo_campana).length;
-        const positivosCount = comments.filter(c => c.sentimiento === 'positivo').length;
-        const negativosCount = comments.filter(c => c.sentimiento === 'negativo').length;
-        const neutrosCount = comments.filter(c => c.sentimiento === 'neutral').length;
+        const criticasCount = comments.filter(c => c.categoria_contenido === 'critica' || c.es_critica_legitima).length;
+        const insultosCount = comments.filter(c => c.categoria_contenido === 'insulto').length;
+        const amenazasCount = comments.filter(c => c.categoria_contenido === 'amenaza' || c.es_amenaza).length;
+        const preguntasCount = comments.filter(c => c.categoria_contenido === 'pregunta').length;
+        const spamCount = comments.filter(c => c.categoria_contenido === 'spam').length;
+        const revisionPendienteCount = comments.filter(c => c.estado_revision === 'pendiente' && c.requiere_revision_humana).length;
 
         res.json({
             success: true,
@@ -1310,14 +1454,17 @@ exports.getAllComments = async (req, res) => {
                 total,
                 equipoCount,
                 ciudadanosCount,
-                positivosCount,
-                negativosCount,
-                neutrosCount
+                criticasCount,
+                insultosCount,
+                amenazasCount,
+                preguntasCount,
+                spamCount,
+                revisionPendienteCount
             }
         });
     } catch (error) {
-        console.error('Error al obtener vigilancia de comentarios:', error);
-        res.status(500).json({ success: false, message: 'Error al obtener comentarios de vigilancia', error: error.message });
+        console.error('Error al obtener comentarios:', error);
+        res.status(500).json({ success: false, message: 'Error al obtener comentarios', error: error.message });
     }
 };
 
@@ -1476,4 +1623,367 @@ exports.exportSocialExcel = async (req, res) => {
         res.status(500).json({ success: false, message: 'Error al exportar a Excel', error: error.message });
     }
 };
+
+/**
+ * -------------------------------------------------------------
+ * CONTROLADORES PARA MONITOREO REAL DE REDES SOCIALES (ORDEN MAESTRA)
+ * -------------------------------------------------------------
+ */
+
+/**
+ * LISTAR CUENTAS MONITOREADAS (PROPIAS Y DE TERCEROS)
+ */
+exports.getAccounts = async (req, res) => {
+    try {
+        const { campana_id, plataforma, tipo_cuenta } = req.query;
+        const where = {};
+        if (campana_id) where.campana_id = parseInt(campana_id, 10);
+        if (plataforma && plataforma !== 'todas') where.plataforma = plataforma;
+        if (tipo_cuenta && tipo_cuenta !== 'todas') where.tipo_cuenta = tipo_cuenta;
+
+        const accounts = await SocialAccount.findAll({
+            where,
+            order: [['createdAt', 'DESC']]
+        });
+
+        // Contar publicaciones reales por cuenta
+        const accountsWithCounts = await Promise.all(accounts.map(async (acc) => {
+            const postCount = await SocialMediaPost.count({ where: { account_id: acc.id } });
+            const item = acc.toJSON();
+            item.total_publicaciones_reales = postCount;
+            return item;
+        }));
+
+        res.json({ success: true, accounts: accountsWithCounts });
+    } catch (error) {
+        console.error('Error al listar cuentas sociales:', error);
+        res.status(500).json({ success: false, message: 'Error al listar cuentas sociales', error: error.message });
+    }
+};
+
+/**
+ * REGISTRAR O VINCULAR NUEVA CUENTA
+ */
+exports.createAccount = async (req, res) => {
+    try {
+        const { campana_id, url, plataforma, tipo_cuenta, handle, nombre_mostrado } = req.body;
+        const activeCampanaId = campana_id || req.user?.campana_id || 1;
+
+        if (!url && !handle) {
+            return res.status(400).json({ success: false, message: 'Debe ingresar una URL o el handle de la cuenta' });
+        }
+
+        const account = await socialSyncService.registerMonitoredAccount({
+            campanaId: parseInt(activeCampanaId, 10),
+            url,
+            platform: plataforma,
+            tipoCuenta: tipo_cuenta || 'public_third_party',
+            handle,
+            nombreMostrado: nombre_mostrado
+        });
+
+        res.json({ success: true, account });
+    } catch (error) {
+        console.error('Error al registrar cuenta social:', error);
+        res.status(500).json({ success: false, message: error.message, error: error.message });
+    }
+};
+
+/**
+ * ELIMINAR O DESVINCULAR CUENTA MONITOREADA
+ */
+exports.deleteAccount = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const account = await SocialAccount.findByPk(id);
+        if (!account) {
+            return res.status(404).json({ success: false, message: 'Cuenta social no encontrada' });
+        }
+
+        await SocialAuditLog.create({
+            campana_id: account.campana_id,
+            user_id: req.user?.id || null,
+            tipo_evento: 'account_unlinked',
+            plataforma: account.plataforma,
+            entidad_afectada: 'SocialAccount',
+            entidad_id: account.id,
+            descripcion: `Cuenta ${account.handle} desvinculada del monitoreo.`
+        });
+
+        await account.destroy();
+        res.json({ success: true, message: 'Cuenta social eliminada correctamente' });
+    } catch (error) {
+        console.error('Error al eliminar cuenta social:', error);
+        res.status(500).json({ success: false, message: 'Error al eliminar cuenta', error: error.message });
+    }
+};
+
+/**
+ * SINCRONIZAR MANUALMENTE UNA CUENTA
+ */
+exports.syncAccount = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const account = await SocialAccount.findByPk(id);
+        if (!account) {
+            return res.status(404).json({ success: false, message: 'Cuenta social no encontrada' });
+        }
+
+        const result = await socialSyncService.syncAccountPostsAndComments({
+            accountId: account.id,
+            campanaId: account.campana_id,
+            limit: req.body?.limit || 20,
+            syncOrigin: 'manual_usuario'
+        });
+
+        res.json({ success: true, result });
+    } catch (error) {
+        console.error('Error al sincronizar cuenta específica:', error);
+        res.status(500).json({ success: false, message: error.message, error: error.message });
+    }
+};
+
+/**
+ * LISTAR CONEXIONES Y CREDENCIALES CONFIGURADAS (SIN EXPONER SECRETOS)
+ */
+exports.getConnections = async (req, res) => {
+    try {
+        const { campana_id } = req.query;
+        const where = {};
+        if (campana_id) where.campana_id = parseInt(campana_id, 10);
+
+        const connections = await SocialConnection.findAll({ where });
+
+        // Verificar disponibilidad en variables de entorno también
+        const envStatus = {
+            youtube: !!process.env.YOUTUBE_API_KEY,
+            facebook: !!process.env.META_ACCESS_TOKEN || !!process.env.FACEBOOK_PAGE_TOKEN,
+            instagram: !!process.env.META_ACCESS_TOKEN,
+            twitter: !!process.env.TWITTER_BEARER_TOKEN || !!process.env.X_BEARER_TOKEN,
+            tiktok: !!process.env.TIKTOK_ACCESS_TOKEN
+        };
+
+        res.json({
+            success: true,
+            connections: connections.map(c => c.toJSON()),
+            envStatus
+        });
+    } catch (error) {
+        console.error('Error al consultar conexiones:', error);
+        res.status(500).json({ success: false, message: 'Error al obtener conexiones', error: error.message });
+    }
+};
+
+/**
+ * GUARDAR O ACTUALIZAR CREDENCIAL / TOKEN DE PLATAFORMA
+ */
+exports.saveConnection = async (req, res) => {
+    try {
+        const { campana_id, plataforma, token, tipo_autenticacion, app_id, account_id } = req.body;
+        const activeCampanaId = campana_id || req.user?.campana_id || 1;
+
+        if (!plataforma || !token) {
+            return res.status(400).json({ success: false, message: 'Plataforma y token/clave requeridos' });
+        }
+
+        const [conn, created] = await SocialConnection.findOrCreate({
+            where: {
+                campana_id: parseInt(activeCampanaId, 10),
+                plataforma,
+                account_id: account_id || null
+            },
+            defaults: {
+                campana_id: parseInt(activeCampanaId, 10),
+                plataforma,
+                account_id: account_id || null,
+                tipo_autenticacion: tipo_autenticacion || 'api_key',
+                token_seguro: token.trim(),
+                app_id: app_id || null,
+                is_valid: true,
+                fecha_ultimo_chequeo: new Date()
+            }
+        });
+
+        if (!created) {
+            conn.token_seguro = token.trim();
+            conn.tipo_autenticacion = tipo_autenticacion || conn.tipo_autenticacion;
+            if (app_id) conn.app_id = app_id;
+            conn.is_valid = true;
+            conn.ultimo_error = null;
+            conn.fecha_ultimo_chequeo = new Date();
+            await conn.save();
+        }
+
+        await SocialAuditLog.create({
+            campana_id: activeCampanaId,
+            user_id: req.user?.id || null,
+            tipo_evento: 'connection_created',
+            plataforma,
+            descripcion: `Credencial de acceso actualizada para ${plataforma}.`
+        });
+
+        res.json({ success: true, message: 'Credencial guardada de forma segura', connection: conn.toJSON() });
+    } catch (error) {
+        console.error('Error al guardar credencial social:', error);
+        res.status(500).json({ success: false, message: 'Error al guardar credencial', error: error.message });
+    }
+};
+
+/**
+ * PROBAR CONEXIÓN TÉCNICA CON LA API OFICIAL
+ */
+exports.testConnection = async (req, res) => {
+    try {
+        const { plataforma, token, campana_id } = req.body;
+        const activeCampanaId = campana_id || req.user?.campana_id || 1;
+        const connector = getConnector(plataforma);
+
+        let credentials = null;
+        if (token) {
+            credentials = {
+                available: true,
+                apiKey: token,
+                accessToken: token,
+                bearerToken: token
+            };
+        } else {
+            credentials = await connector.getCredentials(activeCampanaId);
+        }
+
+        const testResult = await connector.testConnection(credentials);
+        res.json(testResult);
+    } catch (error) {
+        console.error('Error al probar conexión:', error);
+        res.status(500).json({ ok: false, message: error.message, error: error.message });
+    }
+};
+
+/**
+ * BANDEJA DE ALERTAS DE CONTENIDO (AMENAZAS, INSULTOS, SPAM)
+ */
+exports.getContentAlerts = async (req, res) => {
+    try {
+        const { campana_id, estado, nivel_severidad, tipo_alerta, plataforma } = req.query;
+        const where = {};
+        if (campana_id) where.campana_id = parseInt(campana_id, 10);
+        if (estado && estado !== 'todos') where.estado = estado;
+        if (nivel_severidad && nivel_severidad !== 'todos') where.nivel_severidad = nivel_severidad;
+        if (tipo_alerta && tipo_alerta !== 'todos') where.tipo_alerta = tipo_alerta;
+        if (plataforma && plataforma !== 'todas') where.plataforma = plataforma;
+
+        const alerts = await ContentAlert.findAll({
+            where,
+            order: [['createdAt', 'DESC']]
+        });
+
+        res.json({ success: true, alerts });
+    } catch (error) {
+        console.error('Error al obtener alertas de contenido:', error);
+        res.status(500).json({ success: false, message: 'Error al obtener alertas', error: error.message });
+    }
+};
+
+/**
+ * RESOLVER / MODERAR ALERTA DE CONTENIDO
+ */
+exports.resolveContentAlert = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { estado, resolucion_notas } = req.body;
+        const alert = await ContentAlert.findByPk(id);
+        if (!alert) {
+            return res.status(404).json({ success: false, message: 'Alerta no encontrada' });
+        }
+
+        alert.estado = estado || 'gestionado';
+        alert.resolucion_notas = resolucion_notas || alert.resolucion_notas;
+        alert.revisado_por_user_id = req.user?.id || null;
+        alert.fecha_resolucion = new Date();
+        await alert.save();
+
+        await SocialAuditLog.create({
+            campana_id: alert.campana_id,
+            user_id: req.user?.id || null,
+            tipo_evento: 'moderation_action',
+            plataforma: alert.plataforma,
+            entidad_afectada: 'ContentAlert',
+            entidad_id: alert.id,
+            descripcion: `Alerta #${alert.id} (${alert.tipo_alerta}) marcada como ${alert.estado}.`
+        });
+
+        res.json({ success: true, alert });
+    } catch (error) {
+        console.error('Error al resolver alerta:', error);
+        res.status(500).json({ success: false, message: 'Error al resolver alerta', error: error.message });
+    }
+};
+
+/**
+ * REVISIÓN HUMANA DE CLASIFICACIÓN DE UN COMENTARIO
+ */
+exports.reviewComment = async (req, res) => {
+    try {
+        const { commentId } = req.params;
+        const { categoria_nueva, es_critica_legitima, es_amenaza, estado_revision, notas_moderacion } = req.body;
+        const comment = await SocialPostComment.findByPk(commentId);
+        if (!comment) {
+            return res.status(404).json({ success: false, message: 'Comentario no encontrado' });
+        }
+
+        const categoriaAnterior = comment.categoria_contenido;
+        comment.categoria_contenido = categoria_nueva || comment.categoria_contenido;
+        if (es_critica_legitima !== undefined) comment.es_critica_legitima = es_critica_legitima;
+        if (es_amenaza !== undefined) comment.es_amenaza = es_amenaza;
+        comment.estado_revision = estado_revision || 'corregido';
+        comment.requiere_revision_humana = false;
+        comment.revisado_por_user_id = req.user?.id || null;
+        comment.notas_moderacion = notas_moderacion || comment.notas_moderacion;
+        await comment.save();
+
+        await ModerationReview.create({
+            campana_id: comment.campana_id,
+            comment_id: comment.id,
+            user_id: req.user?.id || 1,
+            accion: categoria_nueva && categoria_nueva !== categoriaAnterior ? 'clasificacion_corregida' : 'clasificacion_confirmada',
+            categoria_anterior: categoriaAnterior,
+            categoria_nueva: comment.categoria_contenido,
+            es_critica_legitima: comment.es_critica_legitima,
+            motivo_cambio: notas_moderacion || 'Revisión por moderador de campaña'
+        });
+
+        res.json({ success: true, comment });
+    } catch (error) {
+        console.error('Error en moderación humana de comentario:', error);
+        res.status(500).json({ success: false, message: 'Error al moderar comentario', error: error.message });
+    }
+};
+
+/**
+ * CONSULTAR HISTORIAL TÉCNICO DE SINCRONIZACIÓN Y ERRORES
+ */
+exports.getSyncJobs = async (req, res) => {
+    try {
+        const { campana_id, limit = 20 } = req.query;
+        const where = {};
+        if (campana_id) where.campana_id = parseInt(campana_id, 10);
+
+        const jobs = await SocialSyncJob.findAll({
+            where,
+            order: [['iniciado_en', 'DESC']],
+            limit: parseInt(limit, 10)
+        });
+
+        const errors = await SocialSyncError.findAll({
+            where,
+            order: [['createdAt', 'DESC']],
+            limit: parseInt(limit, 10)
+        });
+
+        res.json({ success: true, jobs, errors });
+    } catch (error) {
+        console.error('Error al consultar historial de sincronización:', error);
+        res.status(500).json({ success: false, message: 'Error al consultar trabajos de sincronización', error: error.message });
+    }
+};
+
 

@@ -1,702 +1,641 @@
+const { Op } = require('sequelize');
 const SocialMediaPost = require('../models/SocialMediaPost');
 const SocialTeamAccount = require('../models/SocialTeamAccount');
 const SocialPostComment = require('../models/SocialPostComment');
+const SocialAccount = require('../models/SocialAccount');
+const SocialConnection = require('../models/SocialConnection');
+const SocialTeamInteraction = require('../models/SocialTeamInteraction');
+const SocialSyncJob = require('../models/SocialSyncJob');
+const SocialSyncError = require('../models/SocialSyncError');
+const SocialAuditLog = require('../models/SocialAuditLog');
 const Campaign = require('../models/Campaign');
-const Voter = require('../models/Voter');
-const { Op } = require('sequelize');
-const { getDiegoArizaPosts } = require('./diegoArizaPosts');
-const { getOscarVillamizarPosts } = require('./oscarVillamizarPosts');
+const { getConnector } = require('./socialConnectors');
+const { classifyComment, checkAndCreateContentAlert } = require('./commentClassifierService');
 
 function normalizeHandle(handle) {
-  if (!handle) return '';
-  let clean = String(handle).trim().toLowerCase();
-  if (!clean.startsWith('@')) clean = '@' + clean;
-  return clean;
+    if (!handle) return '';
+    let clean = String(handle).trim().toLowerCase();
+    if (!clean.startsWith('@')) clean = '@' + clean;
+    return clean;
 }
 
 function parseProfileUrl(url) {
-  if (!url) return { platform: 'instagram', handle: '@campana', cleanUrl: '' };
+    if (!url) return { platform: 'instagram', handle: '@campana', cleanUrl: '' };
 
-  const cleanUrl = url.trim().replace(/\?.*$/, '').replace(/\/$/, '');
-  let platform = 'instagram';
-  let handle = '';
+    const cleanUrl = url.trim().replace(/\?.*$/, '').replace(/\/$/, '');
+    let platform = 'instagram';
+    let handle = '';
 
-  if (/instagram\.com/i.test(cleanUrl)) {
-    platform = 'instagram';
-    const match = cleanUrl.match(/instagram\.com\/([^/?#]+)/i);
-    handle = match ? match[1] : 'oscarvillamiz';
-  } else if (/tiktok\.com/i.test(cleanUrl)) {
-    platform = 'tiktok';
-    const match = cleanUrl.match(/tiktok\.com\/@?([^/?#]+)/i);
-    handle = match ? match[1] : 'oscarvillamiz';
-  } else if (/twitter\.com|x\.com/i.test(cleanUrl)) {
-    platform = 'twitter';
-    const match = cleanUrl.match(/(?:twitter|x)\.com\/([^/?#]+)/i);
-    handle = match ? match[1] : 'OscarVillamiz';
-  } else if (/facebook\.com/i.test(cleanUrl)) {
-    platform = 'facebook';
-    const match = cleanUrl.match(/facebook\.com\/([^/?#]+)/i);
-    handle = match ? match[1] : 'OscarVillamiz';
-  } else if (/youtube\.com/i.test(cleanUrl)) {
-    platform = 'youtube';
-    const match = cleanUrl.match(/youtube\.com\/(?:@|channel\/|user\/)?([^/?#]+)/i);
-    handle = match ? match[1] : 'OscarVillamizarOficial';
-  }
-
-  return {
-    platform,
-    handle: normalizeHandle(handle),
-    cleanUrl
-  };
-}
-
-async function matchTeamMember(campanaId, authorHandle, authorName) {
-  const normHandle = normalizeHandle(authorHandle);
-  const bareHandle = normHandle.replace(/^@/, '');
-
-  const teamMember = await SocialTeamAccount.findOne({
-    where: {
-      campana_id: campanaId,
-      [Op.or]: [
-        { usuario_handle: normHandle },
-        { usuario_handle: bareHandle },
-        { usuario_handle: '@' + bareHandle },
-        ...(authorName ? [{ nombre_miembro: { [Op.like]: `%${authorName}%` } }] : [])
-      ]
+    if (/youtube\.com/i.test(cleanUrl)) {
+        platform = 'youtube';
+        const match = cleanUrl.match(/youtube\.com\/(?:@|channel\/|user\/)?([^/?#]+)/i);
+        handle = match ? match[1] : '';
+    } else if (/facebook\.com/i.test(cleanUrl)) {
+        platform = 'facebook';
+        const match = cleanUrl.match(/facebook\.com\/([^/?#]+)/i);
+        handle = match ? match[1] : '';
+    } else if (/instagram\.com/i.test(cleanUrl)) {
+        platform = 'instagram';
+        const match = cleanUrl.match(/instagram\.com\/([^/?#]+)/i);
+        handle = match ? match[1] : '';
+    } else if (/twitter\.com|x\.com/i.test(cleanUrl)) {
+        platform = 'twitter';
+        const match = cleanUrl.match(/(?:twitter|x)\.com\/([^/?#]+)/i);
+        handle = match ? match[1] : '';
+    } else if (/tiktok\.com/i.test(cleanUrl)) {
+        platform = 'tiktok';
+        const match = cleanUrl.match(/tiktok\.com\/@?([^/?#]+)/i);
+        handle = match ? match[1] : '';
     }
-  });
-
-  if (teamMember) {
-    await teamMember.increment('repost_campana_count', { by: 1 }).catch(() => {});
-    teamMember.ultimo_apoyo_fecha = new Date().toISOString();
-    teamMember.nivel_participacion = 'Muy Activo';
-    await teamMember.save().catch(() => {});
 
     return {
-      isTeam: true,
-      teamMemberId: teamMember.id,
-      teamMemberName: teamMember.nombre_miembro,
-      teamMemberRole: teamMember.rol_equipo
+        platform,
+        handle: normalizeHandle(handle),
+        cleanUrl
     };
-  }
-
-  return { isTeam: false, teamMemberId: null, teamMemberName: null, teamMemberRole: null };
 }
 
-function getGenericCandidatePosts(platform, handle, candidateName, cleanUrl, teamAccounts = []) {
-  const t0 = teamAccounts[0]?.usuario_handle || '@equipo_campana';
-  const t0n = teamAccounts[0]?.nombre_miembro || 'Equipo de Campaña Oficial';
-  const t1 = teamAccounts[1]?.usuario_handle || '@juventudes_campana';
-  const t1n = teamAccounts[1]?.nombre_miembro || 'Juventudes con el Candidato';
-
-  return [
-    {
-      titulo: 'Compromiso con el Desarrollo y el Futuro de Nuestra Región',
-      contenido: '🇨🇴 Recorriendo cada rincón del territorio, escuchando a nuestra gente y construyendo propuestas con soluciones reales. ¡Vamos con toda la fuerza ciudadana! #' + candidateName.replace(/\s+/g, '') + ' #CompromisoCiudadano',
-      tipo_contenido: 'video',
-      video_duration_seconds: 60,
-      alcance: 38400,
-      impresiones: 49500,
-      reproducciones: 24000,
-      interacciones: 3450,
-      compartidos: 720,
-      likes: 2410,
-      me_encanta: 890,
-      me_enoja: 15,
-      tema_estrategico: 'Visión de Desarrollo y Liderazgo',
-      comentarios_conteo: 8,
-      commentsData: [
-        { usuario_red: t0, nombre_usuario: t0n, texto_comentario: 'Equipo desplegado en territorio respaldando la propuesta y consolidando voluntades.', tipo_reaccion: 'apoyo', sentimiento: 'positivo', likes: 45, es_equipo_campana: true, equipo_nombre: t0n, equipo_rol: 'Coordinador General' },
-        { usuario_red: t1, nombre_usuario: t1n, texto_comentario: 'Los jóvenes nos sumamos con energía por este proyecto de cambio y liderazgo.', tipo_reaccion: 'me_encanta', sentimiento: 'positivo', likes: 38, es_equipo_campana: true, equipo_nombre: t1n, equipo_rol: 'Líder Juventudes' },
-        { usuario_red: '@luz_marina_vargas', nombre_usuario: 'Luz Marina Vargas', texto_comentario: 'Excelente propuesta, cuente con nuestro voto y apoyo familiar incondicional.', tipo_reaccion: 'me_encanta', sentimiento: 'positivo', likes: 32, es_equipo_campana: false },
-        { usuario_red: '@carlos_eduardo_perez', nombre_usuario: 'Carlos Eduardo Pérez', texto_comentario: 'Líder con carácter y propuestas viables para los sectores más olvidados.', tipo_reaccion: 'apoyo', sentimiento: 'positivo', likes: 27, es_equipo_campana: false },
-        { usuario_red: '@claudia_patricia_m', nombre_usuario: 'Claudia Patricia Moreno', texto_comentario: '¿Cuándo visitarán la comuna oriental para dialogar con las madres comunitarias?', tipo_reaccion: 'pregunta', sentimiento: 'neutral', likes: 19, es_equipo_campana: false },
-        { usuario_red: '@ricardo_mendoza_stder', nombre_usuario: 'Ricardo Mendoza', texto_comentario: 'Gran trabajo en equipo, se siente la fuerza en los barrios.', tipo_reaccion: 'aplausos', sentimiento: 'positivo', likes: 22, es_equipo_campana: false },
-        { usuario_red: '@andres_felipe_q', nombre_usuario: 'Andrés Felipe Quintero', texto_comentario: 'Seguimos firmes compartiendo el mensaje por todas las redes sociales.', tipo_reaccion: 'me_gusta', sentimiento: 'positivo', likes: 16, es_equipo_campana: false },
-        { usuario_red: '@veeduria_ciudadana_26', nombre_usuario: 'Veeduría Ciudadana 2026', texto_comentario: 'Estaremos vigilantes al cumplimiento de cada uno de los compromisos adquiridos en campaña.', tipo_reaccion: 'critica', sentimiento: 'neutral', likes: 12, es_equipo_campana: false }
-      ]
-    },
-    {
-      titulo: 'Diálogo con Emprendedores y Generación de Empleo Digno',
-      contenido: 'Apoyar a quienes generan puestos de trabajo es la clave para transformar nuestra sociedad. Menos trabas tributarias y más crédito blando para nuestros comerciantes.',
-      tipo_contenido: 'imagen',
-      alcance: 31200,
-      impresiones: 42100,
-      reproducciones: 0,
-      interacciones: 2890,
-      compartidos: 540,
-      likes: 1980,
-      me_encanta: 750,
-      me_enoja: 10,
-      tema_estrategico: 'Empleo y Oportunidades',
-      comentarios_conteo: 8,
-      commentsData: [
-        { usuario_red: t0, nombre_usuario: t0n, texto_comentario: 'El plan de reactivación económica para microempresas ya está estructurado y socializado.', tipo_reaccion: 'apoyo', sentimiento: 'positivo', likes: 41, es_equipo_campana: true, equipo_nombre: t0n, equipo_rol: 'Coordinador General' },
-        { usuario_red: '@don_javier_comercio', nombre_usuario: 'Javier Restrepo Gómez', texto_comentario: 'Los microempresarios necesitamos que bajen los impuestos municipales e incentiven la contratación.', tipo_reaccion: 'apoyo', sentimiento: 'positivo', likes: 36, es_equipo_campana: false },
-        { usuario_red: '@mariana_emprendedora', nombre_usuario: 'Mariana Duarte', texto_comentario: '¡Totalmente de acuerdo! Qué bueno que piensen en las mujeres emprendedoras independientes.', tipo_reaccion: 'me_encanta', sentimiento: 'positivo', likes: 31, es_equipo_campana: false },
-        { usuario_red: '@hugo_fernandez_cont', nombre_usuario: 'Hugo Fernández', texto_comentario: '¿Cuáles incentivos específicos contempla el proyecto para jóvenes recién graduados?', tipo_reaccion: 'pregunta', sentimiento: 'neutral', likes: 18, es_equipo_campana: false },
-        { usuario_red: '@patricia_gomez_bga', nombre_usuario: 'Patricia Gómez', texto_comentario: 'Excelente propuesta económica. Cuentan con el respaldo de nuestro gremio.', tipo_reaccion: 'aplausos', sentimiento: 'positivo', likes: 25, es_equipo_campana: false },
-        { usuario_red: t1, nombre_usuario: t1n, texto_comentario: 'Con empleo y formación Santander saldrá adelante con paso firme.', tipo_reaccion: 'apoyo', sentimiento: 'positivo', likes: 28, es_equipo_campana: true, equipo_nombre: t1n, equipo_rol: 'Líder Juventudes' },
-        { usuario_red: '@jaime_solano_tax', nombre_usuario: 'Jaime Solano', texto_comentario: 'Bien visto el apoyo al transporte y comerciantes locales.', tipo_reaccion: 'me_gusta', sentimiento: 'positivo', likes: 14, es_equipo_campana: false },
-        { usuario_red: '@critico_economico_hoy', nombre_usuario: 'Análisis Crítico', texto_comentario: 'Es necesario explicar con qué presupuesto se van a subsidiar esos créditos blandos.', tipo_reaccion: 'critica', sentimiento: 'negativo', likes: 11, es_equipo_campana: false }
-      ]
-    },
-    {
-      titulo: 'Seguridad Ciudadana, Paz Territorial y Protección a las Familias',
-      contenido: 'La tranquilidad de nuestros barrios y campos no es negociable. Fortaleceremos la tecnología, cámaras de seguridad y presencia institucional frente al delito.',
-      tipo_contenido: 'video',
-      video_duration_seconds: 45,
-      alcance: 42500,
-      impresiones: 56000,
-      reproducciones: 28000,
-      interacciones: 3890,
-      compartidos: 890,
-      likes: 2750,
-      me_encanta: 1100,
-      me_enoja: 20,
-      tema_estrategico: 'Seguridad y Convivencia',
-      comentarios_conteo: 8,
-      commentsData: [
-        { usuario_red: t0, nombre_usuario: t0n, texto_comentario: 'Mano firme contra la delincuencia y apoyo irrestricto a nuestras comunidades.', tipo_reaccion: 'apoyo', sentimiento: 'positivo', likes: 49, es_equipo_campana: true, equipo_nombre: t0n, equipo_rol: 'Coordinador General' },
-        { usuario_red: '@vecinos_seguros_bga', nombre_usuario: 'Comité de Seguridad Vecinal', texto_comentario: 'Respaldamos la propuesta. En las comunas necesitamos cuadrantes activos las 24 horas.', tipo_reaccion: 'apoyo', sentimiento: 'positivo', likes: 43, es_equipo_campana: false },
-        { usuario_red: '@martha_lucia_madre', nombre_usuario: 'Martha Lucía Rangel', texto_comentario: 'Queremos parques seguros para nuestros hijos, sin consumo ni amenazas.', tipo_reaccion: 'me_encanta', sentimiento: 'positivo', likes: 39, es_equipo_campana: false },
-        { usuario_red: '@jorge_enrique_ing', nombre_usuario: 'Ing. Jorge Enrique León', texto_comentario: '¿Se implementará inteligencia artificial y cámaras LPR en los accesos viales?', tipo_reaccion: 'pregunta', sentimiento: 'neutral', likes: 24, es_equipo_campana: false },
-        { usuario_red: t1, nombre_usuario: t1n, texto_comentario: 'Seguridad y oportunidades van de la mano para que los jóvenes construyamos futuro.', tipo_reaccion: 'aplausos', sentimiento: 'positivo', likes: 31, es_equipo_campana: true, equipo_nombre: t1n, equipo_rol: 'Líder Juventudes' },
-        { usuario_red: '@alvaro_jose_retirado', nombre_usuario: 'Álvaro José Valdivieso', texto_comentario: 'Excelente enfoque institucional de mano de la justicia.', tipo_reaccion: 'me_gusta', sentimiento: 'positivo', likes: 21, es_equipo_campana: false },
-        { usuario_red: '@comerciante_centro_st', nombre_usuario: 'Guillermo Flórez', texto_comentario: 'Urgente mayor control en el sector céntrico contra el hurto a personas.', tipo_reaccion: 'apoyo', sentimiento: 'positivo', likes: 28, es_equipo_campana: false },
-        { usuario_red: '@veeduria_derechos_col', nombre_usuario: 'Observatorio de DDHH', texto_comentario: 'Toda política de seguridad debe garantizar plenamente el debido proceso y los DDHH.', tipo_reaccion: 'critica', sentimiento: 'neutral', likes: 13, es_equipo_campana: false }
-      ]
-    },
-    {
-      titulo: 'Inversión Social, Salud y Educación Pertinente con Futuro',
-      contenido: 'Nuestros jóvenes necesitan educación pertinente y tecnológica para competir en el mercado global. La salud y la educación son derechos fundamentales.',
-      tipo_contenido: 'imagen',
-      alcance: 29800,
-      impresiones: 38900,
-      reproducciones: 0,
-      interacciones: 2410,
-      compartidos: 480,
-      likes: 1850,
-      me_encanta: 680,
-      me_enoja: 8,
-      tema_estrategico: 'Educación y Juventud',
-      comentarios_conteo: 8,
-      commentsData: [
-        { usuario_red: t0, nombre_usuario: t0n, texto_comentario: 'La educación y la salud son los pilares centrales de nuestro plan de gobierno legislativo.', tipo_reaccion: 'me_encanta', sentimiento: 'positivo', likes: 35, es_equipo_campana: true, equipo_nombre: t0n, equipo_rol: 'Coordinador General' },
-        { usuario_red: '@profesora_maria_elena', nombre_usuario: 'Lic. María Elena Barajas', texto_comentario: 'Los docentes de colegios públicos apoyamos la dignificación de la infraestructura educativa.', tipo_reaccion: 'apoyo', sentimiento: 'positivo', likes: 32, es_equipo_campana: false },
-        { usuario_red: t1, nombre_usuario: t1n, texto_comentario: 'Becas universitarias de excelencia y conectividad en veredas. ¡Vamos con todo!', tipo_reaccion: 'me_encanta', sentimiento: 'positivo', likes: 29, es_equipo_campana: true, equipo_nombre: t1n, equipo_rol: 'Líder Juventudes' },
-        { usuario_red: '@estudiante_tecnologia', nombre_usuario: 'Daniel Felipe Pinto', texto_comentario: '¿Habrá programas de formación en desarrollo de software e IA gratuitos en la provincia?', tipo_reaccion: 'pregunta', sentimiento: 'neutral', likes: 22, es_equipo_campana: false },
-        { usuario_red: '@medico_rural_santander', nombre_usuario: 'Dr. Hernán Silva', texto_comentario: 'Fundamental reforzar los centros de salud de primer nivel en los municipios.', tipo_reaccion: 'apoyo', sentimiento: 'positivo', likes: 26, es_equipo_campana: false },
-        { usuario_red: '@madre_cabeza_hogar_bga', nombre_usuario: 'Yolanda Bautista', texto_comentario: 'Agradecida con el compromiso con nuestros hijos y su bienestar.', tipo_reaccion: 'aplausos', sentimiento: 'positivo', likes: 20, es_equipo_campana: false },
-        { usuario_red: '@felipe_arenas_est', nombre_usuario: 'Felipe Arenas', texto_comentario: 'Muy buena iniciativa, compartiendo la propuesta con los compañeros.', tipo_reaccion: 'me_gusta', sentimiento: 'positivo', likes: 15, es_equipo_campana: false },
-        { usuario_red: '@analista_politicas_pub', nombre_usuario: 'Veeduría Educativa', texto_comentario: 'Exigiremos metas e indicadores claros de cobertura y permanencia escolar.', tipo_reaccion: 'critica', sentimiento: 'neutral', likes: 10, es_equipo_campana: false }
-      ]
-    }
-  ];
-}
-
-async function syncProfileFromUrl({ url, campanaId }) {
-  const { platform, handle, cleanUrl } = parseProfileUrl(url);
-
-  const campaign = await Campaign.findByPk(campanaId);
-  if (campaign) {
-    if (platform === 'instagram') campaign.link_instagram = cleanUrl;
-    else if (platform === 'tiktok') campaign.link_tiktok = cleanUrl;
-    else if (platform === 'facebook') campaign.link_facebook = cleanUrl;
-    else if (platform === 'twitter') campaign.link_twitter = cleanUrl;
-    else if (platform === 'youtube') campaign.link_youtube = cleanUrl;
-    await campaign.save();
-  }
-
-  const teamAccounts = await SocialTeamAccount.findAll({ where: { campana_id: campanaId } });
-
-  const isDiegoAriza = (campaign?.candidato && campaign.candidato.toLowerCase().includes('ariza')) || 
-                       (campaign?.nombre && campaign.nombre.toLowerCase().includes('ariza')) ||
-                       (!campaign?.candidato && handle.toLowerCase().includes('ariza'));
-
-  const isOscarVillamizar = !isDiegoAriza && (
-                            (campaign?.candidato && campaign.candidato.toLowerCase().includes('villamizar')) || 
-                            (campaign?.nombre && campaign.nombre.toLowerCase().includes('villamizar')) ||
-                            (!campaign?.candidato && handle.toLowerCase().includes('oscarvillamiz')));
-
-  const candidateName = campaign ? campaign.candidato : (isDiegoAriza ? 'Diego Fran Ariza' : (isOscarVillamizar ? 'Oscar Villamizar' : 'Candidato Oficial'));
-
-  let samplePosts = [];
-  if (isDiegoAriza) {
-    samplePosts = getDiegoArizaPosts(platform, handle, cleanUrl, teamAccounts);
-  } else if (isOscarVillamizar) {
-    samplePosts = getOscarVillamizarPosts(platform, handle, cleanUrl, teamAccounts);
-  } else {
-    samplePosts = getGenericCandidatePosts(platform, handle, candidateName, cleanUrl, teamAccounts);
-  }
-
-  let postsCreated = 0;
-  let commentsCreated = 0;
-  let teamMatchedCount = 0;
-
-  for (const p of samplePosts) {
-    // Strip any handle prefix so title matches authentic headline as seen on social media
-    const cleanTitle = (p.titulo || '').replace(/^@[a-zA-Z0-9_]+:\s*/, '').trim();
-
-    let post = await SocialMediaPost.findOne({
-      where: {
-        campana_id: campanaId,
-        plataforma: platform,
-        [Op.or]: [
-          { titulo: cleanTitle },
-          { titulo: p.titulo },
-          { titulo: { [Op.like]: '%' + cleanTitle.slice(0, 25) + '%' } }
-        ]
-      }
-    });
-
-    if (!post) {
-      post = await SocialMediaPost.create({
-        campana_id: campanaId,
-        plataforma: platform,
-        autor_nombre: p.autor_nombre || candidateName || handle.replace(/^@/, ''),
-        autor_usuario: p.autor_usuario || handle,
-        url_publicacion: p.url_publicacion || cleanUrl,
-        titulo: cleanTitle,
-        contenido: p.contenido,
-        tipo_contenido: p.tipo_contenido || 'imagen',
-        video_url: cleanUrl,
-        video_duration_seconds: p.video_duration_seconds || 0,
-        alcance: p.alcance,
-        impresiones: p.impresiones,
-        reproducciones: p.reproducciones || 0,
-        interacciones: p.interacciones || Math.round((p.likes || 0) * 1.3),
-        compartidos: p.compartidos || 0,
-        comentarios_conteo: (p.commentsData || []).length || p.comentarios_conteo || 0,
-        likes: p.likes || 0,
-        me_encanta: p.me_encanta || Math.round((p.likes || 0) * 0.35),
-        me_enoja: p.me_enoja || 10,
-        sentimiento_positivo: p.sentimiento_positivo || 80.0,
-        sentimiento_neutral: p.sentimiento_neutral || 15.0,
-        sentimiento_negativo: p.sentimiento_negativo || 5.0,
-        en_vivo: !!p.en_vivo,
-        estado_en_vivo: p.estado_en_vivo || 'finalizado',
-        espectadores_en_vivo: p.espectadores_en_vivo || 0,
-        pico_espectadores: p.pico_espectadores || 0,
-        tema_estrategico: p.tema_estrategico || 'Estrategia de Campaña',
-        fecha_publicacion: p.fecha_publicacion || new Date().toISOString()
-      });
-      postsCreated++;
-    } else {
-      await post.update({
-        titulo: cleanTitle,
-        autor_nombre: p.autor_nombre || candidateName || handle.replace(/^@/, ''),
-        autor_usuario: p.autor_usuario || handle,
-        url_publicacion: p.url_publicacion || cleanUrl,
-        contenido: p.contenido,
-        tipo_contenido: p.tipo_contenido || post.tipo_contenido,
-        video_duration_seconds: p.video_duration_seconds || post.video_duration_seconds,
-        alcance: p.alcance,
-        impresiones: p.impresiones,
-        reproducciones: p.reproducciones || post.reproducciones,
-        likes: p.likes,
-        me_encanta: p.me_encanta || Math.round((p.likes || 0) * 0.35),
-        me_enoja: p.me_enoja || post.me_enoja,
-        compartidos: p.compartidos,
-        tema_estrategico: p.tema_estrategico
-      });
-      postsCreated++;
+/**
+ * Coincidencia estricta de integrante del equipo.
+ * REGLA ESTRICTA DE LA ORDEN MAESTRA:
+ * "Evitar registros duplicados y atribuciones basadas únicamente en nombres similares.
+ * El sistema no atribuye comentarios a un integrante por coincidencias parciales de nombre."
+ * Solo coincide por handle exacto o identificador externo del miembro con consentimiento voluntario.
+ */
+async function matchTeamMember(campanaId, authorHandle, authorExternalId = null) {
+    if (!authorHandle && !authorExternalId) {
+        return { isTeam: false, teamMember: null };
     }
 
-    for (const c of (p.commentsData || [])) {
-      const match = await matchTeamMember(campanaId, c.usuario_red, c.nombre_usuario);
-      const isTeam = match.isTeam || !!c.es_equipo_campana;
-      if (isTeam) teamMatchedCount++;
+    const normHandle = normalizeHandle(authorHandle);
+    const bareHandle = normHandle.replace(/^@/, '');
 
-      let existingComment = await SocialPostComment.findOne({
+    const whereConditions = [
+        { usuario_handle: normHandle },
+        { usuario_handle: bareHandle },
+        { usuario_handle: '@' + bareHandle }
+    ];
+
+    if (authorExternalId) {
+        whereConditions.push({ id_externo_usuario: String(authorExternalId) });
+    }
+
+    const teamMember = await SocialTeamAccount.findOne({
         where: {
-          post_id: post.id,
-          usuario_red: normalizeHandle(c.usuario_red)
+            campana_id: campanaId,
+            consentimiento_vinculacion: true,
+            [Op.or]: whereConditions
         }
-      });
-
-      if (!existingComment) {
-        await SocialPostComment.create({
-          post_id: post.id,
-          campana_id: campanaId,
-          plataforma: platform,
-          usuario_red: normalizeHandle(c.usuario_red),
-          nombre_usuario: c.nombre_usuario,
-          texto_comentario: c.texto_comentario,
-          tipo_reaccion: c.tipo_reaccion || 'apoyo',
-          sentimiento: c.sentimiento || 'positivo',
-          es_equipo_campana: isTeam,
-          equipo_miembro_id: match.teamMemberId || c.equipo_miembro_id || null,
-          equipo_nombre: match.teamMemberName || c.equipo_nombre || null,
-          equipo_rol: match.teamMemberRole || c.equipo_rol || null,
-          likes_comentario: c.likes || c.likes_comentario || 0,
-          fecha_comentario: c.fecha_comentario || new Date().toISOString()
-        });
-        commentsCreated++;
-      } else {
-        await existingComment.update({
-          nombre_usuario: c.nombre_usuario || existingComment.nombre_usuario,
-          texto_comentario: c.texto_comentario || existingComment.texto_comentario,
-          tipo_reaccion: c.tipo_reaccion || existingComment.tipo_reaccion,
-          sentimiento: c.sentimiento || existingComment.sentimiento,
-          es_equipo_campana: isTeam,
-          equipo_miembro_id: match.teamMemberId || c.equipo_miembro_id || existingComment.equipo_miembro_id,
-          equipo_nombre: match.teamMemberName || c.equipo_nombre || existingComment.equipo_nombre,
-          equipo_rol: match.teamMemberRole || c.equipo_rol || existingComment.equipo_rol,
-          likes_comentario: c.likes || c.likes_comentario || existingComment.likes_comentario
-        });
-      }
-    }
-
-    const realCommentsCount = await SocialPostComment.count({ where: { post_id: post.id } });
-    await post.update({ comentarios_conteo: realCommentsCount });
-  }
-
-  return {
-    success: true,
-    platform,
-    handle,
-    url: cleanUrl,
-    postsCreated,
-    commentsCreated,
-    teamMatchedCount,
-    totalTeamAccounts: teamAccounts.length
-  };
-}
-
-async function importTeamMembers({ members = [], campanaId }) {
-  let createdCount = 0;
-  let updatedCount = 0;
-
-  for (const m of members) {
-    if (!m.nombre_miembro || !m.usuario_handle) continue;
-
-    const normHandle = normalizeHandle(m.usuario_handle);
-    const platform = m.plataforma ? m.plataforma.toLowerCase() : 'instagram';
-
-    const [record, created] = await SocialTeamAccount.findOrCreate({
-      where: {
-        campana_id: campanaId,
-        usuario_handle: normHandle,
-        plataforma: platform
-      },
-      defaults: {
-        campana_id: campanaId,
-        nombre_miembro: m.nombre_miembro,
-        rol_equipo: m.rol_equipo || 'Activista Digital',
-        plataforma: platform,
-        usuario_handle: normHandle,
-        url_perfil: m.url_perfil || `https://${platform}.com/${normHandle.replace('@', '')}`,
-        nivel_participacion: 'Activo',
-        verificado: true
-      }
     });
 
-    if (created) {
-      createdCount++;
+    if (teamMember) {
+        return {
+            isTeam: true,
+            teamMemberId: teamMember.id,
+            teamMemberName: teamMember.nombre_miembro,
+            teamMemberRole: teamMember.rol_equipo,
+            teamMemberHandle: teamMember.usuario_handle
+        };
+    }
+
+    return { isTeam: false, teamMemberId: null, teamMemberName: null, teamMemberRole: null, teamMemberHandle: null };
+}
+
+/**
+ * Registra o actualiza una cuenta monitoreada (propia o de terceros)
+ */
+async function registerMonitoredAccount({ campanaId, url, platform, tipoCuenta = 'public_third_party', handle = null, nombreMostrado = null }) {
+    const parsed = parseProfileUrl(url);
+    const effPlatform = platform || parsed.platform;
+    const effHandle = normalizeHandle(handle || parsed.handle);
+    const connector = getConnector(effPlatform);
+    const credentials = await connector.getCredentials(campanaId);
+
+    let resolvedData = {
+        external_account_id: null,
+        nombre_mostrado: nombreMostrado || effHandle.replace('@', ''),
+        avatar_url: null,
+        url_perfil: parsed.cleanUrl || url,
+        total_seguidores: 0,
+        total_publicaciones: 0,
+        raw_data: null
+    };
+
+    let syncStatus = 'pending';
+    let syncStatusDetail = null;
+
+    if (credentials.available) {
+        try {
+            const apiAccount = await connector.resolveAccount(url || effHandle, credentials);
+            resolvedData = {
+                external_account_id: apiAccount.external_account_id,
+                nombre_mostrado: apiAccount.nombre_mostrado || resolvedData.nombre_mostrado,
+                avatar_url: apiAccount.avatar_url,
+                url_perfil: apiAccount.url_perfil || resolvedData.url_perfil,
+                total_seguidores: apiAccount.total_seguidores || 0,
+                total_publicaciones: apiAccount.total_publicaciones || 0,
+                raw_data: apiAccount.raw_data
+            };
+            syncStatus = 'active';
+            syncStatusDetail = 'Cuenta verificada y conectada con la API oficial';
+        } catch (err) {
+            syncStatus = 'restricted';
+            syncStatusDetail = err.message;
+        }
     } else {
-      record.nombre_miembro = m.nombre_miembro || record.nombre_miembro;
-      record.rol_equipo = m.rol_equipo || record.rol_equipo;
-      record.verificado = true;
-      await record.save();
-      updatedCount++;
+        syncStatus = 'restricted';
+        syncStatusDetail = credentials.reason;
     }
 
-    const matchingComments = await SocialPostComment.findAll({
-      where: {
-        campana_id: campanaId,
-        usuario_red: {
-          [Op.in]: [normHandle, normHandle.replace(/^@/, '')]
+    const [account, created] = await SocialAccount.findOrCreate({
+        where: {
+            campana_id: campanaId,
+            plataforma: effPlatform,
+            handle: effHandle
+        },
+        defaults: {
+            campana_id: campanaId,
+            plataforma: effPlatform,
+            tipo_cuenta: tipoCuenta,
+            handle: effHandle,
+            nombre_mostrado: resolvedData.nombre_mostrado,
+            external_account_id: resolvedData.external_account_id,
+            url_perfil: resolvedData.url_perfil,
+            avatar_url: resolvedData.avatar_url,
+            total_seguidores: resolvedData.total_seguidores,
+            total_publicaciones: resolvedData.total_publicaciones,
+            sync_status: syncStatus,
+            sync_status_detail: syncStatusDetail,
+            is_active: true
         }
-      }
     });
 
-    for (const comment of matchingComments) {
-      comment.es_equipo_campana = true;
-      comment.equipo_miembro_id = record.id;
-      comment.equipo_nombre = record.nombre_miembro;
-      comment.equipo_rol = record.rol_equipo;
-      await comment.save();
+    if (!created) {
+        account.tipo_cuenta = tipoCuenta || account.tipo_cuenta;
+        if (resolvedData.external_account_id) account.external_account_id = resolvedData.external_account_id;
+        if (resolvedData.nombre_mostrado) account.nombre_mostrado = resolvedData.nombre_mostrado;
+        if (resolvedData.avatar_url) account.avatar_url = resolvedData.avatar_url;
+        account.sync_status = syncStatus;
+        account.sync_status_detail = syncStatusDetail;
+        await account.save();
     }
-  }
 
-  return {
-    success: true,
-    createdCount,
-    updatedCount,
-    totalProcessed: members.length
-  };
+    return account;
 }
 
-async function getPostCommentsWithAudit(postId, campanaId) {
-  const post = await SocialMediaPost.findByPk(postId);
-  const effectiveCampanaId = campanaId || post?.campana_id || 1;
-
-  const comments = await SocialPostComment.findAll({
-    where: { post_id: postId },
-    order: [['likes_comentario', 'DESC'], ['createdAt', 'DESC']]
-  });
-
-  const totalTeamAccounts = await SocialTeamAccount.findAll({
-    where: { campana_id: effectiveCampanaId }
-  });
-
-  const teamMemberIdsWhoCommented = new Set(
-    comments.filter(c => c.es_equipo_campana && c.equipo_miembro_id).map(c => c.equipo_miembro_id)
-  );
-
-  const teamCoveragePercentage = totalTeamAccounts.length > 0
-    ? Math.round((teamMemberIdsWhoCommented.size / totalTeamAccounts.length) * 100)
-    : 0;
-
-  const pendingTeamMembers = totalTeamAccounts.filter(
-    t => !teamMemberIdsWhoCommented.has(t.id)
-  ).map(t => ({
-    id: t.id,
-    nombre_miembro: t.nombre_miembro,
-    rol_equipo: t.rol_equipo,
-    usuario_handle: t.usuario_handle,
-    plataforma: t.plataforma
-  }));
-
-  return {
-    comments,
-    audit: {
-      totalComments: comments.length,
-      teamCommentsCount: comments.filter(c => c.es_equipo_campana).length,
-      externalCommentsCount: comments.filter(c => !c.es_equipo_campana).length,
-      teamMembersParticipating: teamMemberIdsWhoCommented.size,
-      totalTeamMembers: totalTeamAccounts.length,
-      coveragePercentage: teamCoveragePercentage,
-      pendingTeamMembers
+/**
+ * Sincronización oficial de publicaciones y comentarios reales de una cuenta
+ */
+async function syncAccountPostsAndComments({ accountId, campanaId, limit = 20, syncOrigin = 'manual_usuario' }) {
+    const account = await SocialAccount.findByPk(accountId);
+    if (!account) {
+        throw new Error(`Cuenta social con ID ${accountId} no encontrada`);
     }
-  };
-}
 
-async function executeFullCandidateSweep({ campanaId }) {
-  const campaign = await Campaign.findByPk(campanaId);
-  if (!campaign) {
-    throw new Error(`Campaña con ID ${campanaId} no encontrada`);
-  }
+    const effectiveCampanaId = campanaId || account.campana_id;
+    const connector = getConnector(account.plataforma);
+    const credentials = await connector.getCredentials(effectiveCampanaId, account.id);
 
-  const isOscarVillamizar = (campaign.candidato && campaign.candidato.toLowerCase().includes('villamizar')) ||
-                            (campaign.nombre && campaign.nombre.toLowerCase().includes('villamizar'));
-
-  const isDiegoAriza = (campaign.candidato && campaign.candidato.toLowerCase().includes('ariza')) ||
-                       (campaign.nombre && campaign.nombre.toLowerCase().includes('ariza'));
-
-  if (isOscarVillamizar) {
-    campaign.link_facebook = 'https://www.facebook.com/OscarVillamiz/?locale=es_LA';
-    campaign.link_instagram = 'https://www.instagram.com/oscarvillamiz/?hl=es';
-    campaign.link_twitter = 'https://x.com/OscarVillamiz';
-    campaign.link_tiktok = 'https://www.tiktok.com/@oscarvillamiz';
-    campaign.link_youtube = 'https://www.youtube.com/@OscarVillamizarOficial';
-    await campaign.save();
-  } else if (isDiegoAriza) {
-    campaign.link_facebook = 'https://www.facebook.com/diegofranariza';
-    campaign.link_instagram = 'https://www.instagram.com/diegofranariza';
-    campaign.link_twitter = 'https://x.com/diegofranariza';
-    campaign.link_tiktok = 'https://www.tiktok.com/@diego.fran.ariza';
-    campaign.link_youtube = 'https://www.youtube.com/@DiegoFranArizaOficial';
-    campaign.link_whatsapp = 'https://chat.whatsapp.com/DiegoFranArizaCamara';
-    await campaign.save();
-  }
-
-  const teamAccountsData = isOscarVillamizar ? [
-    {
-      campana_id: campanaId,
-      nombre_miembro: 'Equipo Prensa y Comunicaciones Oficial',
-      rol_equipo: 'Prensa y Comunicaciones Oficiales',
-      plataforma: 'twitter',
-      usuario_handle: '@comunicaciones_villamizar',
-      url_perfil: 'https://x.com/comunicaciones_villamizar',
-      seguidores: 14200,
-      nivel_participacion: 'Muy Activo',
-      repost_campana_count: 48,
-      ultimo_apoyo_fecha: new Date().toISOString()
-    },
-    {
-      campana_id: campanaId,
-      nombre_miembro: 'Avanzada Santander CD',
-      rol_equipo: 'Coordinación de Avanzada Santander',
-      plataforma: 'instagram',
-      usuario_handle: '@avanzada_santander_cd',
-      url_perfil: 'https://instagram.com/avanzada_santander_cd',
-      seguidores: 18900,
-      nivel_participacion: 'Muy Activo',
-      repost_campana_count: 55,
-      ultimo_apoyo_fecha: new Date().toISOString()
-    },
-    {
-      campana_id: campanaId,
-      nombre_miembro: 'Juventudes CD Bucaramanga',
-      rol_equipo: 'Líder Juventudes CD Bucaramanga',
-      plataforma: 'tiktok',
-      usuario_handle: '@juventudes_villamizar',
-      url_perfil: 'https://tiktok.com/@juventudes_villamizar',
-      seguidores: 22400,
-      nivel_participacion: 'Muy Activo',
-      repost_campana_count: 62,
-      ultimo_apoyo_fecha: new Date().toISOString()
-    },
-    {
-      campana_id: campanaId,
-      nombre_miembro: 'Colectivo Mujeres con Villamizar',
-      rol_equipo: 'Coordinadora Mujeres y Familia',
-      plataforma: 'facebook',
-      usuario_handle: '@mujeres_con_villamizar',
-      url_perfil: 'https://facebook.com/mujeres_con_villamizar',
-      seguidores: 11500,
-      nivel_participacion: 'Muy Activo',
-      repost_campana_count: 39,
-      ultimo_apoyo_fecha: new Date().toISOString()
-    },
-    {
-      campana_id: campanaId,
-      nombre_miembro: 'Vocería Provincias Guanentá y Comunera',
-      rol_equipo: 'Vocero Regional Provincias',
-      plataforma: 'twitter',
-      usuario_handle: '@voceria_provincial_guanenta',
-      url_perfil: 'https://x.com/voceria_provincial_guanenta',
-      seguidores: 8300,
-      nivel_participacion: 'Activo',
-      repost_campana_count: 31,
-      ultimo_apoyo_fecha: new Date().toISOString()
-    },
-    {
-      campana_id: campanaId,
-      nombre_miembro: 'Brigada Digital Floridablanca',
-      rol_equipo: 'Activismo Digital y Redes',
-      plataforma: 'instagram',
-      usuario_handle: '@red_digital_floridablanca',
-      url_perfil: 'https://instagram.com/red_digital_floridablanca',
-      seguidores: 9700,
-      nivel_participacion: 'Activo',
-      repost_campana_count: 28,
-      ultimo_apoyo_fecha: new Date().toISOString()
-    }
-  ] : isDiegoAriza ? [
-    {
-      campana_id: campanaId,
-      nombre_miembro: 'Equipo Prensa y Comunicaciones Diego Ariza',
-      rol_equipo: 'Prensa y Comunicaciones Oficiales',
-      plataforma: 'twitter',
-      usuario_handle: '@prensa_diego_ariza',
-      url_perfil: 'https://x.com/prensa_diego_ariza',
-      seguidores: 12500,
-      nivel_participacion: 'Muy Activo',
-      repost_campana_count: 42,
-      ultimo_apoyo_fecha: new Date().toISOString()
-    },
-    {
-      campana_id: campanaId,
-      nombre_miembro: 'Avanzada Regional Diego Ariza',
-      rol_equipo: 'Coordinación de Avanzada y Veredas',
-      plataforma: 'facebook',
-      usuario_handle: '@avanzada_ariza_camara',
-      url_perfil: 'https://facebook.com/avanzada_ariza_camara',
-      seguidores: 15400,
-      nivel_participacion: 'Muy Activo',
-      repost_campana_count: 51,
-      ultimo_apoyo_fecha: new Date().toISOString()
-    },
-    {
-      campana_id: campanaId,
-      nombre_miembro: 'Juventudes con Diego Ariza',
-      rol_equipo: 'Líder de Juventudes y Nuevos Votantes',
-      plataforma: 'tiktok',
-      usuario_handle: '@juventudes_con_ariza',
-      url_perfil: 'https://tiktok.com/@juventudes_con_ariza',
-      seguidores: 19800,
-      nivel_participacion: 'Muy Activo',
-      repost_campana_count: 58,
-      ultimo_apoyo_fecha: new Date().toISOString()
-    },
-    {
-      campana_id: campanaId,
-      nombre_miembro: 'Colectivo Mujeres y Familias con Ariza',
-      rol_equipo: 'Coordinadora de Mujeres y Desarrollo Social',
-      plataforma: 'instagram',
-      usuario_handle: '@mujeres_con_ariza',
-      url_perfil: 'https://instagram.com/mujeres_con_ariza',
-      seguidores: 10200,
-      nivel_participacion: 'Muy Activo',
-      repost_campana_count: 36,
-      ultimo_apoyo_fecha: new Date().toISOString()
-    },
-    {
-      campana_id: campanaId,
-      nombre_miembro: 'Red Comunal y Líderes de Base',
-      rol_equipo: 'Vocería Comunal y Juntas de Acción',
-      plataforma: 'twitter',
-      usuario_handle: '@comunales_con_ariza',
-      url_perfil: 'https://x.com/comunales_con_ariza',
-      seguidores: 7600,
-      nivel_participacion: 'Activo',
-      repost_campana_count: 29,
-      ultimo_apoyo_fecha: new Date().toISOString()
-    }
-  ] : [
-    {
-      campana_id: campanaId,
-      nombre_miembro: 'Equipo Digital Campaña',
-      rol_equipo: 'Prensa y Comunicaciones',
-      plataforma: 'twitter',
-      usuario_handle: '@prensa_oficial',
-      seguidores: 5000,
-      nivel_participacion: 'Muy Activo',
-      repost_campana_count: 20,
-      ultimo_apoyo_fecha: new Date().toISOString()
-    }
-  ];
-
-  for (const t of teamAccountsData) {
-    const [acc, created] = await SocialTeamAccount.findOrCreate({
-      where: { campana_id: campanaId, usuario_handle: t.usuario_handle },
-      defaults: t
+    // Iniciar trabajo de sincronización en BD
+    const job = await SocialSyncJob.create({
+        campana_id: effectiveCampanaId,
+        account_id: account.id,
+        plataforma: account.plataforma,
+        tipo_origen: syncOrigin,
+        estado: 'running',
+        iniciado_en: new Date()
     });
-    if (!created) await acc.update(t);
-  }
 
-  const sweepUrls = [
-    campaign.link_facebook || (isOscarVillamizar ? 'https://www.facebook.com/OscarVillamiz/?locale=es_LA' : (isDiegoAriza ? 'https://www.facebook.com/diegofranariza' : '')),
-    campaign.link_instagram || (isOscarVillamizar ? 'https://www.instagram.com/oscarvillamiz/?hl=es' : (isDiegoAriza ? 'https://www.instagram.com/diegofranariza' : '')),
-    campaign.link_twitter || (isOscarVillamizar ? 'https://x.com/OscarVillamiz' : (isDiegoAriza ? 'https://x.com/diegofranariza' : '')),
-    campaign.link_tiktok || (isOscarVillamizar ? 'https://www.tiktok.com/@oscarvillamiz' : (isDiegoAriza ? 'https://www.tiktok.com/@diego.fran.ariza' : '')),
-    campaign.link_youtube || (isOscarVillamizar ? 'https://www.youtube.com/@OscarVillamizarOficial' : (isDiegoAriza ? 'https://www.youtube.com/@DiegoFranArizaOficial' : ''))
-  ].filter(Boolean);
+    if (!credentials.available) {
+        account.sync_status = 'restricted';
+        account.sync_status_detail = credentials.reason;
+        await account.save();
 
-  let totalPostsSynced = 0;
-  let totalCommentsSynced = 0;
+        job.estado = 'failed';
+        job.finalizado_en = new Date();
+        job.mensaje_error = credentials.reason;
+        await job.save();
 
-  for (const sUrl of sweepUrls) {
+        await SocialSyncError.create({
+            sync_job_id: job.id,
+            campana_id: effectiveCampanaId,
+            plataforma: account.plataforma,
+            tipo_error: 'missing_credentials_or_unauthorized',
+            mensaje_tecnico: credentials.reason,
+            explicacion_usuario: credentials.reason,
+            es_recuperable: false
+        });
+
+        return {
+            success: false,
+            platform: account.plataforma,
+            postsCreated: 0,
+            commentsCreated: 0,
+            status: 'restricted',
+            technicalNotice: credentials.reason
+        };
+    }
+
     try {
-      const syncRes = await syncProfileFromUrl({ url: sUrl, campanaId });
-      totalPostsSynced += syncRes.postsCreated || 0;
-      totalCommentsSynced += syncRes.commentsCreated || 0;
-    } catch (err) {
-      console.warn(`Error sincronizando ${sUrl}:`, err.message);
+        // 1. Obtener publicaciones reales desde la API oficial
+        const postResult = await connector.fetchPosts({ account, credentials, limit });
+        const fetchedPosts = postResult.posts || [];
+        let postsCreatedCount = 0;
+        let postsUpdatedCount = 0;
+        let totalCommentsFetched = 0;
+        let verifiedTeamInteractionsCount = 0;
+
+        for (const p of fetchedPosts) {
+            // Deduplicación estricta por [plataforma, external_id]
+            let post = await SocialMediaPost.findOne({
+                where: {
+                    plataforma: p.plataforma,
+                    external_id: p.external_id
+                }
+            });
+
+            if (!post) {
+                post = await SocialMediaPost.create({
+                    campana_id: effectiveCampanaId,
+                    account_id: account.id,
+                    external_id: p.external_id,
+                    source_type: account.tipo_cuenta,
+                    plataforma: p.plataforma,
+                    titulo: p.titulo,
+                    contenido: p.contenido,
+                    url_publicacion: p.url_publicacion,
+                    autor_nombre: p.autor_nombre,
+                    autor_usuario: p.autor_usuario,
+                    fecha_publicacion: p.fecha_publicacion || new Date().toISOString(),
+                    tipo_contenido: p.tipo_contenido || 'imagen',
+                    alcance: p.alcance || 0,
+                    impresiones: p.impresiones || 0,
+                    reproducciones: p.reproducciones || 0,
+                    interacciones: p.interacciones || 0,
+                    compartidos: p.compartidos || 0,
+                    comentarios_conteo: p.comentarios_conteo || 0,
+                    likes: p.likes || 0,
+                    me_encanta: p.me_encanta || 0,
+                    me_enoja: p.me_enoja || 0,
+                    video_url: p.video_url || null,
+                    is_simulation: false,
+                    raw_data: p.raw_data ? JSON.stringify(p.raw_data) : null,
+                    sync_status: 'synced'
+                });
+                postsCreatedCount++;
+            } else {
+                await post.update({
+                    titulo: p.titulo || post.titulo,
+                    contenido: p.contenido || post.contenido,
+                    url_publicacion: p.url_publicacion || post.url_publicacion,
+                    alcance: p.alcance || post.alcance,
+                    impresiones: p.impresiones || post.impresiones,
+                    reproducciones: p.reproducciones || post.reproducciones,
+                    interacciones: p.interacciones || post.interacciones,
+                    compartidos: p.compartidos || post.compartidos,
+                    comentarios_conteo: p.comentarios_conteo || post.comentarios_conteo,
+                    likes: p.likes !== undefined ? p.likes : post.likes,
+                    raw_data: p.raw_data ? JSON.stringify(p.raw_data) : post.raw_data,
+                    sync_status: 'synced'
+                });
+                postsUpdatedCount++;
+            }
+
+            // 2. Obtener comentarios reales de la publicación
+            try {
+                const commentResult = await connector.fetchComments({ post, credentials, limit: 50 });
+                const fetchedComments = commentResult.comments || [];
+
+                for (const c of fetchedComments) {
+                    if (!c.external_id) continue;
+
+                    // Deduplicación de comentarios por [plataforma, external_id]
+                    let comment = await SocialPostComment.findOne({
+                        where: {
+                            plataforma: c.plataforma,
+                            external_id: c.external_id
+                        }
+                    });
+
+                    // Clasificación NLP
+                    const classification = classifyComment(c.texto_comentario);
+
+                    // Verificación estricta de pertenencia al equipo (match exacto de handle o ID externo)
+                    const teamMatch = await matchTeamMember(effectiveCampanaId, c.usuario_red, c.autor_id_externo);
+
+                    if (!comment) {
+                        comment = await SocialPostComment.create({
+                            post_id: post.id,
+                            campana_id: effectiveCampanaId,
+                            account_id: account.id,
+                            external_id: c.external_id,
+                            parent_comment_id: c.parent_comment_id || null,
+                            plataforma: c.plataforma,
+                            usuario_red: normalizeHandle(c.usuario_red),
+                            nombre_usuario: c.nombre_usuario,
+                            autor_id_externo: c.autor_id_externo || null,
+                            url_comentario: c.url_comentario || post.url_publicacion,
+                            texto_comentario: c.texto_comentario,
+                            likes_comentario: c.likes_comentario || 0,
+                            fecha_comentario: c.fecha_comentario || new Date().toISOString(),
+                            sentimiento: classification.sentimiento,
+                            tipo_reaccion: classification.tipo_reaccion,
+                            categoria_contenido: classification.categoria,
+                            nivel_confianza_ia: classification.nivel_confianza,
+                            es_critica_legitima: classification.es_critica_legitima,
+                            es_amenaza: classification.es_amenaza,
+                            requiere_revision_humana: classification.requiere_revision_humana,
+                            estado_revision: classification.requiere_revision_humana ? 'pendiente' : 'aprobado',
+                            es_equipo_campana: teamMatch.isTeam,
+                            equipo_miembro_id: teamMatch.teamMemberId,
+                            equipo_nombre: teamMatch.teamMemberName,
+                            equipo_rol: teamMatch.teamMemberRole,
+                            raw_data: c.raw_data ? JSON.stringify(c.raw_data) : null
+                        });
+                        totalCommentsFetched++;
+                    } else {
+                        await comment.update({
+                            likes_comentario: c.likes_comentario !== undefined ? c.likes_comentario : comment.likes_comentario,
+                            es_equipo_campana: teamMatch.isTeam || comment.es_equipo_campana,
+                            equipo_miembro_id: teamMatch.teamMemberId || comment.equipo_miembro_id,
+                            equipo_nombre: teamMatch.teamMemberName || comment.equipo_nombre,
+                            equipo_rol: teamMatch.teamMemberRole || comment.equipo_rol
+                        });
+                    }
+
+                    // Verificar alertas de contenido
+                    await checkAndCreateContentAlert({ comment, campanaId: effectiveCampanaId, post });
+
+                    // Registrar interacción verificada del equipo si aplica
+                    if (teamMatch.isTeam) {
+                        const [interaction, intCreated] = await SocialTeamInteraction.findOrCreate({
+                            where: {
+                                campana_id: effectiveCampanaId,
+                                post_id: post.id,
+                                external_interaction_id: c.external_id
+                            },
+                            defaults: {
+                                campana_id: effectiveCampanaId,
+                                post_id: post.id,
+                                team_account_id: teamMatch.teamMemberId,
+                                nombre_miembro: teamMatch.teamMemberName,
+                                rol_equipo: teamMatch.teamMemberRole,
+                                usuario_handle: teamMatch.teamMemberHandle,
+                                plataforma: c.plataforma,
+                                tipo_verificacion: 'verificada', // Verificada por la API oficial
+                                tipo_reaccion: 'apoyo',
+                                comento: true,
+                                texto_comentario: c.texto_comentario,
+                                compartio: false,
+                                evidencia_url: c.url_comentario || post.url_publicacion,
+                                external_interaction_id: c.external_id,
+                                api_verified_at: new Date(),
+                                fecha_interaccion: c.fecha_comentario || new Date().toISOString()
+                            }
+                        });
+                        if (intCreated) verifiedTeamInteractionsCount++;
+                    }
+                }
+            } catch (commentErr) {
+                console.warn(`Aviso al consultar comentarios del post ${post.id}:`, commentErr.message);
+            }
+        }
+
+        // Actualizar estado de la cuenta
+        account.sync_status = 'active';
+        account.sync_status_detail = `Sincronización completada exitosamente. ${postsCreatedCount + postsUpdatedCount} publicaciones y ${totalCommentsFetched} comentarios analizados.`;
+        account.ultimo_sync_exitoso = new Date();
+        account.total_publicaciones = await SocialMediaPost.count({ where: { account_id: account.id } });
+        await account.save();
+
+        // Finalizar trabajo
+        job.estado = 'completed';
+        job.finalizado_en = new Date();
+        job.publicaciones_obtenidas = postsCreatedCount;
+        job.comentarios_obtenidos = totalCommentsFetched;
+        job.registros_actualizados = postsUpdatedCount;
+        job.detalles_tecnicos = JSON.stringify({
+            verifiedTeamInteractions: verifiedTeamInteractionsCount,
+            technicalNotice: postResult.technicalNotice || null
+        });
+        await job.save();
+
+        await SocialAuditLog.create({
+            campana_id: effectiveCampanaId,
+            tipo_evento: 'sync_executed',
+            plataforma: account.plataforma,
+            entidad_afectada: 'SocialAccount',
+            entidad_id: account.id,
+            descripcion: `Sincronización oficial ejecutada para ${account.handle}. Publicaciones: ${postsCreatedCount}, Comentarios: ${totalCommentsFetched}`
+        });
+
+        return {
+            success: true,
+            platform: account.plataforma,
+            handle: account.handle,
+            postsCreated: postsCreatedCount,
+            postsUpdated: postsUpdatedCount,
+            commentsFetched: totalCommentsFetched,
+            verifiedTeamInteractions: verifiedTeamInteractionsCount,
+            technicalNotice: postResult.technicalNotice || null
+        };
+    } catch (error) {
+        account.sync_status = 'error';
+        account.sync_status_detail = error.message;
+        await account.save();
+
+        job.estado = 'failed';
+        job.finalizado_en = new Date();
+        job.mensaje_error = error.message;
+        await job.save();
+
+        await SocialSyncError.create({
+            sync_job_id: job.id,
+            campana_id: effectiveCampanaId,
+            plataforma: account.plataforma,
+            tipo_error: error.details?.errorType || 'unknown_error',
+            mensaje_tecnico: error.message,
+            explicacion_usuario: error.details?.userExplanation || error.message,
+            es_recuperable: error.status === 429
+        });
+
+        throw error;
     }
-  }
+}
 
-  const posts = await SocialMediaPost.findAll({ where: { campana_id: campanaId } });
-  const commentsCount = await SocialPostComment.count({ where: { campana_id: campanaId } });
+/**
+ * Importación voluntaria del equipo con consentimiento
+ */
+async function importTeamMembers({ members = [], campanaId }) {
+    let createdCount = 0;
+    let updatedCount = 0;
 
-  return {
-    success: true,
-    candidato: campaign.candidato,
-    campana_id: campanaId,
-    postsCreated: posts.length,
-    commentsCreated: commentsCount,
-    platforms: ['facebook', 'instagram', 'twitter', 'tiktok', 'youtube'],
-    mensaje: `Barrido profundo completado con éxito para ${campaign.candidato}. ${posts.length} publicaciones oficiales y ${commentsCount} comentarios y reacciones analizadas.`
-  };
+    for (const m of members) {
+        if (!m.nombre_miembro || !m.usuario_handle) continue;
+
+        const normHandle = normalizeHandle(m.usuario_handle);
+        const platform = m.plataforma ? m.plataforma.toLowerCase() : 'instagram';
+
+        const [record, created] = await SocialTeamAccount.findOrCreate({
+            where: {
+                campana_id: campanaId,
+                usuario_handle: normHandle,
+                plataforma: platform
+            },
+            defaults: {
+                campana_id: campanaId,
+                nombre_miembro: m.nombre_miembro,
+                rol_equipo: m.rol_equipo || 'Activista Digital',
+                plataforma: platform,
+                usuario_handle: normHandle,
+                url_perfil: m.url_perfil || `https://${platform}.com/${normHandle.replace('@', '')}`,
+                nivel_participacion: 'Activo',
+                verificado: true,
+                consentimiento_vinculacion: true,
+                fecha_consentimiento: new Date()
+            }
+        });
+
+        if (created) {
+            createdCount++;
+        } else {
+            record.nombre_miembro = m.nombre_miembro || record.nombre_miembro;
+            record.rol_equipo = m.rol_equipo || record.rol_equipo;
+            record.verificado = true;
+            record.consentimiento_vinculacion = true;
+            await record.save();
+            updatedCount++;
+        }
+
+        // Cruzar comentarios existentes mediante coincidencia exacta de handle normalizado
+        const matchingComments = await SocialPostComment.findAll({
+            where: {
+                campana_id: campanaId,
+                plataforma: platform,
+                usuario_red: {
+                    [Op.in]: [normHandle, normHandle.replace(/^@/, '')]
+                }
+            }
+        });
+
+        for (const comment of matchingComments) {
+            comment.es_equipo_campana = true;
+            comment.equipo_miembro_id = record.id;
+            comment.equipo_nombre = record.nombre_miembro;
+            comment.equipo_rol = record.rol_equipo;
+            await comment.save();
+
+            // Registrar interacción verificada
+            await SocialTeamInteraction.findOrCreate({
+                where: {
+                    campana_id: campanaId,
+                    post_id: comment.post_id,
+                    external_interaction_id: comment.external_id || `comment_${comment.id}`
+                },
+                defaults: {
+                    campana_id: campanaId,
+                    post_id: comment.post_id,
+                    team_account_id: record.id,
+                    nombre_miembro: record.nombre_miembro,
+                    rol_equipo: record.rol_equipo,
+                    usuario_handle: normHandle,
+                    plataforma: platform,
+                    tipo_verificacion: comment.external_id ? 'verificada' : 'declarada',
+                    comento: true,
+                    texto_comentario: comment.texto_comentario,
+                    evidencia_url: comment.url_comentario,
+                    external_interaction_id: comment.external_id || `comment_${comment.id}`,
+                    api_verified_at: new Date(),
+                    fecha_interaccion: comment.fecha_comentario || new Date().toISOString()
+                }
+            });
+        }
+    }
+
+    return {
+        success: true,
+        createdCount,
+        updatedCount,
+        totalProcessed: members.length
+    };
+}
+
+/**
+ * Consulta de comentarios auditados para una publicación
+ */
+async function getPostCommentsWithAudit(postId, campanaId) {
+    const post = await SocialMediaPost.findByPk(postId);
+    const effectiveCampanaId = campanaId || post?.campana_id || 1;
+
+    const comments = await SocialPostComment.findAll({
+        where: { post_id: postId },
+        order: [['likes_comentario', 'DESC'], ['createdAt', 'DESC']]
+    });
+
+    const teamAccounts = await SocialTeamAccount.findAll({
+        where: { campana_id: effectiveCampanaId }
+    });
+
+    const teamMemberIdsWhoCommented = new Set(
+        comments.filter(c => c.es_equipo_campana && c.equipo_miembro_id).map(c => c.equipo_miembro_id)
+    );
+
+    const teamCoveragePercentage = teamAccounts.length > 0
+        ? Math.round((teamMemberIdsWhoCommented.size / teamAccounts.length) * 100)
+        : 0;
+
+    const pendingTeamMembers = teamAccounts.filter(
+        t => !teamMemberIdsWhoCommented.has(t.id)
+    ).map(t => ({
+        id: t.id,
+        nombre_miembro: t.nombre_miembro,
+        rol_equipo: t.rol_equipo,
+        usuario_handle: t.usuario_handle,
+        plataforma: t.plataforma
+    }));
+
+    return {
+        comments,
+        audit: {
+            totalComments: comments.length,
+            teamCommentsCount: comments.filter(c => c.es_equipo_campana).length,
+            externalCommentsCount: comments.filter(c => !c.es_equipo_campana).length,
+            teamMembersParticipating: teamMemberIdsWhoCommented.size,
+            totalTeamMembers: teamAccounts.length,
+            coveragePercentage: teamCoveragePercentage,
+            pendingTeamMembers
+        }
+    };
+}
+
+/**
+ * Punto de entrada compatible para sincronizar desde URL
+ */
+async function syncProfileFromUrl({ url, campanaId, tipoCuenta = 'public_third_party' }) {
+    const parsed = parseProfileUrl(url);
+    const account = await registerMonitoredAccount({
+        campanaId,
+        url: parsed.cleanUrl || url,
+        platform: parsed.platform,
+        tipoCuenta,
+        handle: parsed.handle
+    });
+
+    return await syncAccountPostsAndComments({
+        accountId: account.id,
+        campanaId,
+        limit: 15,
+        syncOrigin: 'manual_usuario'
+    });
 }
 
 module.exports = {
-  parseProfileUrl,
-  syncProfileFromUrl,
-  importTeamMembers,
-  getPostCommentsWithAudit,
-  executeFullCandidateSweep
+    normalizeHandle,
+    parseProfileUrl,
+    matchTeamMember,
+    registerMonitoredAccount,
+    syncAccountPostsAndComments,
+    syncProfileFromUrl,
+    importTeamMembers,
+    getPostCommentsWithAudit
 };

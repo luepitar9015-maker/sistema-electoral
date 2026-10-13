@@ -26,6 +26,13 @@ const SocialExperiment = require('./models/SocialExperiment');
 const AuditLog = require('./models/AuditLog');
 const AIUsageLog = require('./models/AIUsageLog');
 const SocialPostComment = require('./models/SocialPostComment');
+const SocialAccount = require('./models/SocialAccount');
+const SocialConnection = require('./models/SocialConnection');
+const ContentAlert = require('./models/ContentAlert');
+const ModerationReview = require('./models/ModerationReview');
+const SocialSyncJob = require('./models/SocialSyncJob');
+const SocialSyncError = require('./models/SocialSyncError');
+const SocialAuditLog = require('./models/SocialAuditLog');
 const VoterInteraction = require('./models/VoterInteraction');
 const TestigoElectoral = require('./models/TestigoElectoral');
 const DiaDMesaReporte = require('./models/DiaDMesaReporte');
@@ -75,6 +82,32 @@ SocialMediaPost.hasMany(SocialPostComment, { foreignKey: 'post_id', as: 'comenta
 SocialPostComment.belongsTo(SocialMediaPost, { foreignKey: 'post_id' });
 Campaign.hasMany(SocialPostComment, { foreignKey: 'campana_id', as: 'comentarios_campana' });
 SocialPostComment.belongsTo(Campaign, { foreignKey: 'campana_id' });
+
+// Nuevas Asociaciones de Monitoreo Oficial de Redes Sociales
+Campaign.hasMany(SocialAccount, { foreignKey: 'campana_id', as: 'cuentas_sociales', onDelete: 'CASCADE' });
+SocialAccount.belongsTo(Campaign, { foreignKey: 'campana_id' });
+
+SocialAccount.hasMany(SocialMediaPost, { foreignKey: 'account_id', as: 'publicaciones', onDelete: 'SET NULL' });
+SocialMediaPost.belongsTo(SocialAccount, { foreignKey: 'account_id', as: 'cuenta_monitoreada' });
+
+SocialAccount.hasOne(SocialConnection, { foreignKey: 'account_id', as: 'conexion_segura', onDelete: 'CASCADE' });
+SocialConnection.belongsTo(SocialAccount, { foreignKey: 'account_id' });
+
+Campaign.hasMany(SocialConnection, { foreignKey: 'campana_id', as: 'conexiones_redes' });
+SocialConnection.belongsTo(Campaign, { foreignKey: 'campana_id' });
+
+Campaign.hasMany(ContentAlert, { foreignKey: 'campana_id', as: 'alertas_contenido', onDelete: 'CASCADE' });
+ContentAlert.belongsTo(Campaign, { foreignKey: 'campana_id' });
+ContentAlert.belongsTo(SocialPostComment, { foreignKey: 'comment_id', as: 'comentario_origen' });
+
+SocialPostComment.hasMany(ModerationReview, { foreignKey: 'comment_id', as: 'revisiones_moderacion', onDelete: 'CASCADE' });
+ModerationReview.belongsTo(SocialPostComment, { foreignKey: 'comment_id' });
+ModerationReview.belongsTo(User, { foreignKey: 'user_id', as: 'moderador' });
+
+Campaign.hasMany(SocialSyncJob, { foreignKey: 'campana_id', as: 'trabajos_sincronizacion', onDelete: 'CASCADE' });
+SocialSyncJob.belongsTo(Campaign, { foreignKey: 'campana_id' });
+SocialSyncJob.hasMany(SocialSyncError, { foreignKey: 'sync_job_id', as: 'errores_sync', onDelete: 'CASCADE' });
+SocialSyncError.belongsTo(SocialSyncJob, { foreignKey: 'sync_job_id' });
 
 const app = express();
 
@@ -186,8 +219,11 @@ app.use((req, res) => {
 });
 
 // Sincronización de base de datos y arranque del servidor
+const { startScheduler } = require('./services/socialSchedulerService');
+
 sequelize.sync().then(() => {
     console.log('Base de datos sincronizada');
+    startScheduler(); // Inicia monitor automático en segundo plano
     app.listen(PORT, () => {
         console.log(`Servidor corriendo en http://localhost:${PORT}`);
     });

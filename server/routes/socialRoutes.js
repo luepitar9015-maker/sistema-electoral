@@ -21,10 +21,29 @@ router.post('/posts/:id/track-click', socialController.trackPostClick);
 router.post('/sync-profile', socialController.syncProfile);
 router.post('/candidate-sweep', socialController.executeCandidateSweep);
 
+// Cuentas Monitoreadas (Cuentas Administradas y Cuentas Públicas de Terceros)
+router.get('/accounts', socialController.getAccounts);
+router.post('/accounts', socialController.createAccount);
+router.delete('/accounts/:id', socialController.deleteAccount);
+router.post('/accounts/:id/sync', socialController.syncAccount);
+
+// Conexiones Oficiales y Credenciales de Plataformas
+router.get('/connections', socialController.getConnections);
+router.post('/connections', socialController.saveConnection);
+router.post('/connections/test', socialController.testConnection);
+
+// Bandeja de Alertas de Contenido (Amenazas, Insultos, Spam, Crisis)
+router.get('/content-alerts', socialController.getContentAlerts);
+router.put('/content-alerts/:id/resolve', socialController.resolveContentAlert);
+
 // Comentarios y Auditoría de Integrantes del Equipo por Publicación y Global
 router.get('/comments', socialController.getAllComments);
 router.get('/posts/:postId/comments', socialController.getPostComments);
 router.post('/comments/:commentId/reply', socialController.replyToComment);
+router.put('/comments/:commentId/review', socialController.reviewComment);
+
+// Historial Técnico de Sincronización y Errores de API
+router.get('/sync-jobs', socialController.getSyncJobs);
 
 // Importación Masiva de Base de Datos del Equipo (Excel / CSV / JSON)
 router.post('/team/import', socialController.importTeamDatabase);

@@ -15,6 +15,8 @@ import ContentIntelligenceDashboard from '../features/social/ContentIntelligence
 import TeamDatabaseUploadModal from '../features/social/TeamDatabaseUploadModal';
 import PostCommentsModal from '../features/social/PostCommentsModal';
 import CompetitorWarRoom from '../features/social/CompetitorWarRoom';
+import OfficialConnectionsManager from '../features/social/OfficialConnectionsManager';
+import ContentAlertsModerationTray from '../features/social/ContentAlertsModerationTray';
 
 const PLATAFORMAS_INFO = {
     facebook:  { label: 'Facebook',  color: 'bg-blue-600 text-white', border: 'border-blue-500', light: 'bg-blue-50 text-blue-700' },
@@ -26,56 +28,20 @@ const PLATAFORMAS_INFO = {
 
 const getCandidateSocialLinks = (campaign) => {
     const candName = campaign?.candidato || campaign?.nombre || 'Candidato Oficial';
-    const isOscar = candName.toLowerCase().includes('villamizar');
-    const isDiego = candName.toLowerCase().includes('ariza');
     const cleanSlug = candName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, '');
 
-    if (isOscar) {
-        return {
-            instagram: campaign?.link_instagram || 'https://www.instagram.com/oscarvillamiz/?hl=es',
-            instagramUser: '@oscarvillamiz',
-            tiktok: campaign?.link_tiktok || 'https://www.tiktok.com/@oscarvillamiz',
-            tiktokUser: '@oscarvillamiz',
-            facebook: campaign?.link_facebook || 'https://www.facebook.com/OscarVillamiz/?locale=es_LA',
-            facebookUser: 'Oscar Villamizar',
-            twitter: campaign?.link_twitter || 'https://x.com/OscarVillamiz',
-            twitterUser: '@OscarVillamiz',
-            youtube: campaign?.link_youtube || 'https://www.youtube.com/@OscarVillamizarOficial',
-            youtubeUser: 'Oscar Villamizar Oficial',
-            whatsapp: campaign?.link_whatsapp || 'https://chat.whatsapp.com/OscarVillamizarSenado',
-            whatsappUser: 'Comunidad Oficial Oscar Villamizar'
-        };
-    }
-
-    if (isDiego) {
-        return {
-            instagram: campaign?.link_instagram || 'https://www.instagram.com/diegofranariza',
-            instagramUser: '@diegofranariza',
-            tiktok: campaign?.link_tiktok || 'https://www.tiktok.com/@diego.fran.ariza',
-            tiktokUser: '@diego.fran.ariza',
-            facebook: campaign?.link_facebook || 'https://www.facebook.com/diegofranariza',
-            facebookUser: 'Diego Fran Ariza',
-            twitter: campaign?.link_twitter || 'https://x.com/diegofranariza',
-            twitterUser: '@diegofranariza',
-            youtube: campaign?.link_youtube || 'https://www.youtube.com/@DiegoFranArizaOficial',
-            youtubeUser: 'Diego Fran Ariza Oficial',
-            whatsapp: campaign?.link_whatsapp || 'https://chat.whatsapp.com/DiegoFranArizaCamara',
-            whatsappUser: 'Comunidad Oficial Diego Fran Ariza'
-        };
-    }
-
     return {
-        instagram: campaign?.link_instagram || (cleanSlug ? `https://www.instagram.com/${cleanSlug}` : ''),
+        instagram: campaign?.link_instagram || '',
         instagramUser: campaign?.link_instagram ? '@' + campaign.link_instagram.split('/').filter(Boolean).pop().replace(/^@/, '') : (cleanSlug ? `@${cleanSlug}` : '@candidato'),
-        tiktok: campaign?.link_tiktok || (cleanSlug ? `https://www.tiktok.com/@${cleanSlug}` : ''),
+        tiktok: campaign?.link_tiktok || '',
         tiktokUser: campaign?.link_tiktok ? '@' + campaign.link_tiktok.split('/').filter(Boolean).pop().replace(/^@/, '') : (cleanSlug ? `@${cleanSlug}` : '@candidato'),
-        facebook: campaign?.link_facebook || (cleanSlug ? `https://www.facebook.com/${cleanSlug}` : ''),
-        facebookUser: candName,
-        twitter: campaign?.link_twitter || (cleanSlug ? `https://x.com/${cleanSlug}` : ''),
+        facebook: campaign?.link_facebook || '',
+        facebookUser: campaign?.link_facebook ? campaign.link_facebook.split('/').filter(Boolean).pop() : candName,
+        twitter: campaign?.link_twitter || '',
         twitterUser: campaign?.link_twitter ? '@' + campaign.link_twitter.split('/').filter(Boolean).pop().replace(/^@/, '') : (cleanSlug ? `@${cleanSlug}` : '@candidato'),
-        youtube: campaign?.link_youtube || (cleanSlug ? `https://www.youtube.com/@${cleanSlug}Oficial` : ''),
-        youtubeUser: `${candName} Oficial`,
-        whatsapp: campaign?.link_whatsapp || (cleanSlug ? `https://chat.whatsapp.com/${cleanSlug}` : ''),
+        youtube: campaign?.link_youtube || '',
+        youtubeUser: campaign?.link_youtube ? campaign.link_youtube.split('/').filter(Boolean).pop() : `${candName} Oficial`,
+        whatsapp: campaign?.link_whatsapp || '',
         whatsappUser: `Comunidad Oficial ${candName}`
     };
 };
@@ -1239,7 +1205,29 @@ export default function SocialMediaPage() {
                     <Sparkles size={16} className={activeTab === 'inteligencia' ? 'text-cyan-200 animate-pulse' : 'text-cyan-600'} />
                     <span>⚡ Impulsar Algoritmo Social</span>
                 </button>
+
+                <button
+                    onClick={() => setActiveTab('conexiones')}
+                    className={`flex items-center gap-2 px-5 py-3 rounded-2xl font-black text-xs uppercase tracking-wider transition-all cursor-pointer ${
+                        activeTab === 'conexiones'
+                            ? 'bg-gradient-to-r from-emerald-600 to-teal-700 text-white shadow-lg shadow-emerald-500/25'
+                            : 'text-emerald-800 bg-emerald-50/80 hover:bg-emerald-100 border border-emerald-200'
+                    }`}
+                >
+                    <Link size={16} className={activeTab === 'conexiones' ? 'text-emerald-100' : 'text-emerald-600'} />
+                    <span>🔌 Conexiones Oficiales & Cuentas</span>
+                </button>
             </div>
+
+            {/* ========================================================= */}
+            {/* PESTAÑA: CONEXIONES OFICIALES & GESTIÓN DE CUENTAS */}
+            {/* ========================================================= */}
+            {activeTab === 'conexiones' && (
+                <OfficialConnectionsManager
+                    campanaId={activeCampaign?.id || campaigns?.[0]?.id || 1}
+                    onAccountSynced={fetchAllData}
+                />
+            )}
 
             {/* ========================================================= */}
             {/* PESTAÑA: IMPULSAR ALGORITMO SOCIAL / CONTENT INTELLIGENCE */}
@@ -1692,8 +1680,25 @@ export default function SocialMediaPage() {
                     {loading ? (
                         <div className="text-center py-16 text-gray-400 text-xs">Cargando publicaciones...</div>
                     ) : filteredPosts.length === 0 ? (
-                        <div className="bg-white rounded-3xl p-12 text-center border border-gray-100 text-gray-400 text-xs">
-                            No se encontraron publicaciones con los filtros aplicados.
+                        <div className="bg-white rounded-3xl p-12 text-center border border-gray-100 space-y-4 shadow-sm">
+                            <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto text-slate-400">
+                                <Share2 size={28} />
+                            </div>
+                            <div className="max-w-md mx-auto space-y-1">
+                                <h4 className="font-black text-slate-800 text-sm uppercase">Sin publicaciones sincronizadas</h4>
+                                <p className="text-xs text-gray-500 leading-relaxed">
+                                    No hay publicaciones reales importadas con los filtros actuales. Conecta tus credenciales oficiales de Meta, YouTube, X o TikTok, o registra perfiles públicos en la pestaña <strong>Conexiones Oficiales</strong>.
+                                </p>
+                            </div>
+                            <div className="pt-2">
+                                <button
+                                    onClick={() => setActiveTab('conexiones')}
+                                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md inline-flex items-center gap-2 cursor-pointer"
+                                >
+                                    <Link size={14} />
+                                    <span>Ir a Conexiones Oficiales & Cuentas</span>
+                                </button>
+                            </div>
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1711,6 +1716,20 @@ export default function SocialMediaPage() {
                                                     <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200" title="Identificador único del post">
                                                         #{p.id}
                                                     </span>
+                                                    {p.source_type && (
+                                                        <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-full border ${
+                                                            p.source_type === 'managed'
+                                                                ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                                                                : 'bg-blue-50 text-blue-700 border-blue-200'
+                                                        }`}>
+                                                            {p.source_type === 'managed' ? 'Oficial' : 'Pública'}
+                                                        </span>
+                                                    )}
+                                                    {p.external_id && (
+                                                        <span className="text-[8px] font-mono text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-200" title={`ID Oficial de API: ${p.external_id}`}>
+                                                            API: {p.external_id.length > 12 ? p.external_id.slice(0, 11) + '…' : p.external_id}
+                                                        </span>
+                                                    )}
                                                 </div>
 
                                                 <div className="flex items-center gap-1.5">
@@ -2181,6 +2200,12 @@ export default function SocialMediaPage() {
                         </button>
                     </div>
 
+                    {/* Bandeja de Alertas de Contenido & Moderación Oficial NLP */}
+                    <ContentAlertsModerationTray
+                        campanaId={activeCampaign?.id || campaigns?.[0]?.id || 1}
+                        onModerationComplete={fetchAllData}
+                    />
+
                     {/* Filtros de Riesgo */}
                     <div className="flex items-center gap-2 bg-white p-3 rounded-2xl border border-gray-100 shadow-sm text-xs font-bold">
                         <span className="text-gray-400 uppercase text-[10px] pl-2">Filtrar Severidad:</span>
@@ -2623,6 +2648,32 @@ export default function SocialMediaPage() {
                                                     }`}>
                                                         Sentimiento: {com.sentimiento || 'Positivo'}
                                                     </span>
+
+                                                    {com.categoria_contenido && (
+                                                        <span className={`px-2 py-0.5 rounded-lg font-black uppercase text-[9px] border ${
+                                                            com.categoria_contenido === 'amenaza' ? 'bg-red-100 text-red-800 border-red-300 animate-pulse' :
+                                                            com.categoria_contenido === 'insulto' ? 'bg-rose-100 text-rose-800 border-rose-300' :
+                                                            com.categoria_contenido === 'critica_legitima' ? 'bg-amber-100 text-amber-800 border-amber-300' :
+                                                            com.categoria_contenido === 'pregunta' ? 'bg-blue-100 text-blue-800 border-blue-300' :
+                                                            com.categoria_contenido === 'spam' || com.categoria_contenido === 'acoso' ? 'bg-purple-100 text-purple-800 border-purple-300' :
+                                                            'bg-slate-100 text-slate-700 border-slate-200'
+                                                        }`}>
+                                                            Categoría: {com.categoria_contenido.replace('_', ' ')}
+                                                        </span>
+                                                    )}
+
+                                                    {com.nivel_confianza_ia != null && (
+                                                        <span className="text-[9px] font-mono text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">
+                                                            IA: {Math.round(com.nivel_confianza_ia * 100)}%
+                                                        </span>
+                                                    )}
+
+                                                    {com.requiere_revision_humana && (
+                                                        <span className="text-[9px] font-black uppercase text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-300 flex items-center gap-1">
+                                                            ⚠️ Requiere Revisión
+                                                        </span>
+                                                    )}
+
                                                     {com.likes_comentario > 0 && (
                                                         <span className="text-gray-500 font-mono text-[10px]">
                                                             👍 {com.likes_comentario} me gusta
@@ -2640,7 +2691,19 @@ export default function SocialMediaPage() {
                                                     "{com.texto_comentario}"
                                                 </div>
 
-                                                <div className="flex items-center justify-end gap-2 pt-1">
+                                                <div className="flex items-center justify-end gap-2 pt-1 flex-wrap">
+                                                    {com.url_comentario && (
+                                                        <a
+                                                            href={com.url_comentario}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-[10px] font-bold transition-colors border border-slate-300 inline-flex items-center gap-1"
+                                                        >
+                                                            <ExternalLink size={11} />
+                                                            <span>Ver Comentario</span>
+                                                        </a>
+                                                    )}
+
                                                     {com.post && (
                                                         <button
                                                             type="button"

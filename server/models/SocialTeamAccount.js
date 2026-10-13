@@ -60,6 +60,18 @@ const SocialTeamAccount = sequelize.define('SocialTeamAccount', {
         type: DataTypes.BOOLEAN,
         defaultValue: false
     },
+    consentimiento_vinculacion: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: true // Registro voluntario con consentimiento
+    },
+    fecha_consentimiento: {
+        type: DataTypes.DATE,
+        defaultValue: DataTypes.NOW
+    },
+    id_externo_usuario: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
     observaciones: {
         type: DataTypes.STRING,
         allowNull: true
