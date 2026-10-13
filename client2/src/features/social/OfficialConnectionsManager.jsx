@@ -3,7 +3,7 @@ import axios from 'axios';
 import {
     Radio, ShieldCheck, CheckCircle2, AlertTriangle, AlertCircle,
     RefreshCw, Key, Globe, Plus, Trash2, ExternalLink, Activity,
-    Sliders, Check, X, Info, Clock, ChevronRight
+    Sliders, Check, X, Info, Clock, ChevronRight, BookOpen, Download
 } from 'lucide-react';
 import { API } from '../../config/api';
 
@@ -81,6 +81,7 @@ export default function OfficialConnectionsManager({ campanaId, onAccountSynced 
     const [testingConnection, setTestingConnection] = useState(false);
     const [testResult, setTestResult] = useState(null);
     const [savingCreds, setSavingCreds] = useState(false);
+    const [modalInstructivo, setModalInstructivo] = useState(false);
 
     const loadAll = async () => {
         if (!campanaId) return;
@@ -245,6 +246,13 @@ export default function OfficialConnectionsManager({ campanaId, onAccountSynced 
                     >
                         <Key size={15} />
                         <span>Configurar Credenciales</span>
+                    </button>
+                    <button
+                        onClick={() => setModalInstructivo(true)}
+                        className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition"
+                    >
+                        <BookOpen size={15} />
+                        <span>📖 Instructivo de APIs</span>
                     </button>
                     <button
                         onClick={loadAll}
@@ -676,6 +684,164 @@ export default function OfficialConnectionsManager({ campanaId, onAccountSynced 
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal Instructivo Oficial de Conexión de APIs */}
+            {modalInstructivo && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
+                    <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+                        {/* Header del Modal */}
+                        <div className="p-6 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <span className="p-2.5 bg-emerald-500/20 text-emerald-400 rounded-2xl border border-emerald-500/30">
+                                    <BookOpen size={22} />
+                                </span>
+                                <div>
+                                    <h3 className="text-lg font-bold">Instructivo Oficial: Conexión de Redes por API</h3>
+                                    <p className="text-xs text-gray-300">
+                                        Guía técnica para vincular Meta, YouTube, X y TikTok con cero bloqueos de IP y datos 100% reales.
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <a
+                                    href="/INSTRUCTIVO_CONEXION_APIS_REDES.md"
+                                    download="INSTRUCTIVO_CONEXION_APIS_REDES.md"
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition"
+                                    title="Descargar archivo en Markdown"
+                                >
+                                    <Download size={14} />
+                                    <span>Descargar .MD</span>
+                                </a>
+                                <button
+                                    onClick={() => setModalInstructivo(false)}
+                                    className="p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded-xl transition"
+                                >
+                                    <X size={18} />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Contenido con Scroll */}
+                        <div className="p-6 overflow-y-auto space-y-6 text-sm text-gray-700">
+                            {/* Alerta de Seguridad y Blindaje */}
+                            <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-start gap-3">
+                                <ShieldCheck size={20} className="text-emerald-600 shrink-0 mt-0.5" />
+                                <div className="text-xs text-emerald-900 leading-relaxed">
+                                    <strong className="font-bold text-emerald-950">Garantía de Cero Bloqueos:</strong> Al utilizar las APIs oficiales, tu servidor (80.241.212.9) opera formalmente autorizado por Meta y Google. La extracción de publicaciones y comentarios reales se realiza por canales HTTPS seguros sin captchas ni restricciones de red.
+                                </div>
+                            </div>
+
+                            {/* Sección Meta (Instagram y Facebook) */}
+                            <div className="p-5 bg-gradient-to-br from-pink-50/40 via-purple-50/30 to-blue-50/40 border border-purple-200 rounded-3xl space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2 font-bold text-base text-gray-900">
+                                        <span>📸</span>
+                                        <span>Meta Graph API (Instagram Profesional & Página de Facebook)</span>
+                                    </div>
+                                    <a
+                                        href="https://developers.facebook.com/tools/explorer/"
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+                                    >
+                                        <span>Abrir Graph API Explorer</span>
+                                        <ExternalLink size={12} />
+                                    </a>
+                                </div>
+
+                                <div className="space-y-2 text-xs leading-relaxed text-gray-600">
+                                    <div className="bg-white/80 p-3 rounded-2xl border border-gray-100">
+                                        <p className="font-bold text-gray-800 mb-1">1. Requisito en Instagram del Candidato:</p>
+                                        <p>En el celular, en la app de Instagram de la campaña: Ir a <strong>Configuración</strong> &gt; <strong>Tipo de cuenta</strong> &gt; <strong>Cambiar a cuenta profesional</strong> (Creador o Figura Pública). Vincularla a la Página de Facebook oficial.</p>
+                                    </div>
+
+                                    <div className="bg-white/80 p-3 rounded-2xl border border-gray-100">
+                                        <p className="font-bold text-gray-800 mb-1">2. Generar el Token en Meta Developers:</p>
+                                        <p>Entrar a <a href="https://developers.facebook.com" target="_blank" rel="noreferrer" className="text-blue-600 underline font-semibold">developers.facebook.com</a> con el Facebook del administrador &gt; Crear App tipo <strong>Empresa / Negocio</strong> &gt; Ir a <strong>Herramientas &gt; Graph API Explorer</strong>.</p>
+                                        <p className="mt-1">Agregar permisos: <code className="bg-gray-100 px-1 py-0.5 rounded text-purple-700 font-mono">pages_read_engagement</code>, <code className="bg-gray-100 px-1 py-0.5 rounded text-purple-700 font-mono">instagram_basic</code>, <code className="bg-gray-100 px-1 py-0.5 rounded text-purple-700 font-mono">instagram_manage_comments</code> y <code className="bg-gray-100 px-1 py-0.5 rounded text-purple-700 font-mono">pages_show_list</code>. Presionar <strong>Generate Access Token</strong> y copiarlo.</p>
+                                    </div>
+
+                                    <div className="bg-white/80 p-3 rounded-2xl border border-gray-100">
+                                        <p className="font-bold text-gray-800 mb-1">3. Guardar en el Sistema:</p>
+                                        <p>Cerrar este instructivo, hacer clic en <strong>Configurar Credenciales</strong> en la tarjeta de Meta, pegar el Token y presionar <strong>Probar Conexión</strong>.</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Sección YouTube Data API v3 */}
+                            <div className="p-5 bg-red-50/40 border border-red-200 rounded-3xl space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2 font-bold text-base text-gray-900">
+                                        <span>▶️</span>
+                                        <span>Google Cloud (YouTube Data API v3 — 100% Gratuita)</span>
+                                    </div>
+                                    <a
+                                        href="https://console.cloud.google.com/apis/library/youtube.googleapis.com"
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="text-xs font-bold text-red-600 hover:text-red-800 flex items-center gap-1"
+                                    >
+                                        <span>Abrir Google Cloud Console</span>
+                                        <ExternalLink size={12} />
+                                    </a>
+                                </div>
+
+                                <div className="space-y-2 text-xs leading-relaxed text-gray-600">
+                                    <div className="bg-white/80 p-3 rounded-2xl border border-gray-100">
+                                        <p className="font-bold text-gray-800 mb-1">1. Habilitar la API:</p>
+                                        <p>En Google Cloud Console &gt; <strong>APIs y servicios</strong> &gt; <strong>Biblioteca</strong> &gt; Buscar <strong>YouTube Data API v3</strong> y presionar <strong>Habilitar</strong>.</p>
+                                    </div>
+                                    <div className="bg-white/80 p-3 rounded-2xl border border-gray-100">
+                                        <p className="font-bold text-gray-800 mb-1">2. Crear la Clave:</p>
+                                        <p>Ir a <strong>Credenciales</strong> &gt; <strong>+ Crear credenciales</strong> &gt; <strong>Clave de API (API Key)</strong>. Copiar la clave generada (inicia con <code className="bg-gray-100 px-1 py-0.5 rounded text-red-700 font-mono">AIzaSy...</code>).</p>
+                                    </div>
+                                    <div className="bg-white/80 p-3 rounded-2xl border border-gray-100">
+                                        <p className="font-bold text-gray-800 mb-1">3. Guardar en el Sistema:</p>
+                                        <p>En la tarjeta de YouTube, presionar <strong>Configurar Credenciales</strong>, pegar la API Key y hacer clic en <strong>Probar Conexión</strong>.</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Sección X (Twitter) */}
+                            <div className="p-5 bg-slate-50 border border-slate-200 rounded-3xl space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2 font-bold text-base text-gray-900">
+                                        <span>🐦</span>
+                                        <span>X / Twitter (X API v2)</span>
+                                    </div>
+                                    <a
+                                        href="https://developer.x.com/"
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="text-xs font-bold text-slate-700 hover:text-black flex items-center gap-1"
+                                    >
+                                        <span>Abrir X Developer Portal</span>
+                                        <ExternalLink size={12} />
+                                    </a>
+                                </div>
+                                <p className="text-xs text-gray-600">
+                                    Ingresar a <a href="https://developer.x.com" target="_blank" rel="noreferrer" className="text-blue-600 underline font-semibold">developer.x.com</a> con la cuenta de la campaña &gt; Crear un Proyecto y App &gt; Copiar el <strong>Bearer Token</strong> y guardarlo en la tarjeta de X en el sistema.
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Footer del Modal */}
+                        <div className="p-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
+                            <span className="text-xs text-gray-500 font-medium">
+                                Documento persistido en el servidor: <code className="bg-gray-200 px-1.5 py-0.5 rounded text-[11px]">/var/www/sistema-electoral/INSTRUCTIVO_CONEXION_APIS_REDES.md</code>
+                            </span>
+                            <button
+                                onClick={() => setModalInstructivo(false)}
+                                className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition"
+                            >
+                                Entendido, Cerrar
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
