@@ -59,7 +59,7 @@ async function runTests() {
     try {
         const res3 = await fetch(`${BASE_URL}/social/posts?campana_id=1`, { headers });
         const data3 = await res3.json();
-        const posts = data3.posts || [];
+        const posts = Array.isArray(data3) ? data3 : (data3.posts || []);
         console.log(` Total publicaciones reales en BD: ${posts.length}`);
         if (posts.length > 0) {
             const last = posts[0];
