@@ -5,9 +5,9 @@ const SocialMediaPost = require('../models/SocialMediaPost');
 
 (async () => {
     const User = require('../models/User');
-    const users = await User.findAll({ attributes: ['id', 'username', 'email', 'role', 'campana_id'] });
+    const users = await User.findAll({ attributes: ['id', 'nombre', 'email', 'role', 'campana_id'] });
     console.log('\n=== USUARIOS EN PRODUCCION ===');
-    users.forEach(u => console.log(`ID: ${u.id} | User: ${u.username} | Role: ${u.role} | Campaña: ${u.campana_id}`));
+    users.forEach(u => console.log(`ID: ${u.id} | Nombre: ${u.nombre} | Role: ${u.role} | Campaña: ${u.campana_id}`));
 
     const posts = await SocialMediaPost.findAll({ attributes: ['id', 'campana_id', 'autor_nombre', 'titulo'] });
     console.log('\nTotal posts:', posts.length);
