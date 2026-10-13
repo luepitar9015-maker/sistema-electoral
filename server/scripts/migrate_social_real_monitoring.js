@@ -34,6 +34,10 @@ async function migrateSocialRealMonitoring() {
             }
         }
 
+        const boolFalse = isPostgres ? 'BOOLEAN DEFAULT FALSE' : 'BOOLEAN DEFAULT 0';
+        const boolTrue = isPostgres ? 'BOOLEAN DEFAULT TRUE' : 'BOOLEAN DEFAULT 1';
+        const dateType = isPostgres ? 'TIMESTAMP' : 'DATETIME';
+
         // Columnas en SocialMediaPosts
         await addColumnIfNotExists('SocialMediaPosts', 'account_id', 'INTEGER');
         await addColumnIfNotExists('SocialMediaPosts', 'external_id', 'VARCHAR(255)');
@@ -49,9 +53,9 @@ async function migrateSocialRealMonitoring() {
         await addColumnIfNotExists('SocialPostComments', 'url_comentario', 'TEXT');
         await addColumnIfNotExists('SocialPostComments', 'categoria_contenido', "VARCHAR(50) DEFAULT 'general'");
         await addColumnIfNotExists('SocialPostComments', 'nivel_confianza_ia', 'FLOAT DEFAULT 1.0');
-        await addColumnIfNotExists('SocialPostComments', 'es_critica_legitima', 'BOOLEAN DEFAULT 0');
-        await addColumnIfNotExists('SocialPostComments', 'es_amenaza', 'BOOLEAN DEFAULT 0');
-        await addColumnIfNotExists('SocialPostComments', 'requiere_revision_humana', 'BOOLEAN DEFAULT 0');
+        await addColumnIfNotExists('SocialPostComments', 'es_critica_legitima', boolFalse);
+        await addColumnIfNotExists('SocialPostComments', 'es_amenaza', boolFalse);
+        await addColumnIfNotExists('SocialPostComments', 'requiere_revision_humana', boolFalse);
         await addColumnIfNotExists('SocialPostComments', 'estado_revision', "VARCHAR(50) DEFAULT 'pendiente'");
         await addColumnIfNotExists('SocialPostComments', 'revisado_por_user_id', 'INTEGER');
         await addColumnIfNotExists('SocialPostComments', 'notas_moderacion', 'TEXT');
@@ -61,12 +65,12 @@ async function migrateSocialRealMonitoring() {
         await addColumnIfNotExists('SocialTeamInteractions', 'tipo_verificacion', "VARCHAR(50) DEFAULT 'declarada'");
         await addColumnIfNotExists('SocialTeamInteractions', 'evidencia_url', 'TEXT');
         await addColumnIfNotExists('SocialTeamInteractions', 'external_interaction_id', 'VARCHAR(255)');
-        await addColumnIfNotExists('SocialTeamInteractions', 'api_verified_at', 'DATETIME');
+        await addColumnIfNotExists('SocialTeamInteractions', 'api_verified_at', dateType);
         await addColumnIfNotExists('SocialTeamInteractions', 'notas_verificacion', 'TEXT');
 
         // Columnas en SocialTeamAccounts
-        await addColumnIfNotExists('SocialTeamAccounts', 'consentimiento_vinculacion', 'BOOLEAN DEFAULT 1');
-        await addColumnIfNotExists('SocialTeamAccounts', 'fecha_consentimiento', 'DATETIME');
+        await addColumnIfNotExists('SocialTeamAccounts', 'consentimiento_vinculacion', boolTrue);
+        await addColumnIfNotExists('SocialTeamAccounts', 'fecha_consentimiento', dateType);
         await addColumnIfNotExists('SocialTeamAccounts', 'id_externo_usuario', 'VARCHAR(255)');
 
         // 3. Crear índices únicos para evitar duplicados en inserción concurrente
