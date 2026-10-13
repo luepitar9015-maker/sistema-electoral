@@ -91,12 +91,13 @@ class TikTokConnector extends BaseConnector {
 
     async fetchPosts({ account, credentials, limit = 20, cursor = null }) {
         if (!credentials?.available) {
-            const isVideoUrl = (account.url || '').includes('/video/') || (account.url || '').includes('tiktok.com');
+            const targetUrl = account.url_perfil || account.url || '';
+            const isVideoUrl = targetUrl.includes('/video/') || targetUrl.includes('tiktok.com');
             if (isVideoUrl) {
                 try {
-                    const oembedRes = await this.makeRequest(`https://www.tiktok.com/oembed?url=${encodeURIComponent(account.url)}`);
+                    const oembedRes = await this.makeRequest(`https://www.tiktok.com/oembed?url=${encodeURIComponent(targetUrl)}`);
                     const data = oembedRes.data;
-                    const videoIdMatch = (account.url || '').match(/\/video\/(\d+)/);
+                    const videoIdMatch = targetUrl.match(/\/video\/(\d+)/);
                     const extId = videoIdMatch ? videoIdMatch[1] : `tt_${Date.now()}`;
                     return {
                         posts: [{

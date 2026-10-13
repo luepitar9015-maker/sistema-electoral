@@ -115,7 +115,8 @@ class YouTubeConnector extends BaseConnector {
     async fetchPosts({ account, credentials, limit = 15, cursor = null }) {
         if (!credentials?.available) {
             // Si la URL de la cuenta corresponde a un video público directo o shorts, extraer vía oEmbed oficial
-            const videoMatch = (account.url || '').match(/(?:v=|\/shorts\/|youtu\.be\/)([a-zA-Z0-9_-]{11})/i);
+            const targetUrl = account.url_perfil || account.url || '';
+            const videoMatch = targetUrl.match(/(?:v=|\/shorts\/|youtu\.be\/)([a-zA-Z0-9_-]{11})/i);
             if (videoMatch) {
                 const vidId = videoMatch[1];
                 const videoUrl = `https://www.youtube.com/watch?v=${vidId}`;

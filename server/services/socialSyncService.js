@@ -206,7 +206,13 @@ async function syncAccountPostsAndComments({ accountId, campanaId, limit = 20, s
         iniciado_en: new Date()
     });
 
-    if (!credentials.available) {
+    const targetUrl = account.url_perfil || account.url || '';
+    const isPublicVideoUrl = !!(
+        (account.plataforma === 'youtube' && targetUrl.match(/(?:v=|\/shorts\/|youtu\.be\/)[a-zA-Z0-9_-]{11}/i)) ||
+        (account.plataforma === 'tiktok' && (targetUrl.includes('/video/') || targetUrl.includes('tiktok.com')))
+    );
+
+    if (!credentials.available && !isPublicVideoUrl) {
         account.sync_status = 'restricted';
         account.sync_status_detail = credentials.reason;
         await account.save();
