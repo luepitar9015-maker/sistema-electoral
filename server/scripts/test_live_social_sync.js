@@ -1,7 +1,8 @@
+const path = require('path');
 const jwt = require('jsonwebtoken');
-require('dotenv').config();
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 
-const JWT_SECRET = process.env.JWT_SECRET || 'secret';
+const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_electoral_jwt_2026_xyz';
 const BASE_URL = process.env.API_TEST_URL || 'http://127.0.0.1:5000/api';
 
 async function runTests() {
