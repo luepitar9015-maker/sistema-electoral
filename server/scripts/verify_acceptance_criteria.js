@@ -185,10 +185,17 @@ async function runAcceptanceTests() {
 
         // Test 6: Integridad de tablas electorales previas
         console.log('\n--- TEST 6: Integridad de Módulos Electorales Existentes ---');
-        const [tables] = await sequelize.query("SELECT name FROM sqlite_master WHERE type='table'");
-        const tableNames = tables.map(t => t.name);
+        const isPostgres = process.env.DB_DIALECT === 'postgres' || !!process.env.DATABASE_URL;
+        let tableNames = [];
+        if (isPostgres) {
+            const [tables] = await sequelize.query("SELECT table_name as name FROM information_schema.tables WHERE table_schema = 'public'");
+            tableNames = tables.map(t => t.name);
+        } else {
+            const [tables] = await sequelize.query("SELECT name FROM sqlite_master WHERE type='table'");
+            tableNames = tables.map(t => t.name);
+        }
         const requiredCoreTables = ['Voters', 'Campaigns', 'Users', 'ProyectosInversion', 'AuditLogs'];
-        const existingCore = requiredCoreTables.filter(t => tableNames.includes(t));
+        const existingCore = requiredCoreTables.filter(t => tableNames.map(n => n.toLowerCase()).includes(t.toLowerCase()));
         assert('Tablas electorales previas intactas y accesibles', existingCore.length > 0, `Tablas existentes encontradas: ${existingCore.join(', ')}`);
 
         console.log(`\n================================================================`);
