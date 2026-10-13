@@ -436,9 +436,15 @@ export default function SocialMediaPage() {
             }, authHeaders);
 
             await fetchAllData();
+
+            if (res.data?.success === false) {
+                alert(`⚠️ AVISO TÉCNICO DE LA PLATAFORMA:\n\n${res.data.technicalNotice || res.data.message || 'No se pudo sincronizar.'}\n\nNota: Para extraer listas completas de videos, comentarios y estadísticas de cuentas, configure la API Key o Token oficial en la pestaña "🔌 Conexiones Oficiales & Cuentas".`);
+                return;
+            }
+
             setActiveTab('feed');
             setSyncSuccessToast({
-                message: `¡Extracción completa! Se importaron ${res.data.postsCreated} publicaciones y ${res.data.commentsCreated} comentarios y reacciones de ${res.data.platform.toUpperCase()}. ${res.data.teamMatchedCount} interacciones corresponden a integrantes del equipo identificados.`,
+                message: `¡Extracción completada! Se procesaron ${res.data.postsCreated || 0} publicaciones y ${res.data.commentsFetched || res.data.commentsCreated || 0} comentarios de ${(res.data.platform || 'la red').toUpperCase()}. ${res.data.verifiedTeamInteractions || 0} interacciones verificadas del equipo.`,
                 platform: res.data.platform,
                 handle: res.data.handle
             });

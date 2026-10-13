@@ -114,6 +114,45 @@ class YouTubeConnector extends BaseConnector {
      */
     async fetchPosts({ account, credentials, limit = 15, cursor = null }) {
         if (!credentials?.available) {
+            // Si la URL de la cuenta corresponde a un video público directo o shorts, extraer vía oEmbed oficial
+            const videoMatch = (account.url || '').match(/(?:v=|\/shorts\/|youtu\.be\/)([a-zA-Z0-9_-]{11})/i);
+            if (videoMatch) {
+                const vidId = videoMatch[1];
+                const videoUrl = `https://www.youtube.com/watch?v=${vidId}`;
+                try {
+                    const oembedRes = await this.makeRequest(`https://www.youtube.com/oembed?url=${encodeURIComponent(videoUrl)}&format=json`);
+                    const data = oembedRes.data;
+                    return {
+                        posts: [{
+                            plataforma: 'youtube',
+                            external_id: vidId,
+                            titulo: data.title || 'Video de YouTube',
+                            contenido: `${data.title || 'Video'} — Publicado por ${data.author_name || 'Canal de YouTube'}`,
+                            url_publicacion: videoUrl,
+                            autor_nombre: data.author_name || 'YouTube Creator',
+                            autor_usuario: data.author_name ? '@' + data.author_name.toLowerCase().replace(/[^a-z0-9_]/g, '') : '@youtube',
+                            tipo_contenido: 'video',
+                            imagen_url: data.thumbnail_url || null,
+                            video_url: videoUrl,
+                            alcance: 0,
+                            impresiones: 0,
+                            reproducciones: 0,
+                            interacciones: 0,
+                            likes: 0,
+                            me_encanta: 0,
+                            me_enoja: 0,
+                            comentarios_conteo: 0,
+                            fecha_publicacion: new Date().toISOString(),
+                            raw_data: data
+                        }],
+                        hasMore: false,
+                        technicalNotice: 'Publicación extraída vía protocolo oEmbed oficial de YouTube. Para extraer la lista completa del canal y comentarios públicos, configure la API Key de Google Cloud en Conexiones Oficiales.'
+                    };
+                } catch (oeErr) {
+                    console.warn('Aviso oEmbed YouTube:', oeErr.message);
+                }
+            }
+
             return {
                 posts: [],
                 hasMore: false,

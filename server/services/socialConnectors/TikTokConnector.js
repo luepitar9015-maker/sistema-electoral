@@ -91,6 +91,44 @@ class TikTokConnector extends BaseConnector {
 
     async fetchPosts({ account, credentials, limit = 20, cursor = null }) {
         if (!credentials?.available) {
+            const isVideoUrl = (account.url || '').includes('/video/') || (account.url || '').includes('tiktok.com');
+            if (isVideoUrl) {
+                try {
+                    const oembedRes = await this.makeRequest(`https://www.tiktok.com/oembed?url=${encodeURIComponent(account.url)}`);
+                    const data = oembedRes.data;
+                    const videoIdMatch = (account.url || '').match(/\/video\/(\d+)/);
+                    const extId = videoIdMatch ? videoIdMatch[1] : `tt_${Date.now()}`;
+                    return {
+                        posts: [{
+                            plataforma: 'tiktok',
+                            external_id: extId,
+                            titulo: data.title || 'Video de TikTok',
+                            contenido: data.title || 'Video de TikTok',
+                            url_publicacion: account.url,
+                            autor_nombre: data.author_name || 'TikTok Creator',
+                            autor_usuario: data.author_unique_id ? `@${data.author_unique_id}` : (data.author_name ? `@${data.author_name}` : '@tiktok'),
+                            tipo_contenido: 'video',
+                            imagen_url: data.thumbnail_url || null,
+                            video_url: account.url,
+                            alcance: 0,
+                            impresiones: 0,
+                            reproducciones: 0,
+                            interacciones: 0,
+                            likes: 0,
+                            me_encanta: 0,
+                            me_enoja: 0,
+                            comentarios_conteo: 0,
+                            fecha_publicacion: new Date().toISOString(),
+                            raw_data: data
+                        }],
+                        hasMore: false,
+                        technicalNotice: 'Video extraído vía protocolo oEmbed oficial de TikTok. Para métricas avanzadas y cuentas administradas, vincule la cuenta en Conexiones Oficiales.'
+                    };
+                } catch (oeErr) {
+                    console.warn('Aviso oEmbed TikTok:', oeErr.message);
+                }
+            }
+
             return { posts: [], hasMore: false, technicalNotice: credentials.reason };
         }
 
