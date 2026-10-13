@@ -64,6 +64,22 @@ async function testLiveSocialApi() {
         const jobsList = Array.isArray(jData) ? jData : (jData.jobs || []);
         console.log(`   ✓ Registros de ejecución de sincronización: ${jobsList.length}\n`);
 
+        // 7. Probar sincronización de publicación pública por URL (oEmbed oficial)
+        console.log('7. Probando sincronización de link público (POST /api/social/sync-profile con video de YouTube)...');
+        const syncRes = await fetch(`${baseUrl}/social/sync-profile`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', campana_id: 1 })
+        });
+        const syncData = await syncRes.json();
+        console.log('   ✓ Respuesta del endpoint de sincronización pública:', {
+            success: syncData.success,
+            platform: syncData.platform,
+            postsCreated: syncData.postsCreated,
+            technicalNotice: syncData.technicalNotice
+        });
+        console.log('');
+
         console.log('=====================================================================');
         console.log('   ✅ TODOS LOS ENDPOINTS DE REDES SOCIALES RESPONDEN CORRECTAMENTE');
         console.log('=====================================================================\n');
