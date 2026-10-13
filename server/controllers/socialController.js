@@ -19,15 +19,24 @@ const SocialSyncError = require('../models/SocialSyncError');
 const SocialAuditLog = require('../models/SocialAuditLog');
 const { getConnector, getAllConnectors } = require('../services/socialConnectors');
 
+function resolveCampanaId(req) {
+    const raw = req.query?.campana_id || req.body?.campana_id || req.campana_id || req.user?.campana_id;
+    if (!raw) return null;
+    const parsed = parseInt(raw, 10);
+    return isNaN(parsed) ? null : parsed;
+}
+
 /**
  * Métricas generales y KPIs de redes sociales
  * Basado 100% en publicaciones y comentarios reales sincronizados
  */
 exports.getDashboardMetrics = async (req, res) => {
     try {
-        const { campana_id } = req.query;
-        const where = {};
-        if (campana_id) where.campana_id = parseInt(campana_id, 10);
+        const activeCampanaId = resolveCampanaId(req);
+        if (!activeCampanaId) {
+            return res.status(400).json({ success: false, message: 'Se requiere campana_id válido para consultar métricas' });
+        }
+        const where = { campana_id: activeCampanaId };
 
         const posts = await SocialMediaPost.findAll({ where });
         const teamAccounts = await SocialTeamAccount.findAll({ where });
@@ -158,9 +167,12 @@ exports.getDashboardMetrics = async (req, res) => {
  */
 exports.getPosts = async (req, res) => {
     try {
-        const { campana_id, plataforma, en_vivo, search } = req.query;
-        const where = {};
-        if (campana_id) where.campana_id = parseInt(campana_id, 10);
+        const activeCampanaId = resolveCampanaId(req);
+        if (!activeCampanaId) {
+            return res.status(400).json({ success: false, message: 'Se requiere campana_id válido para consultar publicaciones' });
+        }
+        const { plataforma, en_vivo, search } = req.query;
+        const where = { campana_id: activeCampanaId };
         if (plataforma && plataforma !== 'todas') where.plataforma = plataforma;
         if (en_vivo === 'true') where.en_vivo = true;
 
@@ -172,7 +184,7 @@ exports.getPosts = async (req, res) => {
         // Cargar todos los comentarios de estos posts para coincidencia 100% matemática
         const postIds = posts.map(p => p.id);
         const allComments = postIds.length > 0 ? await SocialPostComment.findAll({
-            where: { post_id: postIds }
+            where: { post_id: postIds, campana_id: activeCampanaId }
         }) : [];
 
         const commentsByPost = {};
@@ -181,8 +193,10 @@ exports.getPosts = async (req, res) => {
             commentsByPost[c.post_id].push(c);
         });
 
-        // Cargar interacciones del equipo para cada post
-        const allInteractions = await SocialTeamInteraction.findAll();
+        // Cargar interacciones del equipo para cada post estrictamente de la campaña activa
+        const allInteractions = postIds.length > 0 ? await SocialTeamInteraction.findAll({
+            where: { post_id: postIds, campana_id: activeCampanaId }
+        }) : [];
         const interactionsByPost = {};
         allInteractions.forEach(it => {
             if (!interactionsByPost[it.post_id]) interactionsByPost[it.post_id] = [];
@@ -325,9 +339,12 @@ exports.trackPostClick = async (req, res) => {
  */
 exports.getTeamAccounts = async (req, res) => {
     try {
-        const { campana_id, plataforma, nivel_participacion, search } = req.query;
-        const where = {};
-        if (campana_id) where.campana_id = parseInt(campana_id, 10);
+        const activeCampanaId = resolveCampanaId(req);
+        if (!activeCampanaId) {
+            return res.status(400).json({ success: false, message: 'Se requiere campana_id válido para cuentas del equipo' });
+        }
+        const { plataforma, nivel_participacion, search } = req.query;
+        const where = { campana_id: activeCampanaId };
         if (plataforma && plataforma !== 'todas') where.plataforma = plataforma;
         if (nivel_participacion && nivel_participacion !== 'todos') where.nivel_participacion = nivel_participacion;
 
@@ -410,9 +427,12 @@ exports.deleteTeamAccount = async (req, res) => {
  */
 exports.getNegativeComments = async (req, res) => {
     try {
-        const { campana_id, nivel_riesgo, estado_gestion, plataforma, search } = req.query;
-        const where = {};
-        if (campana_id) where.campana_id = parseInt(campana_id, 10);
+        const activeCampanaId = resolveCampanaId(req);
+        if (!activeCampanaId) {
+            return res.status(400).json({ success: false, message: 'Se requiere campana_id válido para comentarios negativos' });
+        }
+        const { nivel_riesgo, estado_gestion, plataforma, search } = req.query;
+        const where = { campana_id: activeCampanaId };
         if (nivel_riesgo && nivel_riesgo !== 'todos') where.nivel_riesgo = nivel_riesgo;
         if (estado_gestion && estado_gestion !== 'todos') where.estado_gestion = estado_gestion;
         if (plataforma && plataforma !== 'todas') where.plataforma = plataforma;
@@ -478,9 +498,12 @@ exports.deleteNegativeComment = async (req, res) => {
  */
 exports.getCompetitors = async (req, res) => {
     try {
-        const { campana_id, nivel_amenaza, search } = req.query;
-        const where = {};
-        if (campana_id) where.campana_id = parseInt(campana_id, 10);
+        const activeCampanaId = resolveCampanaId(req);
+        if (!activeCampanaId) {
+            return res.status(400).json({ success: false, message: 'Se requiere campana_id válido para contrincantes' });
+        }
+        const { nivel_amenaza, search } = req.query;
+        const where = { campana_id: activeCampanaId };
         if (nivel_amenaza && nivel_amenaza !== 'todos') where.nivel_amenaza = nivel_amenaza;
 
         const competitors = await SocialCompetitor.findAll({
@@ -588,9 +611,12 @@ exports.deleteCompetitor = async (req, res) => {
 
 exports.getCompetitorAttacks = async (req, res) => {
     try {
-        const { campana_id, competitor_id, blanco_ataque, nivel_amenaza, estado, search } = req.query;
-        const where = {};
-        if (campana_id) where.campana_id = parseInt(campana_id, 10);
+        const activeCampanaId = resolveCampanaId(req);
+        if (!activeCampanaId) {
+            return res.status(400).json({ success: false, message: 'Se requiere campana_id válido para ataques' });
+        }
+        const { competitor_id, blanco_ataque, nivel_amenaza, estado, search } = req.query;
+        const where = { campana_id: activeCampanaId };
         if (competitor_id && competitor_id !== 'todos') where.competitor_id = parseInt(competitor_id, 10);
         if (blanco_ataque && blanco_ataque !== 'todos') where.blanco_ataque = blanco_ataque;
         if (nivel_amenaza && nivel_amenaza !== 'todos') where.nivel_amenaza = nivel_amenaza;
@@ -1133,9 +1159,11 @@ exports.chatWithViralAdvisor = async (req, res) => {
  */
 exports.getLiveStreamMonitor = async (req, res) => {
     try {
-        const { campana_id } = req.query;
-        const where = { en_vivo: true };
-        if (campana_id) where.campana_id = parseInt(campana_id, 10);
+        const activeCampanaId = resolveCampanaId(req);
+        if (!activeCampanaId) {
+            return res.status(400).json({ success: false, message: 'Se requiere campana_id válido para monitor en vivo' });
+        }
+        const where = { en_vivo: true, campana_id: activeCampanaId };
 
         const livePosts = await SocialMediaPost.findAll({
             where,
@@ -1395,9 +1423,12 @@ exports.replyToComment = async (req, res) => {
  */
 exports.getAllComments = async (req, res) => {
     try {
-        const { campana_id, post_id, sentimiento, categoria_contenido, estado_revision, es_equipo_campana, plataforma, search } = req.query;
-        const where = {};
-        if (campana_id) where.campana_id = parseInt(campana_id, 10);
+        const activeCampanaId = resolveCampanaId(req);
+        if (!activeCampanaId) {
+            return res.status(400).json({ success: false, message: 'Se requiere campana_id válido para consultar comentarios' });
+        }
+        const { post_id, sentimiento, categoria_contenido, estado_revision, es_equipo_campana, plataforma, search } = req.query;
+        const where = { campana_id: activeCampanaId };
         if (post_id) where.post_id = parseInt(post_id, 10);
         if (sentimiento && sentimiento !== 'todos') where.sentimiento = sentimiento;
         if (categoria_contenido && categoria_contenido !== 'todos') where.categoria_contenido = categoria_contenido;
@@ -1635,9 +1666,12 @@ exports.exportSocialExcel = async (req, res) => {
  */
 exports.getAccounts = async (req, res) => {
     try {
-        const { campana_id, plataforma, tipo_cuenta } = req.query;
-        const where = {};
-        if (campana_id) where.campana_id = parseInt(campana_id, 10);
+        const activeCampanaId = resolveCampanaId(req);
+        if (!activeCampanaId) {
+            return res.status(400).json({ success: false, message: 'Se requiere campana_id válido para consultar cuentas' });
+        }
+        const { plataforma, tipo_cuenta } = req.query;
+        const where = { campana_id: activeCampanaId };
         if (plataforma && plataforma !== 'todas') where.plataforma = plataforma;
         if (tipo_cuenta && tipo_cuenta !== 'todas') where.tipo_cuenta = tipo_cuenta;
 
@@ -1748,9 +1782,11 @@ exports.syncAccount = async (req, res) => {
  */
 exports.getConnections = async (req, res) => {
     try {
-        const { campana_id } = req.query;
-        const where = {};
-        if (campana_id) where.campana_id = parseInt(campana_id, 10);
+        const activeCampanaId = resolveCampanaId(req);
+        if (!activeCampanaId) {
+            return res.status(400).json({ success: false, message: 'Se requiere campana_id válido para conexiones' });
+        }
+        const where = { campana_id: activeCampanaId };
 
         const connections = await SocialConnection.findAll({ where });
 
@@ -1863,9 +1899,12 @@ exports.testConnection = async (req, res) => {
  */
 exports.getContentAlerts = async (req, res) => {
     try {
-        const { campana_id, estado, nivel_severidad, tipo_alerta, plataforma } = req.query;
-        const where = {};
-        if (campana_id) where.campana_id = parseInt(campana_id, 10);
+        const activeCampanaId = resolveCampanaId(req);
+        if (!activeCampanaId) {
+            return res.status(400).json({ success: false, message: 'Se requiere campana_id válido para alertas' });
+        }
+        const { estado, nivel_severidad, tipo_alerta, plataforma } = req.query;
+        const where = { campana_id: activeCampanaId };
         if (estado && estado !== 'todos') where.estado = estado;
         if (nivel_severidad && nivel_severidad !== 'todos') where.nivel_severidad = nivel_severidad;
         if (tipo_alerta && tipo_alerta !== 'todos') where.tipo_alerta = tipo_alerta;
@@ -1963,9 +2002,12 @@ exports.reviewComment = async (req, res) => {
  */
 exports.getSyncJobs = async (req, res) => {
     try {
-        const { campana_id, limit = 20 } = req.query;
-        const where = {};
-        if (campana_id) where.campana_id = parseInt(campana_id, 10);
+        const activeCampanaId = resolveCampanaId(req);
+        if (!activeCampanaId) {
+            return res.status(400).json({ success: false, message: 'Se requiere campana_id válido para historial' });
+        }
+        const { limit = 20 } = req.query;
+        const where = { campana_id: activeCampanaId };
 
         const jobs = await SocialSyncJob.findAll({
             where,

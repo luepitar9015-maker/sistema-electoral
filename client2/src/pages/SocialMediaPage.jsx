@@ -220,10 +220,11 @@ export default function SocialMediaPage() {
 
     // Cargar métricas y datos
     const fetchAllData = async () => {
+        const campId = activeCampaign?.id || campaigns?.[0]?.id;
+        if (!campId) return;
         setLoading(true);
         try {
-            const campId = activeCampaign?.id || campaigns?.[0]?.id;
-            const params = campId ? { campana_id: campId } : {};
+            const params = { campana_id: campId };
 
             const [mRes, pRes, tRes, cRes, compRes, uRes, lRes, allComRes] = await Promise.all([
                 axios.get(`${API}/social/metrics`, { ...authHeaders, params }),
@@ -237,10 +238,10 @@ export default function SocialMediaPage() {
             ]);
 
             setMetrics(mRes.data);
-            setPosts(pRes.data);
-            setTeamAccounts(tRes.data);
-            setNegativeComments(cRes.data);
-            setCompetitors(compRes.data);
+            setPosts(pRes.data || []);
+            setTeamAccounts(tRes.data || []);
+            setNegativeComments(cRes.data || []);
+            setCompetitors(compRes.data || []);
             setTeamUsers(uRes.data || []);
             setLiveMonitorData(lRes.data || { livePosts: [], resumen: {}, comentariosEnVivo: [] });
             setSurveillanceComments(allComRes?.data?.comments || []);
@@ -253,8 +254,16 @@ export default function SocialMediaPage() {
     };
 
     useEffect(() => {
-        if (activeCampaign?.id || (campaigns && campaigns.length > 0)) {
+        if (activeCampaign?.id) {
+            // Limpiar datos visuales anteriores inmediatamente para evitar mezclas entre candidatos
+            setPosts([]);
+            setSurveillanceComments([]);
+            setTeamAccounts([]);
+            setNegativeComments([]);
+            setCompetitors([]);
             fetchAllData();
+        } else if (campaigns && campaigns.length > 0 && !activeCampaign) {
+            setActiveCampaign(campaigns[0]);
         }
     }, [activeCampaign?.id, campaigns?.length]);
 
@@ -291,8 +300,9 @@ export default function SocialMediaPage() {
         try {
             await axios.post(`${API}/social/posts/${selectedPostForAudit.id}/interactions`, auditForm, authHeaders);
             await fetchAllData();
-            // Refrescar el post seleccionado
-            const updated = await axios.get(`${API}/social/posts`, authHeaders);
+            // Refrescar el post seleccionado con filtro de campana_id
+            const campId = activeCampaign?.id || campaigns?.[0]?.id;
+            const updated = await axios.get(`${API}/social/posts`, { ...authHeaders, params: { campana_id: campId } });
             const match = updated.data.find(p => p.id === selectedPostForAudit.id);
             if (match) setSelectedPostForAudit(match);
             alert('¡Interacción del miembro del equipo registrada exitosamente!');
@@ -313,7 +323,8 @@ export default function SocialMediaPage() {
             await axios.delete(`${API}/social/interactions/${interactionId}`, authHeaders);
             await fetchAllData();
             if (selectedPostForAudit) {
-                const updated = await axios.get(`${API}/social/posts`, authHeaders);
+                const campId = activeCampaign?.id || campaigns?.[0]?.id;
+                const updated = await axios.get(`${API}/social/posts`, { ...authHeaders, params: { campana_id: campId } });
                 const match = updated.data.find(p => p.id === selectedPostForAudit.id);
                 if (match) setSelectedPostForAudit(match);
             }
@@ -333,7 +344,8 @@ export default function SocialMediaPage() {
             }, authHeaders);
             await fetchAllData();
             if (selectedPostForAudit) {
-                const updated = await axios.get(`${API}/social/posts`, authHeaders);
+                const campId = activeCampaign?.id || campaigns?.[0]?.id;
+                const updated = await axios.get(`${API}/social/posts`, { ...authHeaders, params: { campana_id: campId } });
                 const match = updated.data.find(p => p.id === selectedPostForAudit.id);
                 if (match) setSelectedPostForAudit(match);
             }
@@ -699,9 +711,12 @@ export default function SocialMediaPage() {
         window.open(`${API}/social/export/excel?campana_id=${campId}&token=${token}`, '_blank');
     };
 
-    // Filtros de posts
+    // Filtros de posts con aislamiento estricto por campaña
     const filteredPosts = useMemo(() => {
         return posts.filter(p => {
+            if (activeCampaign?.id && p.campana_id && parseInt(p.campana_id, 10) !== parseInt(activeCampaign.id, 10)) {
+                return false;
+            }
             const matchesPlat = filterPlataforma === 'todas' || p.plataforma === filterPlataforma;
             const matchesSearch = !searchTerm || (
                 (p.titulo && p.titulo.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -711,11 +726,14 @@ export default function SocialMediaPage() {
             );
             return matchesPlat && matchesSearch;
         });
-    }, [posts, filterPlataforma, searchTerm]);
+    }, [posts, filterPlataforma, searchTerm, activeCampaign?.id]);
 
-    // Filtros de vigilancia de comentarios y reacciones
+    // Filtros de vigilancia de comentarios y reacciones con aislamiento estricto
     const filteredSurveillanceComments = useMemo(() => {
         return surveillanceComments.filter(c => {
+            if (activeCampaign?.id && c.campana_id && parseInt(c.campana_id, 10) !== parseInt(activeCampaign.id, 10)) {
+                return false;
+            }
             if (vigilanciaFilter === 'equipo' && !c.es_equipo_campana) return false;
             if (vigilanciaFilter === 'ciudadanos' && c.es_equipo_campana) return false;
             if (vigilanciaFilter === 'preguntas' && c.tipo_reaccion !== 'pregunta') return false;
@@ -733,7 +751,7 @@ export default function SocialMediaPage() {
             }
             return true;
         });
-    }, [surveillanceComments, vigilanciaFilter, vigilanciaPlataforma, vigilanciaSearch]);
+    }, [surveillanceComments, vigilanciaFilter, vigilanciaPlataforma, vigilanciaSearch, activeCampaign?.id]);
 
     return (
         <div className="max-w-7xl mx-auto space-y-6 pb-12">
